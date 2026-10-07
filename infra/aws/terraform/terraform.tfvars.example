@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and adjust. Everything has a default; the minimum
+# useful change is the region.
+
+region      = "us-east-1"
+environment = "prod"
+
+# HTTPS (recommended). Request a certificate in ACM for your domain first.
+# domain_name     = "app.example.com"
+# certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
+
+auth_provider = "local" # or "supabase" (set SUPABASE_URL / SUPABASE_ANON_KEY in the app secret)
+llm_provider  = "gemini" # or "anthropic" / "none"; the key goes in the app secret
+
+# Cheapest sizes by default. For a throwaway test environment:
+# protect_data = false   # allows `terraform destroy` to delete the database and bucket

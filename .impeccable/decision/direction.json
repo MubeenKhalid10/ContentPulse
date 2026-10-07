@@ -1,0 +1,126 @@
+{
+  "title": "Choose the visual world for ContentPulse",
+  "question": "The roll assigned the Contact Sheet. Keep it, take an alternate, or re-roll. It will cover the new landing page and the whole app.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Contact Sheet",
+      "kicker": "THE ROLL",
+      "lineage": "a photo editor's contact sheet, marked up in china marker",
+      "thesis": "Every trend is a frame on the sheet; the client's fit is the grease-pencil circle around the selects.",
+      "palette": ["#111110", "#F6F6F2", "#E2342A", "#F2C12E", "#8C8C86"],
+      "materials": ["RC photo paper", "film rebate with frame numbers", "red and yellow china marker", "a loupe"],
+      "viewport": "Landing: today's trends printed as a 36-frame contact sheet with edge numbers; red circles land on the three frames that fit an example agency client, a loupe lifts one select into its finished LinkedIn post, and Start free sits in the sheet's margin.",
+      "risk": "Could read as a photography tool if frames show pictures; every frame must carry a headline, a score and a source.",
+      "raised": [
+        {"from": "challenger-oscilloscope", "raise": "Every frame's fit score is measured on one visible 0-100 scale printed along the film edge, never eyeballed."},
+        {"from": "challenger-exposure-record", "raise": "All neutrals come from one fixed tonal ramp of paper-to-film steps; no stray greys anywhere in the app."},
+        {"from": "challenger-cyclorama", "raise": "Every status is a named mark (circle, cross, star, OK stamp) with a word, never colour alone."},
+        {"from": "challenger-seed-packet", "raise": "Each trend frame leads with the post it could become, and turns over to show its sources."}
+      ],
+      "hero": null
+    },
+    {
+      "id": "model-pick",
+      "label": "The Wire Desk",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "a newsroom wire desk: teleprinter copy, slug lines and priority flags",
+      "thesis": "Trends arrive as wire copy; the desk spikes what doesn't fit and runs what does.",
+      "palette": ["#EDEBE4", "#161616", "#D62718", "#1F3F8F"],
+      "materials": ["newsprint", "teleprinter tape", "slug lines", "URGENT and FLASH flags"],
+      "viewport": "Landing: a live wire scrolling down the left with URGENT slugs on items that fit the client; the chosen item is set in type as a finished post on the right, with Start free in the masthead.",
+      "risk": "Newsroom looks are common for content tools; this is the familiar choice."
+    },
+    {
+      "id": "challenger-oscilloscope",
+      "label": "Signal Bench",
+      "verdict": "declined",
+      "lineage": "a CRT oscilloscope on a signal bench",
+      "thesis": "Trends as signals; the relevance threshold is the trigger level.",
+      "palette": ["#0A0D0A", "#39FF6A", "#F2A53A"],
+      "materials": ["phosphor glass", "etched graticule", "detented knobs"],
+      "viewport": "A phosphor trace with the client's trigger level locking relevant signals still.",
+      "case": "Fuses poorly: agency marketers don't recognise a lab bench, and signal-versus-noise needs explaining.",
+      "kept": "One measured scale for every score.",
+      "risk": "Reads as an engineering tool to a marketing audience.",
+      "hero": "https://impeccable.style/worlds/cards/scientific-notation-oscilloscope-signal-bench-hero.webp"
+    },
+    {
+      "id": "challenger-exposure-record",
+      "label": "Exposure Record",
+      "verdict": "declined",
+      "lineage": "a darkroom printer's exposure record with zone sheets",
+      "thesis": "Overlapping sheets where hatch density shows load and conflict.",
+      "palette": ["#F4F4F2", "#2B2B2B", "#C2187A"],
+      "materials": ["tracing-paper overlays", "zone ramp", "cross-hatching"],
+      "viewport": "Translucent sheets over a backlit zone ramp, hatched by score.",
+      "case": "Fuses poorly: hatching and stop-deltas hide the simple trend-to-post story.",
+      "kept": "A strict tonal ramp as the only neutrals.",
+      "risk": "Too abstract for a first-time visitor."
+    },
+    {
+      "id": "challenger-cyclorama",
+      "label": "Cyclorama Dawn",
+      "verdict": "declined",
+      "lineage": "theatre lighting on a cyclorama, night to day",
+      "thesis": "A trend's life as light rising from night to day.",
+      "palette": ["#05060A", "#1E3FA8", "#E8829B", "#FFFFFF"],
+      "materials": ["stage light", "cue timeline"],
+      "viewport": "A horizon band rising from black as a trend gains fit.",
+      "case": "Fuses poorly: atmosphere carries the mood, not the workflow.",
+      "kept": "Named states that never rely on colour alone.",
+      "risk": "Beautiful but vague about what the product does."
+    },
+    {
+      "id": "challenger-seed-packet",
+      "label": "Seed Packet Rack",
+      "verdict": "declined",
+      "lineage": "a hardware-store seed packet rack",
+      "thesis": "Each item shows its promise on the front and instructions on the back.",
+      "palette": ["#C7372F", "#5E8C3A", "#EFE6D2", "#8A8F93"],
+      "materials": ["gouache packets", "almanac type", "galvanised rack"],
+      "viewport": "A rack of trend packets ranked by season, each flipping to its plan.",
+      "case": "Fuses poorly: agencies don't identify with gardening, though promise-then-instructions fits.",
+      "kept": "Lead with the post each trend could become.",
+      "risk": "Charming but off-audience."
+    },
+    {
+      "id": "challenger-akari",
+      "label": "Akari Workshop",
+      "verdict": "declined",
+      "lineage": "washi paper lamps over bamboo ribs",
+      "thesis": "Active items glow; dismissed ones fold flat.",
+      "palette": ["#F3EAD3", "#B89B6A", "#2A2A2A", "#D2412C"],
+      "materials": ["washi", "bamboo ribs"],
+      "viewport": "Glowing paper volumes for the trends that fit.",
+      "case": "Fuses poorly: no link to agency work or to trends.",
+      "kept": "A clear lit versus folded-away state.",
+      "risk": "Off-subject and soft."
+    },
+    {
+      "id": "challenger-chaekgeori",
+      "label": "Chaekgeori Shelves",
+      "verdict": "declined",
+      "lineage": "Korean reverse-perspective bookshelf screens",
+      "thesis": "Shelves that open toward the viewer as you go deeper.",
+      "palette": ["#3E7B6B", "#B5322A", "#EDE6D8"],
+      "materials": ["mineral pigment on silk"],
+      "viewport": "A cabinet of trend boxes widening toward you.",
+      "case": "Fuses poorly: the spatial trick obscures the task.",
+      "kept": "Whole-box reflow on small screens.",
+      "risk": "Hard to read at a glance."
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code" },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A modern SaaS landing page and app, executed impeccably.",
+    "palette": ["#FFFFFF", "#0F172A", "#0F766E"],
+    "materials": ["clean grid", "product screenshots"],
+    "viewport": "Headline, sub-copy, sign-up button and a product screenshot, then feature sections.",
+    "risk": "Indistinguishable from other content tools by design."
+  },
+  "steer": true
+}

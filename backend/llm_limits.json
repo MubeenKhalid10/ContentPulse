@@ -1,0 +1,112 @@
+{
+  "_about": "Published limits per provider and model, used by the LLM gateway (docs/llm-gateway.md). Keys: 'provider/model' (exact), 'provider/*' (any model of that provider), 'provider' (shared by all of the provider's models, e.g. one API key), '*' (anything else). Fields, all optional: rpm, tpm (per minute), rph, tph (per hour), rpd, tpd (per day), concurrency, max_output_tokens, reset_timezone. The gateway runs at LLM_RATE_LIMIT_SAFETY_FACTOR (default 0.8) of rpm/tpm/rpd/tpd. Values below are entry/free-tier figures: change them to your account's tier, or override single entries with LLM_LIMITS.",
+  "_measured": "Groq and Cerebras entries were read from the providers' x-ratelimit-* response headers on 2026-10-06 (free tier). Gemini embedding entries use Google's published free-tier figures.",
+  "gemini/*": {
+    "rpm": 10,
+    "tpm": 250000,
+    "rpd": 250,
+    "concurrency": 2,
+    "reset_timezone": "America/Los_Angeles"
+  },
+  "gemini/gemini-3.1-flash-lite": {
+    "rpm": 15,
+    "tpm": 250000,
+    "rpd": 500,
+    "concurrency": 2,
+    "reset_timezone": "America/Los_Angeles"
+  },
+  "gemini": {
+    "concurrency": 3
+  },
+  "gemini/gemini-embedding-2": {
+    "rpm": 100,
+    "tpm": 30000,
+    "rpd": 1000,
+    "concurrency": 2,
+    "reset_timezone": "America/Los_Angeles"
+  },
+  "gemini/gemini-embedding-001": {
+    "rpm": 100,
+    "tpm": 30000,
+    "rpd": 1000,
+    "concurrency": 2,
+    "reset_timezone": "America/Los_Angeles"
+  },
+  "gemini/gemini-2.5-flash-image": {
+    "rpm": 10,
+    "rpd": 100,
+    "concurrency": 1,
+    "reset_timezone": "America/Los_Angeles"
+  },
+  "gemini/gemini-3.1-flash-image": {
+    "rpm": 10,
+    "rpd": 100,
+    "concurrency": 1,
+    "reset_timezone": "America/Los_Angeles"
+  },
+  "anthropic/*": {
+    "rpm": 50,
+    "concurrency": 4
+  },
+  "openai/*": {
+    "rpm": 500,
+    "concurrency": 5
+  },
+  "openai/gpt-image-1": {
+    "rpm": 5,
+    "concurrency": 1
+  },
+  "groq/*": {
+    "rpm": 30,
+    "tpm": 8000,
+    "rpd": 1000,
+    "concurrency": 2,
+    "max_output_tokens": 4000
+  },
+  "cerebras/*": {
+    "rpm": 5,
+    "rph": 150,
+    "rpd": 2400,
+    "tpm": 30000,
+    "tph": 1000000,
+    "tpd": 1000000,
+    "concurrency": 2
+  },
+  "cerebras/gpt-oss-120b": {
+    "rpm": 5,
+    "rph": 150,
+    "rpd": 2400,
+    "tpm": 30000,
+    "tph": 1000000,
+    "tpd": 1000000,
+    "concurrency": 2
+  },
+  "cerebras/qwen-3.8-27b": {
+    "rpm": 450,
+    "rph": 27000,
+    "rpd": 648000,
+    "tpm": 150000,
+    "tph": 9000000,
+    "tpd": 216000000,
+    "concurrency": 4
+  },
+  "openrouter/*": {
+    "rpm": 20,
+    "concurrency": 3
+  },
+  "cloudflare/*": {
+    "_note": "Daily image cap per model: keeps the free 10k-neuron allowance from being used up by one busy day.",
+    "rpm": 60,
+    "rpd": 25,
+    "concurrency": 2
+  },
+  "kie/*": {
+    "_note": "Daily image cap per model: Kie charges credits per image. Raise rpd (or override with LLM_LIMITS) to allow more.",
+    "rpm": 20,
+    "rpd": 50,
+    "concurrency": 2
+  },
+  "*": {
+    "concurrency": 3
+  }
+}

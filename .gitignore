@@ -1,0 +1,52 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local creative storage (when S3_BUCKET is not set)
+backend/storage/
+
+# Terraform working files (keep .terraform.lock.hcl)
+.terraform/
+*.tfstate
+*.tfstate.*
+infra/aws/terraform/terraform.tfvars
+
+# Test output
+test-results/
+playwright-report/
+blob-report/
+.coverage
+htmlcov/
+
+# Celery beat state
+celerybeat-schedule*
+
+# Impeccable: transient decision-page state (keep surfaces/, decision/, design.json)
+.impeccable/questions/
+
+# Scratch scripts
+*.tmp.py
+.impeccable/review/

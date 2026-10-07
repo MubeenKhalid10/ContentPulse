@@ -1,0 +1,119 @@
+name: contentpulse
+
+# Local development (what you use day to day):
+#   docker compose up -d                 -> Postgres + pgvector, Redis only.
+#   Run the API and web app yourself (README "Quick start").
+#
+# Production-like stack, all in containers (optional, mirrors AWS):
+#   docker compose --profile app up -d --build
+#   -> migrations, API, Celery worker, Celery beat and the web app on
+#      http://localhost:${WEB_PORT:-3000}. Stop your own dev servers first, or
+#      set WEB_PORT / API_PORT to free ports.
+# Host ports 5434/6380 avoid clashing with locally installed services.
+
+x-backend: &backend
+  build: ./backend
+  env_file: .env
+  environment: &backend-env
+    APP_ENV: development
+    DATABASE_URL: postgresql+asyncpg://contentpulse:contentpulse@db:5432/contentpulse
+    REDIS_URL: redis://redis:6379/0
+    TASK_BACKEND: celery
+    LOCAL_STORAGE_DIR: /data/storage
+    FRONTEND_URL: http://localhost:${WEB_PORT:-3000}
+    CORS_ORIGINS: '["http://localhost:${WEB_PORT:-3000}"]'
+  depends_on: &backend-deps
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: contentpulse
+      POSTGRES_PASSWORD: contentpulse
+      POSTGRES_DB: contentpulse
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contentpulse -d contentpulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *backend
+    profiles: ["app"]
+    command: ["alembic", "upgrade", "head"]
+    healthcheck:
+      disable: true
+    restart: "no"
+
+  api:
+    <<: *backend
+    profiles: ["app"]
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      <<: *backend-deps
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    <<: *backend
+    profiles: ["app"]
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--concurrency=4"]
+    healthcheck:
+      disable: true
+    depends_on:
+      <<: *backend-deps
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  beat:
+    <<: *backend
+    profiles: ["app"]
+    # Exactly one beat per deployment.
+    command: ["celery", "-A", "app.workers.celery_app", "beat", "--loglevel=info", "--schedule", "/tmp/celerybeat-schedule"]
+    healthcheck:
+      disable: true
+    depends_on:
+      <<: *backend-deps
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    profiles: ["app"]
+    build:
+      context: ./frontend
+      args:
+        API_URL: http://api:8000
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  storage:

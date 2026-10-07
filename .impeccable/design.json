@@ -1,0 +1,511 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-07T12:06:10.980Z",
+  "title": "Design System: ContentPulse",
+  "extensions": {
+    "colorMeta": {
+      "flash-red": {
+        "role": "primary",
+        "displayName": "Flash Red",
+        "canonical": "oklch(0.495 0.2 29)",
+        "dark": "oklch(0.68 0.19 29)",
+        "tonalRamp": [
+          "oklch(0.15 0.16 29)",
+          "oklch(0.264 0.16 29)",
+          "oklch(0.379 0.16 29)",
+          "oklch(0.493 0.16 29)",
+          "oklch(0.607 0.16 29)",
+          "oklch(0.721 0.16 29)",
+          "oklch(0.836 0.16 29)",
+          "oklch(0.95 0.16 29)"
+        ]
+      },
+      "wire-blue": {
+        "role": "secondary",
+        "displayName": "Wire Blue",
+        "canonical": "oklch(0.42 0.14 264)",
+        "dark": "oklch(0.74 0.12 262)",
+        "tonalRamp": [
+          "oklch(0.15 0.12 264)",
+          "oklch(0.264 0.12 264)",
+          "oklch(0.379 0.12 264)",
+          "oklch(0.493 0.12 264)",
+          "oklch(0.607 0.12 264)",
+          "oklch(0.721 0.12 264)",
+          "oklch(0.836 0.12 264)",
+          "oklch(0.95 0.12 264)"
+        ]
+      },
+      "paper-0": {
+        "role": "neutral",
+        "displayName": "Clean Sheet",
+        "canonical": "oklch(0.982 0.003 95)",
+        "dark": "oklch(0.15 0.002 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-1": {
+        "role": "neutral",
+        "displayName": "Sidebar Stock",
+        "canonical": "oklch(0.962 0.005 95)",
+        "dark": "oklch(0.185 0.003 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-2": {
+        "role": "neutral",
+        "displayName": "Newsprint",
+        "canonical": "oklch(0.938 0.007 95)",
+        "dark": "oklch(0.215 0.004 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-3": {
+        "role": "neutral",
+        "displayName": "Proof Grey",
+        "canonical": "oklch(0.905 0.008 95)",
+        "dark": "oklch(0.255 0.005 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-4": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(0.86 0.008 95)",
+        "dark": "oklch(0.31 0.006 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-5": {
+        "role": "neutral",
+        "displayName": "Field Rule",
+        "canonical": "oklch(0.76 0.008 95)",
+        "dark": "oklch(0.4 0.007 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-6": {
+        "role": "neutral",
+        "displayName": "Spiked Grey",
+        "canonical": "oklch(0.62 0.008 95)",
+        "dark": "oklch(0.55 0.008 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-7": {
+        "role": "neutral",
+        "displayName": "Slug Grey",
+        "canonical": "oklch(0.455 0.008 95)",
+        "dark": "oklch(0.72 0.008 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-8": {
+        "role": "neutral",
+        "displayName": "Deep Slug",
+        "canonical": "oklch(0.36 0.006 95)",
+        "dark": "oklch(0.82 0.007 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-9": {
+        "role": "neutral",
+        "displayName": "Near Ink",
+        "canonical": "oklch(0.26 0.004 95)",
+        "dark": "oklch(0.9 0.006 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "paper-10": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(0.18 0.002 95)",
+        "dark": "oklch(0.955 0.005 95)",
+        "tonalRamp": [
+          "oklch(0.18 0.002 95)",
+          "oklch(0.26 0.004 95)",
+          "oklch(0.36 0.006 95)",
+          "oklch(0.455 0.008 95)",
+          "oklch(0.62 0.008 95)",
+          "oklch(0.76 0.008 95)",
+          "oklch(0.905 0.008 95)",
+          "oklch(0.982 0.003 95)"
+        ]
+      },
+      "destructive": {
+        "role": "feedback",
+        "displayName": "Destructive",
+        "canonical": "oklch(0.5 0.19 27)",
+        "dark": "oklch(0.7 0.18 25)",
+        "tonalRamp": [
+          "oklch(0.15 0.15 27)",
+          "oklch(0.264 0.15 27)",
+          "oklch(0.379 0.15 27)",
+          "oklch(0.493 0.15 27)",
+          "oklch(0.607 0.15 27)",
+          "oklch(0.721 0.15 27)",
+          "oklch(0.836 0.15 27)",
+          "oklch(0.95 0.15 27)"
+        ]
+      },
+      "success": {
+        "role": "feedback",
+        "displayName": "Success",
+        "canonical": "oklch(0.52 0.12 150)",
+        "dark": "oklch(0.72 0.13 150)",
+        "tonalRamp": [
+          "oklch(0.15 0.11 150)",
+          "oklch(0.264 0.11 150)",
+          "oklch(0.379 0.11 150)",
+          "oklch(0.493 0.11 150)",
+          "oklch(0.607 0.11 150)",
+          "oklch(0.721 0.11 150)",
+          "oklch(0.836 0.11 150)",
+          "oklch(0.95 0.11 150)"
+        ]
+      },
+      "warning": {
+        "role": "feedback",
+        "displayName": "Warning",
+        "canonical": "oklch(0.68 0.14 70)",
+        "dark": "oklch(0.8 0.14 75)",
+        "tonalRamp": [
+          "oklch(0.15 0.12 70)",
+          "oklch(0.264 0.12 70)",
+          "oklch(0.379 0.12 70)",
+          "oklch(0.493 0.12 70)",
+          "oklch(0.607 0.12 70)",
+          "oklch(0.721 0.12 70)",
+          "oklch(0.836 0.12 70)",
+          "oklch(0.95 0.12 70)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing hero and closing banner, uppercase, condensed Archivo at 72% width."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "App page titles (sentence case); landing section heads (uppercase, 2.25rem to 3rem)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Desk names, roles, the headline set on the desk, the wordmark."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All app text and landing list copy, max 62ch."
+      },
+      "body-lead": {
+        "displayName": "Lead",
+        "purpose": "Landing lead paragraphs, 1rem to 1.125rem, max 60ch."
+      },
+      "label": {
+        "displayName": "Slug",
+        "purpose": "Uppercase Martian Mono slug line: sources, times, fit scores, clock, flags, group labels."
+      }
+    },
+    "shadows": [
+      {
+        "name": "set-proof",
+        "value": "0 1px 0 var(--paper-4), 0 12px 28px -18px oklch(0.2 0 0 / 0.45)",
+        "purpose": "A finished post shown as it will run, lying on the desk. The only deliberate lift."
+      },
+      {
+        "name": "card-ring",
+        "value": "0 0 0 1px color-mix(in oklch, var(--paper-10) 10%, transparent)",
+        "purpose": "Cards and dialogs: a hairline ring instead of a shadow."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px color-mix(in oklch, var(--wire) 50%, transparent)",
+        "purpose": "Focus on every control; 60% on landing controls."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-desk",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Short ease-out used by every world animation."
+      },
+      {
+        "name": "wire-step",
+        "value": "1800ms interval, 260ms transform",
+        "purpose": "Teleprinter pace of the landing wire; pauses on hover and focus, can be stopped, static under reduced motion."
+      },
+      {
+        "name": "desk-set",
+        "value": "520ms clip-path top-down reveal",
+        "purpose": "A story is set on the desk."
+      },
+      {
+        "name": "stamp-land",
+        "value": "360ms after 480ms, scale 1.6 to 1 at -6deg",
+        "purpose": "The OK stamp lands on an approved post."
+      },
+      {
+        "name": "flag-stamp",
+        "value": "200ms scale 1.5 to 1",
+        "purpose": "A priority flag is stamped on as the desk reads the item."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation: none",
+        "purpose": "All world animations stop under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "coarse-pointer",
+        "value": "(pointer: coarse)",
+        "purpose": "All controls 44px minimum."
+      }
+    ],
+    "themes": {
+      "dark": "The night desk: .dark re-maps paper-0..paper-10 from the ink end and lifts flash and wire; background becomes paper-0, card paper-1, popover paper-2, sidebar oklch(0.12 0.002 95). The landing masthead and closing banner are always the night desk."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The app's main action: ink on paper, compact.",
+      "html": "<button class=\"ds-btn-primary\">Discover now</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: 0.3rem; background: var(--paper-10, oklch(0.18 0.002 95)); color: var(--paper-0, oklch(0.982 0.003 95)); font: 500 0.875rem/1 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: background 150ms; } .ds-btn-primary:hover { background: color-mix(in oklch, var(--paper-10, oklch(0.18 0.002 95)) 80%, transparent); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--wire, oklch(0.42 0.14 264)) 50%, transparent); } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary app action with a hairline stroke.",
+      "html": "<button class=\"ds-btn-outline\">Sources</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; height: 32px; padding: 0 10px; border: 1px solid var(--paper-4, oklch(0.86 0.008 95)); border-radius: 0.3rem; background: var(--paper-2, oklch(0.938 0.007 95)); color: var(--paper-10, oklch(0.18 0.002 95)); font: 500 0.875rem/1 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: background 150ms; } .ds-btn-outline:hover { background: var(--paper-3, oklch(0.905 0.008 95)); } .ds-btn-outline:focus-visible { border-color: var(--wire, oklch(0.42 0.14 264)); outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--wire, oklch(0.42 0.14 264)) 50%, transparent); }"
+    },
+    {
+      "name": "Flash Button",
+      "kind": "button",
+      "refersTo": "button-flash",
+      "description": "Landing-only Start free in the masthead and closing banner.",
+      "html": "<a class=\"ds-btn-flash\" href=\"#\">Start free <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a>",
+      "css": ".ds-btn-flash { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 0.18rem; background: var(--flash, oklch(0.495 0.2 29)); color: var(--paper-0, oklch(0.982 0.003 95)); font: 600 0.875rem/1 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; text-decoration: none; transition: background 150ms; } .ds-btn-flash:hover { background: color-mix(in oklch, var(--flash, oklch(0.495 0.2 29)) 85%, transparent); } .ds-btn-flash:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--wire, oklch(0.42 0.14 264)) 60%, transparent); }"
+    },
+    {
+      "name": "Line Button",
+      "kind": "button",
+      "refersTo": "button-line-landing",
+      "description": "Landing secondary: ink stroke that floods to ink.",
+      "html": "<a class=\"ds-btn-line\" href=\"#\">Sign in</a>",
+      "css": ".ds-btn-line { display: inline-flex; align-items: center; height: 44px; padding: 0 20px; border: 1px solid var(--paper-10, oklch(0.18 0.002 95)); border-radius: 0.18rem; color: var(--paper-10, oklch(0.18 0.002 95)); font: 600 0.875rem/1 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; text-decoration: none; transition: background 150ms, color 150ms; } .ds-btn-line:hover { background: var(--paper-10, oklch(0.18 0.002 95)); color: var(--paper-0, oklch(0.982 0.003 95)); } .ds-btn-line:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--wire, oklch(0.42 0.14 264)) 60%, transparent); }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Text field: field-rule stroke, flash caret, wire focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Client name\" />",
+      "css": ".ds-input { height: 32px; width: 240px; padding: 4px 10px; border: 1px solid var(--paper-5, oklch(0.76 0.008 95)); border-radius: 0.3rem; background: transparent; color: var(--paper-10, oklch(0.18 0.002 95)); font: 400 0.875rem/1.4 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; caret-color: var(--flash, oklch(0.495 0.2 29)); transition: border-color 150ms; } .ds-input::placeholder { color: var(--paper-7, oklch(0.455 0.008 95)); } .ds-input:focus-visible { border-color: var(--wire, oklch(0.42 0.14 264)); outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--wire, oklch(0.42 0.14 264)) 50%, transparent); }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Slug group label over 36px rows; active row is ink with a flash icon.",
+      "html": "<nav class=\"ds-nav\"><p class=\"ds-nav-label\">Workflow</p><a class=\"ds-nav-item ds-nav-active\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M16 7h6v6\"/><path d=\"m22 7-8.5 8.5-5-5L2 17\"/></svg>Trends</a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M16 7h6v6\"/><path d=\"m22 7-8.5 8.5-5-5L2 17\"/></svg>Topics</a></nav>",
+      "css": ".ds-nav { display: grid; gap: 2px; width: 232px; padding: 8px; background: var(--paper-1, oklch(0.962 0.005 95)); } .ds-nav-label { font-family: var(--font-martian-mono, 'Martian Mono'), ui-monospace, monospace; font-stretch: 88%; font-size: 0.6875rem; line-height: 1rem; letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; margin: 0; padding: 0 10px 6px; color: var(--paper-7, oklch(0.455 0.008 95)); } .ds-nav-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 0.18rem; color: color-mix(in oklch, var(--paper-10, oklch(0.18 0.002 95)) 80%, transparent); font: 400 0.875rem/1 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; text-decoration: none; transition: background 150ms; } .ds-nav-item:hover { background: var(--paper-3, oklch(0.905 0.008 95)); color: var(--paper-10, oklch(0.18 0.002 95)); } .ds-nav-item:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--wire, oklch(0.42 0.14 264)) 50%, transparent); } .ds-nav-active, .ds-nav-active:hover { background: var(--paper-10, oklch(0.18 0.002 95)); color: var(--paper-0, oklch(0.982 0.003 95)); font-weight: 500; } .ds-nav-active svg { color: var(--flash, oklch(0.495 0.2 29)); }"
+    },
+    {
+      "name": "Priority Flag",
+      "kind": "chip",
+      "refersTo": "priority-flag",
+      "description": "Status as a word: FLASH and URGENT in red, ROUTINE as a hairline.",
+      "html": "<span class=\"ds-flag ds-flag-flash\">Flash</span> <span class=\"ds-flag\">Urgent</span> <span class=\"ds-flag ds-flag-routine\">Routine</span>",
+      "css": ".ds-flag { font-family: var(--font-martian-mono, 'Martian Mono'), ui-monospace, monospace; font-stretch: 88%; font-size: 0.6875rem; line-height: 1rem; letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 2px; font-weight: 600; background: var(--flash, oklch(0.495 0.2 29)); color: var(--paper-0, oklch(0.982 0.003 95)); } .ds-flag-flash { outline: 2px solid var(--flash, oklch(0.495 0.2 29)); outline-offset: 1px; } .ds-flag-routine { background: transparent; color: var(--paper-7, oklch(0.455 0.008 95)); box-shadow: inset 0 0 0 1px var(--paper-4, oklch(0.86 0.008 95)); }"
+    },
+    {
+      "name": "Status Tag",
+      "kind": "chip",
+      "refersTo": "status-tag",
+      "description": "Coloured status pill kept by user request; the word is always present.",
+      "html": "<span class=\"ds-tag ds-tag-green\"><span class=\"ds-tag-dot\"></span>Approved</span> <span class=\"ds-tag ds-tag-amber\">Draft</span>",
+      "css": ".ds-tag { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 9999px; font: 500 11px/1 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; white-space: nowrap; } .ds-tag-dot { width: 6px; height: 6px; border-radius: 9999px; background: #059669; } .ds-tag-green { background: #ecfdf5; color: #065f46; box-shadow: inset 0 0 0 1px #a7f3d0; } .ds-tag-amber { background: #fffbeb; color: #92400e; box-shadow: inset 0 0 0 1px #fde68a; }"
+    },
+    {
+      "name": "Page Head",
+      "kind": "custom",
+      "refersTo": "headline",
+      "description": "Condensed title, muted description, actions right, ruled off by the 3px double rule.",
+      "html": "<header class=\"ds-pagehead\"><div><h1 class=\"ds-pagehead-title\">Trends</h1><p class=\"ds-pagehead-desc\">What's rising in your markets, scored for each client.</p></div><button class=\"ds-pagehead-btn\">Discover now</button></header>",
+      "css": ".ds-pagehead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 3px double var(--paper-10, oklch(0.18 0.002 95)); } .ds-pagehead-title { margin: 0; font-family: var(--font-archivo, Archivo), var(--font-geist-sans, Geist), ui-sans-serif, sans-serif; font-stretch: 72%; font-weight: 800; font-size: 2.25rem; line-height: 0.95; letter-spacing: -0.01em; color: var(--paper-10, oklch(0.18 0.002 95)); } .ds-pagehead-desc { margin: 6px 0 0; max-width: 42rem; font: 400 0.875rem/1.5 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; color: var(--paper-7, oklch(0.455 0.008 95)); } .ds-pagehead-btn { height: 32px; padding: 0 10px; border: 0; border-radius: 0.3rem; background: var(--paper-10, oklch(0.18 0.002 95)); color: var(--paper-0, oklch(0.982 0.003 95)); font: 500 0.875rem/1 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; cursor: pointer; } .ds-pagehead-btn:hover { background: color-mix(in oklch, var(--paper-10, oklch(0.18 0.002 95)) 80%, transparent); } .ds-pagehead-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--wire, oklch(0.42 0.14 264)) 50%, transparent); }"
+    },
+    {
+      "name": "Wire Row",
+      "kind": "custom",
+      "refersTo": "priority-flag",
+      "description": "A wire item on the perforated tape: flag, slug source and time, fit score, one-line headline; spiked items strike through.",
+      "html": "<ul class=\"ds-wire\"><li><button class=\"ds-wire-row\"><span class=\"ds-wire-meta\"><span class=\"ds-wire-flag\">Urgent</span><span class=\"ds-wire-src\">RSS · Insurance Times · 09:35</span><span class=\"ds-wire-fit\">Fit 84</span></span><span class=\"ds-wire-head\">Mid-size insurers tighten cyber cover terms for 2027 renewals</span></button></li><li><button class=\"ds-wire-row ds-wire-spiked\"><span class=\"ds-wire-meta\"><span class=\"ds-wire-flag ds-wire-quiet\">Routine</span><span class=\"ds-wire-src\">Google Trends · 09:39</span><span class=\"ds-wire-fit\">Fit 4</span></span><span class=\"ds-wire-head\">Pumpkin spice searches peak a week earlier than last year</span></button></li></ul>",
+      "css": ".ds-wire { list-style: none; margin: 0; padding: 0 0 0 16px; width: 460px; border: 1px solid var(--paper-4, oklch(0.86 0.008 95)); background: var(--paper-0, oklch(0.982 0.003 95)) radial-gradient(circle at center, var(--paper-2, oklch(0.938 0.007 95)) 0 3px, transparent 3.5px) left top / 16px 18px repeat-y; } .ds-wire li + li { border-top: 1px solid var(--paper-4, oklch(0.86 0.008 95)); } .ds-wire-row { display: grid; gap: 6px; width: 100%; padding: 12px 16px; border: 0; background: var(--paper-0, oklch(0.982 0.003 95)); color: var(--paper-10, oklch(0.18 0.002 95)); text-align: left; cursor: pointer; transition: background 150ms; } .ds-wire-row:hover, .ds-wire-row:focus-visible { background: var(--paper-3, oklch(0.905 0.008 95)); outline: none; } .ds-wire-meta { display: flex; align-items: flex-start; gap: 8px; } .ds-wire-flag { font-family: var(--font-martian-mono, 'Martian Mono'), ui-monospace, monospace; font-stretch: 88%; font-size: 0.6875rem; line-height: 1rem; letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 2px; font-weight: 600; background: var(--flash, oklch(0.495 0.2 29)); color: var(--paper-0, oklch(0.982 0.003 95)); } .ds-wire-quiet { background: transparent; color: var(--paper-7, oklch(0.455 0.008 95)); box-shadow: inset 0 0 0 1px var(--paper-4, oklch(0.86 0.008 95)); } .ds-wire-src { font-family: var(--font-martian-mono, 'Martian Mono'), ui-monospace, monospace; font-stretch: 88%; font-size: 0.6875rem; line-height: 1rem; letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; flex: 1; color: var(--paper-7, oklch(0.455 0.008 95)); } .ds-wire-fit { font-family: var(--font-martian-mono, 'Martian Mono'), ui-monospace, monospace; font-stretch: 88%; font-size: 0.6875rem; line-height: 1rem; letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; font-weight: 600; } .ds-wire-head { font: 500 0.875rem/1.375 var(--font-geist-sans, Geist), ui-sans-serif, system-ui, sans-serif; } .ds-wire-spiked { color: var(--paper-7, oklch(0.455 0.008 95)); } .ds-wire-spiked .ds-wire-head { font-weight: 400; text-decoration: line-through; text-decoration-thickness: 1px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Wire Desk",
+    "overview": "ContentPulse is set like a newsroom wire desk. The ground is warm-grey newsprint, the type is black ink, and the furniture is the furniture of a copy desk: slug lines in a teleprinter mono, headlines in a condensed news grotesk, hairline and double rules instead of boxes, a perforated tape edge on the wire, a red priority flag on what matters, a spike for what doesn't run, and an OK stamp for what does. One world serves both the public landing page and the signed-in app; the landing page performs it, the app works inside it.\n\nDensity is a working desk's density: compact controls (32px app buttons, 36px nav rows) on pointer devices, every control 44px on touch. Colour is almost absent. Every neutral comes from one eleven-step paper-to-ink ramp, and the night desk (dark mode) reads the same ramp from the ink end rather than introducing a second palette. Red is the one loud thing, and it means \"fits / urgent / run this\". Blue is the wire's working colour: links, selection, focus.\n\nThe world explicitly refuses the content-SaaS default: gradient hero, floating dashboard screenshot, three feature cards.",
+    "keyCharacteristics": [
+      "Warm-grey newsprint ground (hue 95, near-zero chroma) with black ink.",
+      "One neutral ramp, paper-0 to paper-10, inverted for the night desk.",
+      "Flash red reserved for fit, urgency and the main run action.",
+      "Three type voices: condensed headline, mono slug, plain UI sans.",
+      "Rules, not boxes: hairlines, dashed perforations and a 3px double rule under every page head.",
+      "Flat surfaces; one soft lift for a post set on the desk.",
+      "Status is always a word; colour only reinforces it."
+    ],
+    "rules": [
+      {
+        "name": "The One Ramp Rule",
+        "body": "Every neutral is a `paper-*` step. Never add a stray grey; the night desk swaps the ramp's values, not its names.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flash Is Priority Rule",
+        "body": "Red means \"fits, urgent, run\". It is never decoration, never a background wash larger than the 10% tint marking the fit zone, and in the app never a button fill.",
+        "section": "colors"
+      },
+      {
+        "name": "The Wire Is Blue Rule",
+        "body": "Focus, selection and links are wire blue, everywhere, in both modes.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Voices Rule",
+        "body": "Headlines are condensed Archivo, metadata is Martian Mono slug, everything a person reads or operates is Geist. Don't set running text in the mono or the condensed face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Uppercase Belongs To Slugs Rule",
+        "body": "Uppercase is for slug lines, the wordmark and landing headlines. App page titles and UI text stay in sentence case.",
+        "section": "typography"
+      },
+      {
+        "name": "The Coarse Pointer Rule",
+        "body": "On touch screens every button, input, select, tab and menu item is at least 44px tall, and buttons at least 44px wide. Desktop density is a pointer privilege.",
+        "section": "layout"
+      },
+      {
+        "name": "The Rules Not Boxes Rule",
+        "body": "Separate with hairlines, dashed perforations and the double rule before reaching for a container or a shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do take every neutral from `paper-0` to `paper-10` and let the night desk re-map the ramp.",
+      "Do reserve flash red for fit, urgency, the read line, the OK stamp and the landing's main run action.",
+      "Do use wire blue for focus rings, selection and links in both modes.",
+      "Do set sources, timestamps, scores and section labels as uppercase Martian Mono slugs with tabular numbers.",
+      "Do rule off every page head with the 3px double ink rule.",
+      "Do make every status a word; colour, tint and ring only reinforce it.",
+      "Do keep touch targets at 44px and respect reduced motion on every animation."
+    ],
+    "donts": [
+      "Don't add greys outside the paper ramp.",
+      "Don't fill app buttons with flash red or use red for decoration.",
+      "Don't build a gradient hero, a floating dashboard screenshot or a row of three feature cards.",
+      "Don't set running text in the condensed headline face or the mono.",
+      "Don't let a status rely on colour alone.",
+      "Don't reach for a shadow to separate content; the set proof is the only lift."
+    ]
+  }
+}
