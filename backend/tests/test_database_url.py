@@ -32,3 +32,11 @@ def test_sslmode_disable_and_other_params_kept():
     url, args = async_database_url("postgres://u:p@db.example.com/app?sslmode=disable&application_name=cp")
     assert args["ssl"] is False
     assert url.endswith("/app?application_name=cp")
+
+
+def test_cors_origins_accept_plain_or_json(monkeypatch):
+    from app.core.config import Settings
+
+    for raw in ("https://cp.vercel.app/", '["https://cp.vercel.app"]'):
+        monkeypatch.setenv("CORS_ORIGINS", raw)
+        assert Settings(_env_file=None).cors_origins == ["https://cp.vercel.app"]

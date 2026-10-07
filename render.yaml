@@ -40,7 +40,7 @@ services:
       # https://<your-project>.vercel.app (or your custom domain)
       - key: FRONTEND_URL
         sync: false
-      # The same URL as a JSON list: ["https://<your-project>.vercel.app"]
+      # The same URL (plain, or several separated by commas)
       - key: CORS_ORIGINS
         sync: false
       # Supabase > Connect > Session pooler (port 5432). Paste it as shown.

@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     app_name: str = "ContentPulse"
     api_url: str = "http://localhost:8000"
     frontend_url: str = "http://localhost:3000"
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # A JSON list or a comma-separated list: https://a.example, https://b.example
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     log_level: str = "INFO"
 
     # Database / Redis
@@ -262,7 +263,7 @@ class Settings(BaseSettings):
             return None
         return name or None
 
-    @field_validator("llm_fallbacks", mode="before")
+    @field_validator("llm_fallbacks", "cors_origins", mode="before")
     @classmethod
     def _split_models(cls, value: object) -> object:
         """Accept `a/b, c/d` as well as a JSON list, so .env stays readable."""
@@ -275,6 +276,12 @@ class Settings(BaseSettings):
                     text = text.strip("[]")
             return [part.strip(" \"'") for part in text.split(",") if part.strip(" \"'")]
         return value
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _bare_origins(cls, value: list[str]) -> list[str]:
+        # Browsers send origins without a trailing slash; pasted URLs often have one.
+        return [origin.rstrip("/") for origin in value]
 
     @property
     def email_enabled(self) -> bool:

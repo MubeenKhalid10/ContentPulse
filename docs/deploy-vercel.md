@@ -55,7 +55,7 @@ bucket rather than through the API.
    |---|---|---|
    | `DATABASE_URL` | the session pooler URL | Supabase step 1 |
    | `FRONTEND_URL` | `https://<project>.vercel.app` | Vercel (step 4). Put a placeholder now, fix it after step 4 |
-   | `CORS_ORIGINS` | `["https://<project>.vercel.app"]` | same as above, as a JSON list |
+   | `CORS_ORIGINS` | `https://<project>.vercel.app` | same as above (several: separate with commas) |
    | `S3_BUCKET` | `contentpulse` | Supabase step 2 |
    | `S3_ENDPOINT_URL` | `https://<ref>.supabase.co/storage/v1/s3` | Supabase step 2 |
    | `AWS_REGION` | e.g. `eu-central-1` | Supabase step 2 |
