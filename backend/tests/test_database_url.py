@@ -40,3 +40,31 @@ def test_cors_origins_accept_plain_or_json(monkeypatch):
     for raw in ("https://cp.vercel.app/", '["https://cp.vercel.app"]'):
         monkeypatch.setenv("CORS_ORIGINS", raw)
         assert Settings(_env_file=None).cors_origins == ["https://cp.vercel.app"]
+
+
+def test_password_with_url_special_characters():
+    from sqlalchemy.engine import make_url
+
+    password = "a/b?c#d@e:f+g!"
+    raw = f"postgresql://postgres.abcd:{password}@aws-0-eu.pooler.supabase.com:5432/postgres"
+    url, args = async_database_url(raw)
+    parsed = make_url(url)
+    assert parsed.password == password
+    assert parsed.host == "aws-0-eu.pooler.supabase.com" and parsed.port == 5432
+    assert parsed.database == "postgres"
+    assert isinstance(args["ssl"], ssl.SSLContext)
+
+
+def test_already_escaped_password_is_not_escaped_twice():
+    from sqlalchemy.engine import make_url
+
+    url, _ = async_database_url("postgresql://u:a%2Fb@db.example.com:5432/app")
+    assert make_url(url).password == "a/b"
+
+
+def test_bad_port_error_hides_the_url():
+    import pytest
+
+    with pytest.raises(ValueError) as exc:
+        async_database_url("postgresql://u:secret@host:notaport/db")
+    assert "secret" not in str(exc.value)
