@@ -10,7 +10,13 @@ import { CheckEmail } from "@/components/auth/check-email";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useRegister } from "@/lib/auth";
@@ -55,20 +61,32 @@ export default function RegisterPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle role="heading" aria-level={1} className="text-xl">Create your account</CardTitle>
+        <CardTitle role="heading" aria-level={1} className="text-xl">
+          Create your account
+        </CardTitle>
         <CardDescription>
-          You&apos;ll set up your organization next. Invited by a teammate? Use the link they sent
-          you instead.
+          You&apos;ll set up your organization next. Invited by a teammate? Use
+          the link they sent you instead.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} noValidate className="grid gap-4">
-          {register.isError && !(register.error instanceof ApiError && register.error.status === 422) && (
-            <Alert variant="destructive">
-              <AlertDescription>{errorMessage(register.error)}</AlertDescription>
-            </Alert>
-          )}
-          <FormField id="full_name" label="Full name" error={errors.full_name?.message}>
+          {register.isError &&
+            !(
+              register.error instanceof ApiError &&
+              register.error.status === 422
+            ) && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {errorMessage(register.error)}
+                </AlertDescription>
+              </Alert>
+            )}
+          <FormField
+            id="full_name"
+            label="Full name"
+            error={errors.full_name?.message}
+          >
             <Input
               {...fieldAria("full_name", errors.full_name?.message)}
               autoComplete="name"
@@ -76,7 +94,11 @@ export default function RegisterPage() {
               {...form.register("full_name")}
             />
           </FormField>
-          <FormField id="email" label="Work email" error={errors.email?.message}>
+          <FormField
+            id="email"
+            label="Work email"
+            error={errors.email?.message}
+          >
             <Input
               {...fieldAria("email", errors.email?.message)}
               type="email"
@@ -102,7 +124,10 @@ export default function RegisterPage() {
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+            <Link
+              href="/login"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
               Sign in
             </Link>
           </p>

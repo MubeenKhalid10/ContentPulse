@@ -14,7 +14,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   EXAMPLE_CLIENT,
   FITTING,
-  priorityOf,
+  relevanceOf,
   WIRE,
   type WireItem,
 } from "@/components/landing/wire-data";
@@ -42,10 +42,10 @@ function useReducedMotion() {
 const fits = (item: WireItem) => item.fit >= EXAMPLE_CLIENT.threshold;
 
 /**
- * Priority flag, always a word; colour only reinforces it. Items the desk
- * hasn't read yet carry "NEW"; reading one stamps its priority on.
+ * Relevance flag, in the app's own words. Trends that fit (Relevant or
+ * better) are set in red; the rest stay quiet. Unread items say "Scoring".
  */
-export function PriorityFlag({
+export function RelevanceFlag({
   item,
   read = true,
   inverted = false,
@@ -54,22 +54,22 @@ export function PriorityFlag({
   read?: boolean;
   inverted?: boolean;
 }) {
-  const p = read ? priorityOf(item) : "NEW";
-  const quiet = p === "ROUTINE" || p === "NEW";
+  const label = read ? relevanceOf(item) : "Scoring";
+  const loud = read && fits(item);
   return (
     <span
       className={cn(
-        "slug inline-flex h-5 shrink-0 items-center rounded-[2px] px-1.5 font-semibold",
-        quiet && "ring-1 ring-inset",
-        quiet &&
+        "slug inline-flex h-5 shrink-0 items-center rounded-[2px] px-1.5 font-semibold whitespace-nowrap",
+        !loud && "ring-1 ring-inset",
+        !loud &&
           (inverted
             ? "text-background/80 ring-background/40"
             : "text-muted-foreground ring-border"),
-        !quiet && "flag-stamp bg-flash text-flash-foreground",
-        p === "FLASH" && "outline-2 outline-offset-1 outline-flash",
+        loud && "flag-stamp bg-flash text-flash-foreground",
+        read && item.fit >= 75 && "outline-2 outline-offset-1 outline-flash",
       )}
     >
-      {p}
+      {label}
     </span>
   );
 }
@@ -194,10 +194,12 @@ function WireTape({
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-foreground pb-2">
         <h2 id="wire-title" className="slug font-semibold text-foreground">
-          The wire · example
+          Incoming trends · example
         </h2>
-        <span className="slug text-muted-foreground">
-          Client bar: fit {EXAMPLE_CLIENT.threshold}+
+        {/* Own line, so the header keeps one height with or without Pause. */}
+        <span className="slug order-last basis-full text-muted-foreground">
+          <span className="text-flash">Red</span>: fits ·{" "}
+          <span className="line-through">struck</span>: filtered out
         </span>
         {!reduced && (
           <button
@@ -211,7 +213,7 @@ function WireTape({
             ) : (
               <PauseIcon className="size-3.5" aria-hidden />
             )}
-            {stopped ? "Run the wire" : "Stop the wire"}
+            {stopped ? "Resume" : "Pause"}
           </button>
         )}
       </div>
@@ -249,9 +251,10 @@ function WireTape({
         Example headlines for an invented client, {EXAMPLE_CLIENT.name},{" "}
         {EXAMPLE_CLIENT.what}.{" "}
         {reduced
-          ? `Each item is flagged against the client's bar of ${EXAMPLE_CLIENT.threshold}.`
-          : "Items are read as they cross the red line."}{" "}
-        Pick any item to see what the desk does with it.
+          ? "Each trend carries the relevance label the app gives it."
+          : "Each trend is scored as it crosses the red line."}{" "}
+        Trends rated Relevant or better get post ideas. Pick any item to see
+        what happens to it.
       </p>
     </section>
   );
@@ -287,7 +290,7 @@ function WireList({
               )}
             >
               <span className="flex min-w-0 items-start gap-2">
-                <PriorityFlag
+                <RelevanceFlag
                   key={read ? "read" : "new"}
                   item={item}
                   read={read}
@@ -302,7 +305,8 @@ function WireList({
                   {item.source} · {item.time}
                 </span>
                 <span className="slug shrink-0 font-semibold whitespace-nowrap tabular-nums">
-                  Fit {item.fit}
+                  {/* No number until the item is scored. */}
+                  Fit {read ? item.fit : "—"}
                 </span>
               </span>
               <span
@@ -356,7 +360,7 @@ function Desk({ item, announce }: { item: WireItem; announce: boolean }) {
     >
       <div className="flex items-baseline justify-between gap-3 border-b border-foreground pb-2">
         <h2 id="desk-title" className="slug font-semibold text-foreground">
-          The desk
+          The post it becomes
         </h2>
         <p className="slug text-muted-foreground">
           LinkedIn · {EXAMPLE_CLIENT.name}
@@ -365,7 +369,7 @@ function Desk({ item, announce }: { item: WireItem; announce: boolean }) {
 
       <div key={item.id} className="desk-set mt-4">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <PriorityFlag item={item} />
+          <RelevanceFlag item={item} />
           <span className="slug tabular-nums">Fit {item.fit} / 100</span>
           <span className="slug text-muted-foreground">{item.source}</span>
         </div>
@@ -383,11 +387,11 @@ function Desk({ item, announce }: { item: WireItem; announce: boolean }) {
           <div className="mt-4 flex items-center gap-4 border-y border-dashed border-foreground/40 py-4">
             <SpikeMark className="h-12 w-10 shrink-0 text-foreground" />
             <div className="grid gap-1">
-              <p className="headline text-xl uppercase">Spiked</p>
+              <p className="headline text-xl uppercase">Filtered out</p>
               <p className="text-sm text-muted-foreground">
-                Fit {item.fit} is under this client&apos;s bar of{" "}
-                {EXAMPLE_CLIENT.threshold}. Popular isn&apos;t the same as
-                relevant, so nothing gets written.
+                Fit {item.fit} is {relevanceOf(item)}. Only trends rated
+                Relevant or better get post ideas: popular isn&apos;t the same
+                as relevant.
               </p>
             </div>
           </div>
@@ -419,10 +423,10 @@ function PostProof({ item }: { item: WireItem }) {
         </span>
         <span className="ok-stamp ml-auto grid shrink-0 -rotate-6 place-items-center rounded-sm border-2 border-flash px-2 py-1 text-center text-flash">
           <span className="headline text-lg leading-none uppercase">
-            OK · Run
+            Approved
           </span>
-          <span className="slug text-[9px] leading-tight">
-            Approved to publish
+          <span className="slug text-[11px] leading-tight">
+            Ready to publish
           </span>
         </span>
       </header>

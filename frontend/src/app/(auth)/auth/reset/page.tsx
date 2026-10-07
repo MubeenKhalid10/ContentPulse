@@ -8,7 +8,13 @@ import { useForm } from "react-hook-form";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { errorMessage } from "@/lib/api";
 import { getSupabase, supabaseErrorMessage } from "@/lib/supabase";
@@ -28,7 +34,8 @@ export default function ResetPasswordPage() {
       const supabase = await getSupabase();
       if (!supabase) throw new Error("Password reset isn't available.");
       const { data } = await supabase.auth.getSession();
-      if (!data.session) throw new Error("Your reset link has expired. Request a new one.");
+      if (!data.session)
+        throw new Error("Your reset link has expired. Request a new one.");
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw new Error(supabaseErrorMessage(error.message));
     },
@@ -38,17 +45,30 @@ export default function ResetPasswordPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle role="heading" aria-level={1} className="text-xl">Choose a new password</CardTitle>
-        <CardDescription>You&apos;ll stay signed in on this device.</CardDescription>
+        <CardTitle role="heading" aria-level={1} className="text-xl">
+          Choose a new password
+        </CardTitle>
+        <CardDescription>
+          You&apos;ll stay signed in on this device.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit((v) => update.mutate(v))} noValidate className="grid gap-4">
+        <form
+          onSubmit={form.handleSubmit((v) => update.mutate(v))}
+          noValidate
+          className="grid gap-4"
+        >
           {update.isError && (
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(update.error)}</AlertDescription>
             </Alert>
           )}
-          <FormField id="password" label="New password" hint="At least 10 characters." error={errors.password?.message}>
+          <FormField
+            id="password"
+            label="New password"
+            hint="At least 10 characters."
+            error={errors.password?.message}
+          >
             <Input
               {...fieldAria("password", errors.password?.message)}
               type="password"
@@ -57,7 +77,11 @@ export default function ResetPasswordPage() {
               {...form.register("password")}
             />
           </FormField>
-          <FormField id="confirm" label="Confirm password" error={errors.confirm?.message}>
+          <FormField
+            id="confirm"
+            label="Confirm password"
+            error={errors.confirm?.message}
+          >
             <Input
               {...fieldAria("confirm", errors.confirm?.message)}
               type="password"

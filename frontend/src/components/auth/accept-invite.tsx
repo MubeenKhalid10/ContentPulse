@@ -12,20 +12,31 @@ import { CheckEmail } from "@/components/auth/check-email";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError, errorMessage, setActiveOrgId } from "@/lib/api";
 import { meQueryKey, useAuthConfig } from "@/lib/auth";
 import { roleLabel } from "@/lib/options";
-import { authRedirect, getSupabase, supabaseErrorMessage } from "@/lib/supabase";
+import {
+  authRedirect,
+  getSupabase,
+  supabaseErrorMessage,
+} from "@/lib/supabase";
 import { acceptInviteSchema } from "@/schemas/auth";
 import type { InvitePreview, Me } from "@/types/api";
 
 export function AcceptInvite({ token }: { token: string }) {
   const preview = useQuery({
     queryKey: ["invite", token],
-    queryFn: () => api<InvitePreview>(`/auth/invites/${encodeURIComponent(token)}`),
+    queryFn: () =>
+      api<InvitePreview>(`/auth/invites/${encodeURIComponent(token)}`),
   });
   const authConfig = useAuthConfig();
 
@@ -45,10 +56,13 @@ export function AcceptInvite({ token }: { token: string }) {
   }
 
   if (preview.isError) {
-    const expired = preview.error instanceof ApiError && preview.error.status === 410;
+    const expired =
+      preview.error instanceof ApiError && preview.error.status === 410;
     return (
       <Alert variant="destructive">
-        <AlertTitle>{expired ? "This invitation has expired" : "Invitation not found"}</AlertTitle>
+        <AlertTitle>
+          {expired ? "This invitation has expired" : "Invitation not found"}
+        </AlertTitle>
         <AlertDescription>
           {expired
             ? "Ask an admin of the organization to send you a new invitation."
@@ -64,7 +78,8 @@ export function AcceptInvite({ token }: { token: string }) {
     );
   }
 
-  if (authConfig.data?.provider === "supabase") return <SupabaseAcceptForm token={token} invite={preview.data} />;
+  if (authConfig.data?.provider === "supabase")
+    return <SupabaseAcceptForm token={token} invite={preview.data} />;
   return <AcceptForm token={token} invite={preview.data} />;
 }
 
@@ -73,7 +88,10 @@ function useAcceptInvite(token: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (values: { full_name: string; password?: string }) =>
-      api<Me>("/auth/invites/accept", { method: "POST", body: { token, ...values } }),
+      api<Me>("/auth/invites/accept", {
+        method: "POST",
+        body: { token, ...values },
+      }),
     onSuccess: (me) => {
       setActiveOrgId(me.organization_id);
       queryClient.setQueryData(meQueryKey, me);
@@ -85,23 +103,34 @@ function useAcceptInvite(token: string) {
 function InviteHeader({ invite }: { invite: InvitePreview }) {
   return (
     <CardHeader>
-      <CardTitle role="heading" aria-level={1} className="text-xl">Join {invite.organization_name}</CardTitle>
+      <CardTitle role="heading" aria-level={1} className="text-xl">
+        Join {invite.organization_name}
+      </CardTitle>
       <CardDescription>
-        You&apos;ve been invited as <strong className="text-foreground">{roleLabel(invite.role)}</strong>{" "}
+        You&apos;ve been invited as{" "}
+        <strong className="text-foreground">{roleLabel(invite.role)}</strong>{" "}
         with <span className="text-foreground">{invite.email}</span>.
       </CardDescription>
     </CardHeader>
   );
 }
 
-const nameOnlySchema = z.object({ full_name: z.string().trim().min(1, "Enter your name.").max(200) });
+const nameOnlySchema = z.object({
+  full_name: z.string().trim().min(1, "Enter your name.").max(200),
+});
 const SESSION_EMAIL_KEY = ["supabase", "session-email"] as const;
 
 /**
  * Supabase mode: the invitee proves who they are with a Supabase session for
  * the invited email (signing up or in right here), then accepts.
  */
-function SupabaseAcceptForm({ token, invite }: { token: string; invite: InvitePreview }) {
+function SupabaseAcceptForm({
+  token,
+  invite,
+}: {
+  token: string;
+  invite: InvitePreview;
+}) {
   const queryClient = useQueryClient();
   const session = useQuery({
     queryKey: SESSION_EMAIL_KEY,
@@ -112,12 +141,21 @@ function SupabaseAcceptForm({ token, invite }: { token: string; invite: InvitePr
       return data.session?.user.email?.toLowerCase() ?? null;
     },
   });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: SESSION_EMAIL_KEY });
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: SESSION_EMAIL_KEY });
 
   if (session.isPending) return null;
   const signedInAs = session.data ?? null;
-  if (signedInAs === invite.email.toLowerCase()) return <ConfirmJoin token={token} invite={invite} />;
-  if (!signedInAs) return <SupabaseIdentityForm token={token} invite={invite} onSignedIn={refresh} />;
+  if (signedInAs === invite.email.toLowerCase())
+    return <ConfirmJoin token={token} invite={invite} />;
+  if (!signedInAs)
+    return (
+      <SupabaseIdentityForm
+        token={token}
+        invite={invite}
+        onSignedIn={refresh}
+      />
+    );
 
   const signOut = async () => {
     const supabase = await getSupabase();
@@ -129,7 +167,11 @@ function SupabaseAcceptForm({ token, invite }: { token: string; invite: InvitePr
       <AlertTitle>You&apos;re signed in as {signedInAs}</AlertTitle>
       <AlertDescription>
         This invitation to {invite.organization_name} is for {invite.email}.{" "}
-        <button type="button" onClick={signOut} className="font-medium text-foreground underline underline-offset-4">
+        <button
+          type="button"
+          onClick={signOut}
+          className="font-medium text-foreground underline underline-offset-4"
+        >
           Sign out
         </button>{" "}
         to continue with that address.
@@ -138,7 +180,13 @@ function SupabaseAcceptForm({ token, invite }: { token: string; invite: InvitePr
   );
 }
 
-function ConfirmJoin({ token, invite }: { token: string; invite: InvitePreview }) {
+function ConfirmJoin({
+  token,
+  invite,
+}: {
+  token: string;
+  invite: InvitePreview;
+}) {
   const accept = useAcceptInvite(token);
   const form = useForm<z.infer<typeof nameOnlySchema>>({
     resolver: zodResolver(nameOnlySchema),
@@ -149,13 +197,21 @@ function ConfirmJoin({ token, invite }: { token: string; invite: InvitePreview }
     <Card>
       <InviteHeader invite={invite} />
       <CardContent>
-        <form onSubmit={form.handleSubmit((v) => accept.mutate(v))} noValidate className="grid gap-4">
+        <form
+          onSubmit={form.handleSubmit((v) => accept.mutate(v))}
+          noValidate
+          className="grid gap-4"
+        >
           {accept.isError && (
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(accept.error)}</AlertDescription>
             </Alert>
           )}
-          <FormField id="full_name" label="Your name" error={errors.full_name?.message}>
+          <FormField
+            id="full_name"
+            label="Your name"
+            error={errors.full_name?.message}
+          >
             <Input
               {...fieldAria("full_name", errors.full_name?.message)}
               autoComplete="name"
@@ -196,7 +252,10 @@ function SupabaseIdentityForm({
       const supabase = await getSupabase();
       if (!supabase) throw new Error("Sign-in is unavailable.");
       if (hasAccount) {
-        const { error } = await supabase.auth.signInWithPassword({ email: invite.email, password });
+        const { error } = await supabase.auth.signInWithPassword({
+          email: invite.email,
+          password,
+        });
         if (error) throw new Error(supabaseErrorMessage(error.message));
         return { full_name, signedIn: true };
       }
@@ -205,7 +264,10 @@ function SupabaseIdentityForm({
         password,
         options: {
           data: { full_name },
-          emailRedirectTo: authRedirect("/auth/callback", `/invite/${encodeURIComponent(token)}`),
+          emailRedirectTo: authRedirect(
+            "/auth/callback",
+            `/invite/${encodeURIComponent(token)}`,
+          ),
         },
       });
       if (error) throw new Error(supabaseErrorMessage(error.message));
@@ -234,13 +296,21 @@ function SupabaseIdentityForm({
     <Card>
       <InviteHeader invite={invite} />
       <CardContent>
-        <form onSubmit={form.handleSubmit((v) => identify.mutate(v))} noValidate className="grid gap-4">
+        <form
+          onSubmit={form.handleSubmit((v) => identify.mutate(v))}
+          noValidate
+          className="grid gap-4"
+        >
           {failure && (
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(failure)}</AlertDescription>
             </Alert>
           )}
-          <FormField id="full_name" label="Your name" error={errors.full_name?.message}>
+          <FormField
+            id="full_name"
+            label="Your name"
+            error={errors.full_name?.message}
+          >
             <Input
               {...fieldAria("full_name", errors.full_name?.message)}
               autoComplete="name"
@@ -251,7 +321,11 @@ function SupabaseIdentityForm({
           <FormField
             id="password"
             label={hasAccount ? "Your password" : "Choose a password"}
-            hint={hasAccount ? `Sign in as ${invite.email}.` : "At least 10 characters."}
+            hint={
+              hasAccount
+                ? `Sign in as ${invite.email}.`
+                : "At least 10 characters."
+            }
             error={errors.password?.message}
           >
             <Input
@@ -284,7 +358,13 @@ function SupabaseIdentityForm({
   );
 }
 
-function AcceptForm({ token, invite }: { token: string; invite: InvitePreview }) {
+function AcceptForm({
+  token,
+  invite,
+}: {
+  token: string;
+  invite: InvitePreview;
+}) {
   const schema = acceptInviteSchema(invite.has_account);
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -298,13 +378,21 @@ function AcceptForm({ token, invite }: { token: string; invite: InvitePreview })
     <Card>
       <InviteHeader invite={invite} />
       <CardContent>
-        <form onSubmit={form.handleSubmit((v) => accept.mutate(v))} noValidate className="grid gap-4">
+        <form
+          onSubmit={form.handleSubmit((v) => accept.mutate(v))}
+          noValidate
+          className="grid gap-4"
+        >
           {accept.isError && (
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(accept.error)}</AlertDescription>
             </Alert>
           )}
-          <FormField id="full_name" label="Your name" error={errors.full_name?.message}>
+          <FormField
+            id="full_name"
+            label="Your name"
+            error={errors.full_name?.message}
+          >
             <Input
               {...fieldAria("full_name", errors.full_name?.message)}
               autoComplete="name"
@@ -314,7 +402,9 @@ function AcceptForm({ token, invite }: { token: string; invite: InvitePreview })
           </FormField>
           <FormField
             id="password"
-            label={invite.has_account ? "Your current password" : "Choose a password"}
+            label={
+              invite.has_account ? "Your current password" : "Choose a password"
+            }
             hint={
               invite.has_account
                 ? "You already have an account. Confirm it's you."
@@ -325,7 +415,9 @@ function AcceptForm({ token, invite }: { token: string; invite: InvitePreview })
             <Input
               {...fieldAria("password", errors.password?.message)}
               type="password"
-              autoComplete={invite.has_account ? "current-password" : "new-password"}
+              autoComplete={
+                invite.has_account ? "current-password" : "new-password"
+              }
               {...form.register("password")}
             />
           </FormField>

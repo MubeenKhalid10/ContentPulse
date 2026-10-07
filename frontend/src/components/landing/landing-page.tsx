@@ -4,9 +4,10 @@ import Link from "next/link";
 import { MastheadClock } from "@/components/landing/masthead-clock";
 import {
   EXAMPLE_CLIENT,
-  priorityOf,
+  relevanceOf,
   WIRE,
 } from "@/components/landing/wire-data";
+import { ProductTour } from "@/components/landing/product-tour";
 import { WireDesk } from "@/components/landing/wire-desk";
 import { Logo } from "@/components/shared/logo";
 import { cn } from "@/lib/utils";
@@ -15,44 +16,6 @@ const inkButton =
   "inline-flex h-11 items-center justify-center gap-2 rounded-sm bg-foreground px-5 text-sm font-semibold text-background outline-none transition-colors hover:bg-foreground/85 focus-visible:ring-3 focus-visible:ring-ring/60";
 const lineButton =
   "inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-foreground px-5 text-sm font-semibold outline-none transition-colors hover:bg-foreground hover:text-background focus-visible:ring-3 focus-visible:ring-ring/60";
-
-/** The route a story takes, desk by desk. Mirrors the app's real workflow. */
-const ROUTE = [
-  {
-    desk: "Wire",
-    happens:
-      "Trends arrive from Google Trends, Google News, Hacker News, Reddit and your RSS feeds.",
-    who: "Automatic",
-  },
-  {
-    desk: "Fit check",
-    happens:
-      "Each trend is scored 0–100 against this client's services, audience and knowledge base. Below the bar, it's spiked.",
-    who: "Automatic",
-  },
-  {
-    desk: "Shortlist",
-    happens: "Pick the stories worth running for this client.",
-    who: "Creator",
-  },
-  {
-    desk: "Write",
-    happens:
-      "A post plan per platform, then copy drafted from the client's own material.",
-    who: "Creator",
-  },
-  {
-    desk: "Design",
-    happens: "Upload the visual, or generate one from the brief and the copy.",
-    who: "Creator",
-  },
-  {
-    desk: "Approve",
-    happens:
-      "Read the post as it will appear in the feed. Approve, or send it back with a note.",
-    who: "Admin",
-  },
-];
 
 const STAFF = [
   {
@@ -89,6 +52,23 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           >
             <Logo className="text-xl" />
           </Link>
+          <nav
+            aria-label="Page"
+            className="ml-4 hidden items-center gap-1 md:flex"
+          >
+            {[
+              ["#how-it-works", "How it works"],
+              ["#faq", "FAQ"],
+            ].map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                className="inline-flex h-11 items-center rounded-sm px-3 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/60"
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
           <nav aria-label="Account" className="ml-auto flex items-center gap-1">
             <span className="mr-2 hidden text-muted-foreground sm:inline">
               <MastheadClock />
@@ -127,15 +107,15 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <WireDesk
             intro={
               <div>
-                <h1 className="headline text-[clamp(3.25rem,8vw,6rem)] uppercase">
-                  Read the wire.
-                  <br />
-                  Run what <span className="text-flash">fits.</span>
+                <h1 className="headline text-[clamp(2.75rem,6.4vw,5.25rem)] uppercase">
+                  Turn the trends that <span className="text-flash">fit</span>{" "}
+                  each client into approved posts.
                 </h1>
-                <p className="mt-5 max-w-[60ch] text-base leading-relaxed text-muted-foreground sm:text-lg">
-                  ContentPulse scores every trend against each client&apos;s
-                  services and material, then carries the ones that fit to an
-                  approved post.
+                <p className="mt-5 max-w-[62ch] text-base leading-relaxed text-muted-foreground sm:text-lg">
+                  ContentPulse is a social media workspace for marketing
+                  agencies. It finds what&apos;s trending in each client&apos;s
+                  market, keeps only what fits their business, writes the post
+                  from their own material, and gets it approved by your team.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   {signedIn ? (
@@ -155,20 +135,53 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
                     </>
                   )}
                 </div>
+                <dl className="mt-8 grid gap-x-6 gap-y-3 border-t border-border pt-4 sm:grid-cols-3">
+                  {[
+                    ["For", "Agencies running content for several clients"],
+                    [
+                      "Writes for",
+                      "LinkedIn, X, Instagram, Facebook and blogs",
+                    ],
+                    [
+                      "You stay in charge",
+                      "Nothing is posted without approval",
+                    ],
+                  ].map(([k, v]) => (
+                    <div key={k} className="grid gap-0.5">
+                      <dt className="slug text-muted-foreground">{k}</dt>
+                      <dd className="text-sm font-medium">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
               </div>
             }
           />
         </section>
 
-        <RouteSlip />
+        <section
+          id="how-it-works"
+          aria-labelledby="how-title"
+          className="mx-auto max-w-7xl scroll-mt-6 px-4 py-16 sm:px-6"
+        >
+          <SectionHead id="how-title" title="How it works">
+            <p>
+              Six steps from a trend to a post that&apos;s ready to publish.
+              Here is each screen with an invented client, {EXAMPLE_CLIENT.name}
+              , {EXAMPLE_CLIENT.what}.
+            </p>
+          </SectionHead>
+          <ProductTour />
+        </section>
+
         <FitScale />
         <StaffBox />
         <WhatItRunsOn />
+        <Faq />
 
         <section className="dark bg-background text-foreground">
           <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-6 px-4 py-16 sm:px-6">
             <h2 className="headline max-w-3xl text-[clamp(2.5rem,6vw,4.5rem)] uppercase">
-              Your clients&apos; wire is already running.
+              Set up your first client in ten minutes.
             </h2>
             <Link
               href={signedIn ? "/dashboard" : "/register"}
@@ -226,52 +239,6 @@ function SectionHead({
   );
 }
 
-function RouteSlip() {
-  return (
-    <section
-      aria-labelledby="route-title"
-      className="mx-auto max-w-7xl px-4 py-16 sm:px-6"
-    >
-      <SectionHead id="route-title" title="The route a story takes">
-        <p>
-          Six desks, one place. Most posts go from the wire to &ldquo;Ready to
-          publish&rdquo; in about seven clicks, and nothing is published without
-          a person approving it.
-        </p>
-      </SectionHead>
-      <ol className="mt-8 border-t border-foreground">
-        {ROUTE.map((step, i) => (
-          <li
-            key={step.desk}
-            className="grid gap-x-6 gap-y-1 border-b border-border py-4 sm:grid-cols-[3rem_10rem_minmax(0,1fr)_8rem] sm:items-baseline"
-          >
-            <span
-              className="slug text-muted-foreground tabular-nums"
-              aria-hidden
-            >
-              {String(i + 1).padStart(2, "0")}
-            </span>
-            <span className="headline text-2xl uppercase">{step.desk}</span>
-            <span className="max-w-[62ch] text-sm leading-relaxed">
-              {step.happens}
-            </span>
-            <span
-              className={cn(
-                "slug justify-self-start sm:justify-self-end",
-                step.who === "Automatic"
-                  ? "text-muted-foreground"
-                  : "font-semibold",
-              )}
-            >
-              {step.who}
-            </span>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
 function FitScale() {
   const ticks = [...WIRE].sort((a, b) => a.fit - b.fit);
   return (
@@ -283,8 +250,9 @@ function FitScale() {
         <p>
           Popular isn&apos;t the same as relevant. Every trend gets one score
           from 0 to 100 for each client, from how closely it matches their
-          services, their audience and the material in their knowledge base. You
-          set the bar; anything under it never reaches the desk.
+          services, their audience and the material in their knowledge base. At
+          45 a trend is Relevant and at 75 Highly relevant; only those get post
+          ideas, so the rest never take up your team&apos;s time.
         </p>
         <p className="mt-3">
           Posts are written from the client&apos;s own documents, so every claim
@@ -296,7 +264,7 @@ function FitScale() {
         <div
           className="relative h-28"
           role="img"
-          aria-label={`Example scores on a 0 to 100 scale. The client's bar is ${EXAMPLE_CLIENT.threshold}; ${ticks.filter((t) => t.fit >= EXAMPLE_CLIENT.threshold).length} of ${ticks.length} items clear it.`}
+          aria-label={`Example scores on a 0 to 100 scale. Relevant starts at ${EXAMPLE_CLIENT.threshold}; ${ticks.filter((t) => t.fit >= EXAMPLE_CLIENT.threshold).length} of ${ticks.length} items reach it.`}
         >
           <div
             aria-hidden
@@ -323,7 +291,7 @@ function FitScale() {
             style={{ left: `${EXAMPLE_CLIENT.threshold}%` }}
           >
             <span className="slug absolute top-0 left-2 font-semibold whitespace-nowrap text-flash">
-              Bar {EXAMPLE_CLIENT.threshold}
+              Relevant {EXAMPLE_CLIENT.threshold}+
             </span>
           </span>
           {ticks.map((t, i) => {
@@ -332,7 +300,7 @@ function FitScale() {
               <span
                 key={t.id}
                 aria-hidden
-                title={`${t.headline} (fit ${t.fit}, ${priorityOf(t).toLowerCase()})`}
+                title={`${t.headline} (fit ${t.fit}, ${relevanceOf(t).toLowerCase()})`}
                 className={cn(
                   "absolute bottom-6 w-0.5 -translate-x-1/2",
                   fits ? "bg-flash" : "bg-paper-6",
@@ -347,7 +315,7 @@ function FitScale() {
         </div>
         <figcaption className="mt-3 text-xs text-muted-foreground">
           The example wire above, placed on the scale for {EXAMPLE_CLIENT.name}.
-          Red ticks clear the bar.
+          Red ticks are Relevant or better.
         </figcaption>
       </figure>
     </section>
@@ -360,7 +328,7 @@ function StaffBox() {
       aria-labelledby="staff-title"
       className="mx-auto max-w-7xl px-4 py-16 sm:px-6"
     >
-      <SectionHead id="staff-title" title="Who works the desk">
+      <SectionHead id="staff-title" title="Who does what">
         <p>
           One workspace per client, three roles inside it. One person can work
           for many clients and switch between them.
@@ -393,7 +361,7 @@ function WhatItRunsOn() {
       aria-labelledby="runs-title"
       className="mx-auto max-w-7xl px-4 py-16 sm:px-6"
     >
-      <SectionHead id="runs-title" title="Works with what you have">
+      <SectionHead id="runs-title" title="What it works with">
         <p>
           Trend sources that need no keys work from day one. AI is optional and
           switchable: when a model hits its limit, the next one in your list
@@ -420,6 +388,69 @@ function WhatItRunsOn() {
             <h3 className="slug font-semibold">{title}</h3>
             <p className="mt-2 text-sm leading-relaxed">{body}</p>
           </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+const FAQ = [
+  {
+    q: "What does ContentPulse actually do?",
+    a: "It watches the trends in each client's market, scores how well each one fits that client, and helps your team turn the good ones into finished posts: a plan, the copy, the image and an approval, all in one place.",
+  },
+  {
+    q: "Does it post to LinkedIn, X, Instagram or Facebook for me?",
+    a: "Not yet. Approved posts are marked ready to publish, and you share or copy them to the platform. Nothing is ever posted without a person approving it.",
+  },
+  {
+    q: "Where do the trends come from?",
+    a: "Google Trends, Google News, Hacker News, Reddit and any RSS feeds you add work straight away. NewsAPI-style sources and X can be added with their keys.",
+  },
+  {
+    q: "How does it avoid making things up?",
+    a: "Posts are written from the client's own material: their profile, services and the pages of their website you add to the knowledge base. Each draft shows which sources it used.",
+  },
+  {
+    q: "Who on my team can do what?",
+    a: "Admins set up clients, invite people and approve posts. Creators shortlist topics, write posts and add designs. Viewers can read everything and share finished posts, which suits a client contact.",
+  },
+  {
+    q: "What if AI isn't set up?",
+    a: "Everything still works: trends get a rule-based fit score and posts start from platform templates you can edit. With AI connected, you get written reasons, full drafts and generated images.",
+  },
+];
+
+function Faq() {
+  return (
+    <section
+      id="faq"
+      aria-labelledby="faq-title"
+      className="mx-auto max-w-7xl scroll-mt-6 px-4 py-16 sm:px-6"
+    >
+      <SectionHead id="faq-title" title="Questions" />
+      <div className="mt-8 border-t border-foreground lg:ml-[calc(40%+1rem)]">
+        {FAQ.map(({ q, a }) => (
+          <details key={q} className="group border-b border-border">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 text-base font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/60 [&::-webkit-details-marker]:hidden">
+              {q}
+              <span
+                aria-hidden
+                className="slug shrink-0 text-muted-foreground group-open:hidden"
+              >
+                Open
+              </span>
+              <span
+                aria-hidden
+                className="slug hidden shrink-0 text-muted-foreground group-open:inline"
+              >
+                Close
+              </span>
+            </summary>
+            <p className="max-w-[64ch] pb-5 text-sm leading-relaxed text-muted-foreground">
+              {a}
+            </p>
+          </details>
         ))}
       </div>
     </section>

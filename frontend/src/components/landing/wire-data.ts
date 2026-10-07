@@ -12,10 +12,12 @@ export const EXAMPLE_CLIENT = {
     "Incident response",
     "Security awareness training",
   ],
-  threshold: 60,
+  // The app writes post ideas for trends rated Relevant or better (fit 45+).
+  threshold: 45,
 };
 
-export type Priority = "FLASH" | "URGENT" | "ROUTINE";
+export type Relevance =
+  "Highly relevant" | "Relevant" | "Weakly relevant" | "Not relevant";
 
 export type WireItem = {
   id: string;
@@ -115,10 +117,12 @@ export const WIRE: WireItem[] = [
   },
 ];
 
-export function priorityOf(item: WireItem): Priority {
-  if (item.fit >= 90) return "FLASH";
-  if (item.fit >= EXAMPLE_CLIENT.threshold) return "URGENT";
-  return "ROUTINE";
+/** The app's own relevance bands (backend alignment engine). */
+export function relevanceOf(item: WireItem): Relevance {
+  if (item.fit >= 75) return "Highly relevant";
+  if (item.fit >= 45) return "Relevant";
+  if (item.fit >= 20) return "Weakly relevant";
+  return "Not relevant";
 }
 
 export const FITTING = WIRE.filter((i) => i.fit >= EXAMPLE_CLIENT.threshold);

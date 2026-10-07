@@ -295,3 +295,38 @@
     height: auto;
   }
 }
+
+/*
+ * Sign-in screens: forms sit straight on the paper like the app's pages.
+ * The shared Card becomes a ruled section with a headline title.
+ */
+.auth-desk [data-slot="card"] {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding-block: 0;
+  gap: 1.5rem;
+  overflow: visible;
+}
+.auth-desk [data-slot="card-header"],
+.auth-desk [data-slot="card-content"],
+.auth-desk [data-slot="card-footer"] {
+  padding-inline: 0;
+}
+.auth-desk [data-slot="card-header"] {
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 3px double var(--foreground);
+}
+.auth-desk [data-slot="card-title"] {
+  font-family: var(--font-display);
+  font-stretch: 72%;
+  font-weight: 800;
+  font-size: 2.5rem;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+.auth-desk [data-slot="card-footer"] {
+  background: transparent;
+  border: 0;
+}

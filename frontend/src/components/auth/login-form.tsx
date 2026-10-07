@@ -8,7 +8,13 @@ import { useForm } from "react-hook-form";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { errorMessage } from "@/lib/api";
 import { useAuthConfig, useLogin } from "@/lib/auth";
@@ -19,7 +25,8 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const login = useLogin();
-  const supabaseMode = useAuthConfig().data?.provider === "supabase";
+  // Supabase sends its own reset emails; local mode needs SMTP on the server.
+  const canReset = useAuthConfig().data?.password_reset === true;
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -29,7 +36,11 @@ export function LoginForm() {
   const onSubmit = form.handleSubmit((values) =>
     login.mutate(values, {
       onSuccess: ({ user }) => {
-        router.replace(user.organization_id ? safeNext(searchParams.get("next")) : "/onboarding");
+        router.replace(
+          user.organization_id
+            ? safeNext(searchParams.get("next"))
+            : "/onboarding",
+        );
       },
     }),
   );
@@ -37,8 +48,12 @@ export function LoginForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle role="heading" aria-level={1} className="text-xl">Sign in</CardTitle>
-        <CardDescription>Welcome back. Pick up where your team left off.</CardDescription>
+        <CardTitle role="heading" aria-level={1} className="text-xl">
+          Sign in
+        </CardTitle>
+        <CardDescription>
+          Welcome back. Pick up where your team left off.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} noValidate className="grid gap-4">
@@ -61,7 +76,7 @@ export function LoginForm() {
             label="Password"
             error={errors.password?.message}
             action={
-              supabaseMode ? (
+              canReset ? (
                 <Link
                   href="/forgot-password"
                   className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
@@ -83,7 +98,10 @@ export function LoginForm() {
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             New to ContentPulse?{" "}
-            <Link href="/register" className="font-medium text-foreground underline-offset-4 hover:underline">
+            <Link
+              href="/register"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
               Create an account
             </Link>
           </p>

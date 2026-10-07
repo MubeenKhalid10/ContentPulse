@@ -22,18 +22,24 @@ export function AuthCallback() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(searchParams.get("error_description"));
+  const [error, setError] = useState<string | null>(
+    searchParams.get("error_description"),
+  );
 
   useEffect(() => {
     if (error) return;
     let cancelled = false;
     (async () => {
       const supabase = await getSupabase();
-      if (!supabase) throw new Error("Email sign-in links aren't enabled for this workspace.");
+      if (!supabase)
+        throw new Error(
+          "Email sign-in links aren't enabled for this workspace.",
+        );
       const { error: initError } = await supabase.auth.initialize();
       if (initError) throw new Error(supabaseErrorMessage(initError.message));
       const { data } = await supabase.auth.getSession();
-      if (!data.session) throw new Error("This link is invalid or has already been used.");
+      if (!data.session)
+        throw new Error("This link is invalid or has already been used.");
       const me = await api<Me>("/auth/me");
       if (cancelled) return;
       setActiveOrgId(me.organization_id);
@@ -66,7 +72,9 @@ export function AuthCallback() {
   return (
     <Card aria-busy="true">
       <CardHeader>
-        <CardTitle role="heading" aria-level={1} className="text-xl">Signing you in…</CardTitle>
+        <CardTitle role="heading" aria-level={1} className="text-xl">
+          Signing you in…
+        </CardTitle>
         <Skeleton className="h-4 w-2/3" />
       </CardHeader>
     </Card>
