@@ -66,6 +66,7 @@ bucket rather than through the API.
    | `EMBEDDING_PROVIDER` | `gemini` (or empty) | uses the Gemini key |
    | `IMAGE_PROVIDER` | `kie` (or empty to hide AI images) | your choice |
    | `KIE_AI_API_KEY` | image key | <https://kie.ai/api-key> |
+   | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | free daily image allowance (alternative or backup to Kie) | Cloudflare dashboard: the account id is on the Workers AI page; **My Profile > API Tokens > Create Token** with the "Workers AI" template |
    | `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` | optional email | your mail provider (Resend, Postmark, SendGrid, Amazon SES, Gmail app password) |
 
    | `AUTH_PROVIDER` | `local` (email + password) or `supabase` | your choice; empty means `local` |

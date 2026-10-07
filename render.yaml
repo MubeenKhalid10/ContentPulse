@@ -89,7 +89,16 @@ services:
         sync: false
       - key: IMAGE_PROVIDER
         sync: false
+      # Images: IMAGE_PROVIDER=kie or cloudflare (empty = Kie if its key is set,
+      # else Cloudflare). IMAGE_MODEL is optional (provider default otherwise).
+      - key: IMAGE_MODEL
+        sync: false
       - key: KIE_AI_API_KEY
+        sync: false
+      # Cloudflare Workers AI: account id + an API token with "Workers AI" permission.
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
         sync: false
 
       # Email (optional): invitations and password reset in local sign-in mode.
