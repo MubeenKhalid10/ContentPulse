@@ -9,7 +9,7 @@ matching connect arguments.
 
 import ssl
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "db", "postgres"}
 # libpq-only options asyncpg doesn't understand.
@@ -27,9 +27,37 @@ _SSL_REQUIRED = {"require", "verify-ca", "verify-full"}
 _TRANSACTION_POOL_PORTS = {6543}
 
 
+def _escape_credentials(raw: str) -> str:
+    """Percent-encode the user and password.
+
+    Generated passwords often contain characters that are special in a URL
+    (/ ? # @ :). Pasted unescaped, they cut the URL in the wrong place: part of
+    the password ends up parsed as the host or port. The last "@" always
+    separates the credentials from the host, so split there and encode both
+    halves (decoding first, so an already-escaped password isn't escaped twice).
+    """
+    scheme, sep, rest = raw.partition("://")
+    at = rest.rfind("@")
+    if not sep or at == -1:
+        return raw
+    user, colon, password = rest[:at].partition(":")
+    credentials = quote(unquote(user), safe="")
+    if colon:
+        credentials += ":" + quote(unquote(password), safe="")
+    return f"{scheme}://{credentials}@{rest[at + 1 :]}"
+
+
 def async_database_url(raw: str) -> tuple[str, dict[str, Any]]:
     """Return (sqlalchemy async URL, connect_args) for any Postgres URL."""
-    parts = urlsplit(raw.strip())
+    parts = urlsplit(_escape_credentials(raw.strip()))
+    try:
+        port = parts.port
+    except ValueError:
+        # Never echo the URL: it holds the password.
+        raise ValueError(
+            "DATABASE_URL has an invalid host or port. Copy it again from your database "
+            "provider (for Supabase: Connect > Session pooler)."
+        ) from None
     scheme = parts.scheme
     if scheme in ("postgres", "postgresql", "postgresql+psycopg", "postgresql+psycopg2"):
         scheme = "postgresql+asyncpg"
@@ -50,7 +78,7 @@ def async_database_url(raw: str) -> tuple[str, dict[str, Any]]:
         # Hosted databases expect TLS; local Docker Postgres doesn't offer it.
         connect_args["ssl"] = _ssl_context(verify=False)
 
-    if parts.port in _TRANSACTION_POOL_PORTS or query.get("pgbouncer") == "true":
+    if port in _TRANSACTION_POOL_PORTS or query.get("pgbouncer") == "true":
         # Transaction pools can't keep prepared statements between queries.
         connect_args["statement_cache_size"] = 0
         connect_args["prepared_statement_cache_size"] = 0
