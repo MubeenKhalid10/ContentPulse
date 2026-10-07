@@ -1,9 +1,21 @@
-# Render Blueprint: the FastAPI backend (docs/deploy-vercel.md).
-# The web app runs on Vercel and reaches this service through its
-# /api/v1 rewrite (API_URL). Database: Supabase Postgres. Files: Supabase Storage.
+# Render Blueprint: the FastAPI backend only, on Render's FREE plan
+# (docs/deploy-vercel.md). The website runs on Vercel and reaches this service
+# through its /api/v1 rewrite (API_URL). Database: Supabase Postgres (free).
+# Files: Supabase Storage (S3-compatible).
+#
+# Free-plan notes:
+# - One web service and nothing else. Background jobs and the trend scheduler
+#   run inside the API process (TASK_BACKEND=inprocess), so no worker, Redis or
+#   Render database is needed (workers have no free plan; Redis and Postgres
+#   would add paid or expiring resources).
+# - The service sleeps after 15 minutes without traffic and takes about a
+#   minute to wake. Scheduled trend discovery only runs while it's awake.
+#   Change `plan: free` to `plan: starter` later to keep it always on.
+# - Pre-deploy commands need a paid plan, so migrations run at start-up.
 #
 # Values marked `sync: false` are asked for when you create the Blueprint
-# (Render dashboard > New > Blueprint) and are never stored in git.
+# (Render dashboard > New > Blueprint) and are never stored in git. Leave
+# optional ones empty.
 services:
   - type: web
     name: contentpulse-api
@@ -11,13 +23,10 @@ services:
     rootDir: backend
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    # Always on: background jobs and the trend scheduler run inside this
-    # process, so a sleeping free instance would pause them.
-    plan: starter
+    plan: free
     region: frankfurt
     healthCheckPath: /health
-    # Schema changes run once per deploy, before the new version takes traffic.
-    preDeployCommand: alembic upgrade head
+    dockerCommand: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
     autoDeploy: true
     envVars:
       - key: APP_ENV
@@ -27,23 +36,35 @@ services:
       # https://<your-project>.vercel.app (or your custom domain)
       - key: FRONTEND_URL
         sync: false
+      # The same URL as a JSON list: ["https://<your-project>.vercel.app"]
       - key: CORS_ORIGINS
         sync: false
-      # Supabase > Connect > Session pooler (port 5432)
+      # Supabase > Connect > Session pooler (port 5432). Paste it as shown.
       - key: DATABASE_URL
         sync: false
       # Browser -> Vercel -> Render -> API: the client is the 2nd address from the right.
       - key: TRUSTED_PROXY_COUNT
         value: "2"
+      - key: COOKIE_SECURE
+        value: "true"
       - key: TASK_BACKEND
         value: inprocess
+      - key: TREND_SCHEDULER_ENABLED
+        value: "true"
       # One instance and no Redis: limits live in memory.
       - key: RATE_LIMIT_BACKEND
         value: memory
       - key: LLM_LIMITER_BACKEND
         value: memory
+
+      # Sign-in: "local" (email + password, no setup) or "supabase" (Supabase Auth;
+      # then also set SUPABASE_URL and SUPABASE_ANON_KEY).
       - key: AUTH_PROVIDER
-        value: local
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
 
       # Design files: Supabase Storage through its S3-compatible endpoint.
       - key: S3_BUCKET
@@ -71,7 +92,7 @@ services:
       - key: KIE_AI_API_KEY
         sync: false
 
-      # Email (optional): invitations and password reset.
+      # Email (optional): invitations and password reset in local sign-in mode.
       - key: SMTP_HOST
         sync: false
       - key: SMTP_USERNAME
