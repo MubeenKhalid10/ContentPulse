@@ -9,7 +9,13 @@ import {
   SendIcon,
   ThumbsUpIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import {
   EXAMPLE_CLIENT,
@@ -113,26 +119,26 @@ export function WireDesk({ intro }: { intro?: React.ReactNode }) {
   }
 
   return (
-    <div className="grid min-w-0 gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-12">
-      <WireTape
-        tick={tick}
-        selectedId={selected.id}
-        isRead={isRead}
-        reduced={reduced}
-        stopped={stopped || pickedId !== null}
-        onToggle={() => {
-          if (pickedId !== null) {
-            setPickedId(null);
-            setStopped(false);
-          } else {
-            setStopped((s) => !s);
-          }
-        }}
-        onHold={setHeld}
-        onPick={setPickedId}
-      />
-      <div className="order-1 grid min-w-0 content-start gap-12 lg:order-2">
-        {intro}
+    <div className="grid min-w-0 gap-12">
+      {intro}
+      <div className="grid min-w-0 items-start gap-10 border-t-[3px] border-double border-foreground pt-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-12">
+        <WireTape
+          tick={tick}
+          selectedId={selected.id}
+          isRead={isRead}
+          reduced={reduced}
+          stopped={stopped || pickedId !== null}
+          onToggle={() => {
+            if (pickedId !== null) {
+              setPickedId(null);
+              setStopped(false);
+            } else {
+              setStopped((s) => !s);
+            }
+          }}
+          onHold={setHeld}
+          onPick={setPickedId}
+        />
         <Desk item={selected} announce={pickedId !== null} />
       </div>
     </div>
@@ -161,30 +167,30 @@ function WireTape({
   const feedRef = useRef<HTMLDivElement>(null);
   const atLine = tick % N;
 
-  // Step the feed so the row at the read line sits at the top of the tape.
-  // The list is doubled: wrapping steps onto the copy's first row, then snaps
-  // back to the original without a transition.
-  useEffect(() => {
+  // One list, rotated so the item at the read line is on top. Each step,
+  // the rows slide up by the height of the row that just left the top
+  // (it moves to the bottom), so no item ever shows twice.
+  const order = reduced
+    ? WIRE.map((_, i) => i)
+    : WIRE.map((_, k) => (atLine + k) % N);
+
+  useLayoutEffect(() => {
     const feed = feedRef.current;
-    if (!feed || reduced) return;
-    const rows = feed.querySelectorAll<HTMLElement>("[data-wire-row]");
-    const wrapping = tick > 0 && atLine === 0;
-    const target = rows[wrapping ? N : atLine];
-    if (!target) return;
+    if (!feed || reduced || tick === 0) return;
+    const left = WIRE[(atLine - 1 + N) % N]!;
+    const row = feed.querySelector<HTMLElement>(`[data-wire-row="${left.id}"]`);
+    if (!row) return;
+    feed.style.transition = "none";
+    feed.style.transform = `translateY(${row.offsetHeight}px)`;
+    void feed.offsetHeight; // commit the start position before animating
     feed.style.transition = STEP_EASE;
-    feed.style.transform = `translateY(${-target.offsetTop}px)`;
-    if (!wrapping) return;
-    const snap = window.setTimeout(() => {
-      feed.style.transition = "none";
-      feed.style.transform = "translateY(0)";
-    }, 300);
-    return () => window.clearTimeout(snap);
+    feed.style.transform = "translateY(0)";
   }, [tick, atLine, reduced]);
 
   return (
     <section
       aria-labelledby="wire-title"
-      className="order-2 min-w-0 lg:sticky lg:top-6 lg:order-1 lg:self-start"
+      className="min-w-0"
       onPointerEnter={() => onHold(true)}
       onPointerLeave={() => onHold(false)}
       onFocus={() => onHold(true)}
@@ -198,7 +204,7 @@ function WireTape({
         </h2>
         {/* Own line, so the header keeps one height with or without Pause. */}
         <span className="slug order-last basis-full text-muted-foreground">
-          <span className="text-flash">Red</span>: fits ·{" "}
+          <span className="text-flash">Red</span>: Relevant or better ·{" "}
           <span className="line-through">struck</span>: filtered out
         </span>
         {!reduced && (
@@ -217,7 +223,7 @@ function WireTape({
           </button>
         )}
       </div>
-      <div className="relative h-[26rem] overflow-hidden border-x border-b border-border bg-card lg:h-[calc(100svh-7.5rem)] lg:max-h-[56rem] lg:min-h-[36rem]">
+      <div className="relative h-[26rem] overflow-hidden border-x border-b border-border bg-card lg:h-[38rem]">
         <span
           aria-hidden
           className="wire-perf absolute inset-y-0 left-0 z-10 w-4 border-r border-dashed border-border"
@@ -232,15 +238,12 @@ function WireTape({
           ref={feedRef}
           className={cn("pl-4", reduced && "h-full overflow-y-auto")}
         >
-          <WireList selectedId={selectedId} isRead={isRead} onPick={onPick} />
-          {!reduced && (
-            <WireList
-              selectedId={selectedId}
-              isRead={isRead}
-              onPick={onPick}
-              copy
-            />
-          )}
+          <WireList
+            order={order}
+            selectedId={selectedId}
+            isRead={isRead}
+            onPick={onPick}
+          />
         </div>
         <span
           aria-hidden
@@ -252,7 +255,7 @@ function WireTape({
         {EXAMPLE_CLIENT.what}.{" "}
         {reduced
           ? "Each trend carries the relevance label the app gives it."
-          : "Each trend is scored as it crosses the red line."}{" "}
+          : "Each trend gets its score as it crosses the red line."}{" "}
         Trends rated Relevant or better get post ideas. Pick any item to see
         what happens to it.
       </p>
@@ -261,27 +264,27 @@ function WireTape({
 }
 
 function WireList({
+  order,
   selectedId,
   isRead,
   onPick,
-  copy = false,
 }: {
+  order: number[];
   selectedId: string;
   isRead: (i: number) => boolean;
   onPick: (id: string) => void;
-  copy?: boolean;
 }) {
   return (
-    <ul aria-hidden={copy || undefined} className="divide-y divide-border">
-      {WIRE.map((item, i) => {
+    <ul className="divide-y divide-border">
+      {order.map((i) => {
+        const item = WIRE[i]!;
         const active = item.id === selectedId;
         const read = isRead(i);
         return (
-          <li key={item.id} data-wire-row>
+          <li key={item.id} data-wire-row={item.id}>
             <button
               type="button"
-              tabIndex={copy ? -1 : undefined}
-              aria-pressed={copy ? undefined : active}
+              aria-pressed={active}
               onClick={() => onPick(item.id)}
               className={cn(
                 "grid w-full gap-1.5 px-4 py-3 text-left outline-none transition-colors focus-visible:bg-muted",
@@ -306,7 +309,7 @@ function WireList({
                 </span>
                 <span className="slug shrink-0 font-semibold whitespace-nowrap tabular-nums">
                   {/* No number until the item is scored. */}
-                  Fit {read ? item.fit : "—"}
+                  Score {read ? item.fit : "—"}
                 </span>
               </span>
               <span
@@ -368,28 +371,21 @@ function Desk({ item, announce }: { item: WireItem; announce: boolean }) {
       </div>
 
       <div key={item.id} className="desk-set mt-4">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <RelevanceFlag item={item} />
-          <span className="slug tabular-nums">Fit {item.fit} / 100</span>
-          <span className="slug text-muted-foreground">{item.source}</span>
-        </div>
-        <p className="headline mt-2 text-2xl sm:text-3xl">{item.headline}</p>
-
         {fits(item) && item.post ? (
           <>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Matches: {item.matched?.join(", ")}. Written from the
-              client&apos;s own service notes.
+            <p className="text-sm text-muted-foreground">
+              Written for the highlighted trend from the client&apos;s own
+              service notes. Matches: {item.matched?.join(", ")}.
             </p>
             <PostProof item={item} />
           </>
         ) : (
-          <div className="mt-4 flex items-center gap-4 border-y border-dashed border-foreground/40 py-4">
+          <div className="flex items-center gap-4 border-y border-dashed border-foreground/40 py-4">
             <SpikeMark className="h-12 w-10 shrink-0 text-foreground" />
             <div className="grid gap-1">
               <p className="headline text-xl uppercase">Filtered out</p>
               <p className="text-sm text-muted-foreground">
-                Fit {item.fit} is {relevanceOf(item)}. Only trends rated
+                Score {item.fit}: {relevanceOf(item)}. Only trends rated
                 Relevant or better get post ideas: popular isn&apos;t the same
                 as relevant.
               </p>

@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
+// On Vercel the API lives elsewhere (Render): fail the build rather than ship
+// a site that proxies every request to localhost.
+if (process.env.VERCEL && !process.env.API_URL) {
+  throw new Error("Set API_URL in the Vercel project (Settings > Environment Variables) to the backend's URL.");
+}
+
 const nextConfig: NextConfig = {
   // Self-contained server bundle for the Docker image (frontend/Dockerfile).
   // Local `next dev` / `next start` are unaffected.

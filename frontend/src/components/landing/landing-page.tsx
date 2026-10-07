@@ -135,24 +135,6 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
                     </>
                   )}
                 </div>
-                <dl className="mt-8 grid gap-x-6 gap-y-3 border-t border-border pt-4 sm:grid-cols-3">
-                  {[
-                    ["For", "Agencies running content for several clients"],
-                    [
-                      "Writes for",
-                      "LinkedIn, X, Instagram, Facebook and blogs",
-                    ],
-                    [
-                      "You stay in charge",
-                      "Nothing is posted without approval",
-                    ],
-                  ].map(([k, v]) => (
-                    <div key={k} className="grid gap-0.5">
-                      <dt className="slug text-muted-foreground">{k}</dt>
-                      <dd className="text-sm font-medium">{v}</dd>
-                    </div>
-                  ))}
-                </dl>
               </div>
             }
           />
@@ -246,7 +228,7 @@ function FitScale() {
       aria-labelledby="fit-title"
       className="mx-auto max-w-7xl px-4 py-16 sm:px-6"
     >
-      <SectionHead id="fit-title" title="One scale for fit">
+      <SectionHead id="fit-title" title="One score for every trend">
         <p>
           Popular isn&apos;t the same as relevant. Every trend gets one score
           from 0 to 100 for each client, from how closely it matches their
@@ -300,7 +282,7 @@ function FitScale() {
               <span
                 key={t.id}
                 aria-hidden
-                title={`${t.headline} (fit ${t.fit}, ${relevanceOf(t).toLowerCase()})`}
+                title={`${t.headline} (score ${t.fit}, ${relevanceOf(t).toLowerCase()})`}
                 className={cn(
                   "absolute bottom-6 w-0.5 -translate-x-1/2",
                   fits ? "bg-flash" : "bg-paper-6",
@@ -417,7 +399,7 @@ const FAQ = [
   },
   {
     q: "What if AI isn't set up?",
-    a: "Everything still works: trends get a rule-based fit score and posts start from platform templates you can edit. With AI connected, you get written reasons, full drafts and generated images.",
+    a: "Everything still works: trends get a rule-based score and posts start from platform templates you can edit. With AI connected, you get written reasons, full drafts and generated images.",
   },
 ];
 

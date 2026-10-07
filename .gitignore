@@ -50,3 +50,9 @@ celerybeat-schedule*
 # Scratch scripts
 *.tmp.py
 .impeccable/review/
+.impeccable
+
+
+AUDIT_REPORT.md
+DESIGN.md
+PRODUCT.md

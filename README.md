@@ -529,7 +529,8 @@ goes through `app/ai/gateway.py`. Full guide: [docs/llm-gateway.md](docs/llm-gat
 
 ## Going to production
 
-See [docs/production.md](docs/production.md) for the checklist: secrets, HTTPS cookies,
+To deploy on Vercel (web app) + Render (API) + Supabase (database and files), follow
+[docs/deploy-vercel.md](docs/deploy-vercel.md). See [docs/production.md](docs/production.md) for the checklist: secrets, HTTPS cookies,
 Redis, Celery, S3, email, AI limits and key rotation.
 
 ## Roadmap

@@ -32,7 +32,13 @@ class S3Storage:
             endpoint_url=settings.s3_endpoint_url,
             aws_access_key_id=settings.aws_access_key_id,
             aws_secret_access_key=settings.aws_secret_access_key,
-            config=Config(signature_version="s3v4", retries={"max_attempts": 3}),
+            config=Config(
+                signature_version="s3v4",
+                retries={"max_attempts": 3},
+                # S3-compatible stores (Supabase Storage, R2, MinIO) expect
+                # bucket-in-path URLs; AWS itself prefers virtual hosts.
+                s3={"addressing_style": "path" if settings.s3_endpoint_url else "auto"},
+            ),
         )
 
     async def upload_target(self, key: str, content_type: str, max_bytes: int) -> UploadTarget:

@@ -6,8 +6,8 @@ const STEPS = [
     "Their services, audience and website. About ten minutes.",
   ],
   [
-    "Trends arrive, scored for fit",
-    "Every trend in their market gets a 0–100 fit score. Only what fits reaches you.",
+    "Trends arrive, scored for relevance",
+    "Every trend in their market gets a score from 0 to 100. Only what is relevant reaches you.",
   ],
   [
     "Write from their material",

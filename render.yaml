@@ -1,0 +1,82 @@
+# Render Blueprint: the FastAPI backend (docs/deploy-vercel.md).
+# The web app runs on Vercel and reaches this service through its
+# /api/v1 rewrite (API_URL). Database: Supabase Postgres. Files: Supabase Storage.
+#
+# Values marked `sync: false` are asked for when you create the Blueprint
+# (Render dashboard > New > Blueprint) and are never stored in git.
+services:
+  - type: web
+    name: contentpulse-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Always on: background jobs and the trend scheduler run inside this
+    # process, so a sleeping free instance would pause them.
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /health
+    # Schema changes run once per deploy, before the new version takes traffic.
+    preDeployCommand: alembic upgrade head
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      # https://<your-project>.vercel.app (or your custom domain)
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      # Supabase > Connect > Session pooler (port 5432)
+      - key: DATABASE_URL
+        sync: false
+      # Browser -> Vercel -> Render -> API: the client is the 2nd address from the right.
+      - key: TRUSTED_PROXY_COUNT
+        value: "2"
+      - key: TASK_BACKEND
+        value: inprocess
+      # One instance and no Redis: limits live in memory.
+      - key: RATE_LIMIT_BACKEND
+        value: memory
+      - key: LLM_LIMITER_BACKEND
+        value: memory
+      - key: AUTH_PROVIDER
+        value: local
+
+      # Design files: Supabase Storage through its S3-compatible endpoint.
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+
+      # AI (all optional: without them the app uses rules and templates).
+      - key: LLM_PROVIDER
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: EMBEDDING_PROVIDER
+        sync: false
+      - key: IMAGE_PROVIDER
+        sync: false
+      - key: KIE_AI_API_KEY
+        sync: false
+
+      # Email (optional): invitations and password reset.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false

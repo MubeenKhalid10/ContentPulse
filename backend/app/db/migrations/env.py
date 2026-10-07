@@ -6,6 +6,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_settings
+from app.db.url import async_database_url
 from app.models import Base
 
 config = context.config
@@ -26,7 +27,7 @@ def _database_url() -> str:
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=_database_url(),
+        url=async_database_url(_database_url())[0],
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -43,7 +44,8 @@ def _run(connection: Connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    engine = create_async_engine(_database_url())
+    url, connect_args = async_database_url(_database_url())
+    engine = create_async_engine(url, connect_args=connect_args)
     async with engine.connect() as connection:
         await connection.run_sync(_run)
     await engine.dispose()

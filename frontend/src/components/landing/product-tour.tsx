@@ -40,7 +40,7 @@ const STEPS: Step[] = [
   },
   {
     id: "trends",
-    title: "Trends arrive, scored for fit",
+    title: "Trends arrive, scored for relevance",
     who: "Automatic · hourly to daily",
     body: "ContentPulse collects what's trending in the client's markets and scores every trend from 0 to 100 against their services and material. Popular but irrelevant trends never reach your team.",
     points: [
