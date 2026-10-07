@@ -30,5 +30,6 @@ EXPOSE 8000
 # Client IPs for rate limiting come from X-Forwarded-For (TRUSTED_PROXY_COUNT).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
   CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health/live' % os.environ.get('PORT', '8000'), timeout=3)" || exit 1
-# PORT is set by hosts such as Render; 8000 everywhere else (AWS, compose).
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# scripts/start.sh: optional migrations (MIGRATE_ON_START=true), then uvicorn on
+# $PORT (set by hosts such as Render; 8000 everywhere else).
+CMD ["sh", "/app/scripts/start.sh"]

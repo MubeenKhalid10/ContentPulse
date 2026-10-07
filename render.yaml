@@ -11,7 +11,8 @@
 # - The service sleeps after 15 minutes without traffic and takes about a
 #   minute to wake. Scheduled trend discovery only runs while it's awake.
 #   Change `plan: free` to `plan: starter` later to keep it always on.
-# - Pre-deploy commands need a paid plan, so migrations run at start-up.
+# - Pre-deploy commands need a paid plan, so migrations run at start-up
+#   (MIGRATE_ON_START, handled by backend/scripts/start.sh).
 #
 # Values marked `sync: false` are asked for when you create the Blueprint
 # (Render dashboard > New > Blueprint) and are never stored in git. Leave
@@ -26,11 +27,14 @@ services:
     plan: free
     region: frankfurt
     healthCheckPath: /health
-    dockerCommand: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
     autoDeploy: true
     envVars:
       - key: APP_ENV
         value: production
+      # The image's start script applies migrations, then starts the API
+      # (pre-deploy commands need a paid plan).
+      - key: MIGRATE_ON_START
+        value: "true"
       - key: JWT_SECRET
         generateValue: true
       # https://<your-project>.vercel.app (or your custom domain)
