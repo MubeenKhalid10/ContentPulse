@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftIcon, ExternalLinkIcon, LoaderCircleIcon, PencilIcon, SparklesIcon } from "lucide-react";
+import { ArrowLeftIcon, LoaderCircleIcon, PencilIcon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ import { CreativeUploader, CreativeVersions } from "@/components/design/creative
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArticlePreview } from "@/components/content/article-preview";
@@ -251,10 +251,6 @@ function ContentCard({ task: t }: { task: DesignTaskDetail }) {
             {t.post.topic_title && ` · ${t.post.topic_title}`}
           </CardDescription>
         </div>
-        <Link href={`/content/${t.post.id}`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
-          <ExternalLinkIcon />
-          Open in studio
-        </Link>
       </CardHeader>
       <CardContent>
         {t.post.platform === "blog" ? (

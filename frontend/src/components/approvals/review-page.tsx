@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftIcon, CheckIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, MessageSquarePlusIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckIcon, DownloadIcon, FlagIcon, MessageSquarePlusIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -21,7 +21,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,7 +30,7 @@ import { ApiError, errorMessage } from "@/lib/api";
 import { APPROVAL_STATUS_LABEL, COMMENT_KIND_LABEL } from "@/lib/approvals";
 import { useCan } from "@/lib/auth";
 import { POST_STATUS_LABEL, fullText } from "@/lib/content";
-import { formatDateTime, timeAgo } from "@/lib/format";
+import { cleanNote, formatDateTime, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ApprovalDetail } from "@/types/api";
 
@@ -84,8 +83,7 @@ export function ReviewPage({ id }: { id: string }) {
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Copy v{a.post_version}
-          {a.creative_version != null && ` · creative v${a.creative_version}`} · submitted by{" "}
+          Submitted by{" "}
           {a.submitted_by?.name ?? a.submitted_by?.email ?? "someone"}{" "}
           <time title={formatDateTime(a.created_at)}>{timeAgo(a.created_at)}</time> · Post: {POST_STATUS_LABEL[a.post.status]}
         </p>
@@ -114,16 +112,8 @@ function PreviewCard({ approval: a }: { approval: ApprovalDetail }) {
       <CardHeader className="flex flex-row flex-wrap items-start gap-2">
         <div className="grid flex-1 gap-1">
           <CardTitle>How it will look</CardTitle>
-          <CardDescription>
-            Copy v{a.post_version}
-            {a.creative ? ` and design v${a.creative.version}` : ", no design attached"}, as submitted
-            {a.creative?.note ? ` · “${a.creative.note}”` : ""}
-          </CardDescription>
+          {a.creative?.note && <CardDescription>“{cleanNote(a.creative.note)}”</CardDescription>}
         </div>
-        <Link href={`/content/${a.post.id}`} className="inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline">
-          Open in studio
-          <ExternalLinkIcon className="size-3.5" />
-        </Link>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
         {a.copy_changed_since && (
@@ -359,10 +349,6 @@ function CommentsCard({ approval: a }: { approval: ApprovalDetail }) {
                 <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">{c.author?.name ?? c.author?.email ?? "Someone"}</span>
                   {COMMENT_KIND_LABEL[c.kind]}
-                  <Badge variant="outline" className="h-4 px-1 text-[10px]">
-                    copy v{c.post_version}
-                    {c.creative_version != null && ` · creative v${c.creative_version}`}
-                  </Badge>
                   <time className="ml-auto" title={formatDateTime(c.created_at)}>
                     {timeAgo(c.created_at)}
                   </time>

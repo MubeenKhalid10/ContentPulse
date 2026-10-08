@@ -1,10 +1,12 @@
 "use client";
 
 import { CheckIcon, RotateCcwIcon, Undo2Icon, XIcon } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { DeleteButton } from "@/components/shared/delete-button";
 import { Button } from "@/components/ui/button";
-import { type TopicAction, useTopicAction } from "@/hooks/use-topics";
+import { type TopicAction, useDeleteTopic, useTopicAction } from "@/hooks/use-topics";
 import { errorMessage } from "@/lib/api";
 import type { Topic } from "@/types/api";
 
@@ -19,6 +21,9 @@ const MESSAGES: Record<TopicAction, (title: string) => string> = {
 /** Review decisions for a topic (spec §20). Compact = small buttons for list rows. */
 export function TopicActions({ topic, compact = false }: { topic: Topic; compact?: boolean }) {
   const action = useTopicAction();
+  const remove = useDeleteTopic();
+  const router = useRouter();
+  const pathname = usePathname();
   const run = (kind: TopicAction) =>
     action.mutate(
       { id: topic.id, action: kind },
@@ -27,21 +32,41 @@ export function TopicActions({ topic, compact = false }: { topic: Topic; compact
         onError: (e) => toast.error(errorMessage(e)),
       },
     );
-  const busy = action.isPending;
+  const busy = action.isPending || remove.isPending;
+  const deleteButton = (
+    <DeleteButton
+      title={`Delete “${topic.title}”?`}
+      description="This permanently deletes the topic, its post plans and its trend. Posts already written for it are kept. This can't be undone."
+      pending={busy}
+      onConfirm={() =>
+        remove.mutate(topic.id, {
+          onSuccess: () => {
+            toast.success(`Deleted “${topic.title}”`);
+            if (pathname.startsWith("/topics/")) router.push("/topics");
+          },
+          onError: (e) => toast.error(errorMessage(e)),
+        })
+      }
+    />
+  );
 
-  if (topic.status === "archived") return null;
+  if (topic.status === "archived") return deleteButton;
   if (topic.status === "rejected") {
     return (
-      <Button variant="outline" size="sm" disabled={busy} onClick={() => run("restore")}>
-        <RotateCcwIcon />
-        Restore
-      </Button>
+      <div className="flex flex-wrap gap-1.5">
+        <Button variant="outline" size="sm" disabled={busy} onClick={() => run("restore")}>
+          <RotateCcwIcon />
+          Restore
+        </Button>
+        {deleteButton}
+      </div>
     );
   }
   if (topic.status === "shortlisted") {
-    if (compact) return null;
+    if (compact) return deleteButton;
     return (
       <div className="flex flex-wrap gap-1.5">
+        {deleteButton}
         {topic.strategy_count === 0 && (
           <Button size="sm" variant="outline" disabled={busy} onClick={() => run("review")}>
             <Undo2Icon />

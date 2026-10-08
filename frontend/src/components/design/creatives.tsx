@@ -21,7 +21,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useGenerateImage, useSubmitTask, useUploadCreatives } from "@/hooks/use-design";
 import { errorMessage } from "@/lib/api";
 import { formatBytes } from "@/lib/design";
-import { formatDateTime, timeAgo } from "@/lib/format";
+import { cleanNote, formatDateTime, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CreativeFile, DesignTaskDetail } from "@/types/api";
 
@@ -246,7 +246,7 @@ export function CreativeVersions({ task }: { task: DesignTaskDetail }) {
                 <time title={formatDateTime(v.created_at)}>{timeAgo(v.created_at)}</time>
               </span>
             </div>
-            {v.note && <p className="text-sm text-muted-foreground">{v.note}</p>}
+            {v.note && <p className="text-sm text-muted-foreground">{cleanNote(v.note)}</p>}
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {v.files.map((f) => (
                 <CreativeTile key={f.id} file={f} />

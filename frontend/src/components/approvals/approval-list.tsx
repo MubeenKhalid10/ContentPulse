@@ -6,15 +6,17 @@ import { useState } from "react";
 
 import { APPROVAL_STATUS_TONE } from "@/lib/tones";
 import { PlatformTag, Tag } from "@/components/shared/tag";
+import { DayGroups } from "@/components/shared/day-groups";
 import { PageHeader } from "@/components/shared/page-header";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useApprovals } from "@/hooks/use-approvals";
 import { APPROVAL_STATUS_LABEL } from "@/lib/approvals";
-import { timeAgo } from "@/lib/format";
+import { timeAgo, timeOfDay } from "@/lib/format";
 import { PLATFORM_OPTIONS } from "@/lib/options";
 import { cn } from "@/lib/utils";
 import type { Approval, ApprovalFilter, Platform } from "@/types/api";
@@ -29,8 +31,14 @@ const TABS: { value: ApprovalFilter; label: string }[] = [
 ];
 
 export function ApprovalList() {
-  const [status, setStatus] = useState<ApprovalFilter>("pending");
-  const [platform, setPlatform] = useState<"" | Platform>("");
+  const [{ status, platform }, setFilters] = usePersistedState<{
+    status: ApprovalFilter;
+    platform: "" | Platform;
+  }>("approvals", { status: "pending", platform: "" });
+  const setStatus = (status: ApprovalFilter) =>
+    setFilters((f) => ({ ...f, status }));
+  const setPlatform = (platform: "" | Platform) =>
+    setFilters((f) => ({ ...f, platform }));
   const [limit, setLimit] = useState(PAGE);
   const approvals = useApprovals(status, platform, limit);
   const counts = approvals.data?.counts;
@@ -50,7 +58,8 @@ export function ApprovalList() {
             <div className="grid max-w-md gap-1.5">
               <p className="text-lg font-medium">Nothing to review yet</p>
               <p className="text-sm text-muted-foreground">
-                Posts arrive here when someone adds the design and submits the post.
+                Posts arrive here when someone adds the design and submits the
+                post.
               </p>
             </div>
           </CardContent>
@@ -82,7 +91,10 @@ export function ApprovalList() {
               aria-label="Platform"
               value={platform || "all"}
               onChange={(v) => setPlatform(v === "all" ? "" : (v as Platform))}
-              options={[{ value: "all", label: "Any platform" }, ...PLATFORM_OPTIONS]}
+              options={[
+                { value: "all", label: "Any platform" },
+                ...PLATFORM_OPTIONS,
+              ]}
               className="w-40 sm:ml-auto"
             />
           </div>
@@ -95,24 +107,36 @@ export function ApprovalList() {
             </div>
           ) : approvals.data?.items.length ? (
             <>
-              <ul
-                aria-label="Approvals"
+              <div
                 aria-busy={approvals.isPlaceholderData}
-                className={cn("grid gap-3 transition-opacity", approvals.isPlaceholderData && "opacity-50")}
+                className={cn(
+                  "transition-opacity",
+                  approvals.isPlaceholderData && "opacity-50",
+                )}
               >
-                {approvals.data.items.map((a) => (
-                  <ApprovalRow key={a.id} approval={a} />
-                ))}
-              </ul>
+                <DayGroups
+                  items={approvals.data.items}
+                  dateOf={eventAt}
+                  label="Approvals"
+                  render={(a) => <ApprovalRow key={a.id} approval={a} />}
+                />
+              </div>
               {approvals.data.total > approvals.data.items.length && (
-                <Button variant="outline" className="justify-self-center" onClick={() => setLimit((n) => n + PAGE)}>
-                  Show more ({approvals.data.total - approvals.data.items.length} left)
+                <Button
+                  variant="outline"
+                  className="justify-self-center"
+                  onClick={() => setLimit((n) => n + PAGE)}
+                >
+                  Show more (
+                  {approvals.data.total - approvals.data.items.length} left)
                 </Button>
               )}
             </>
           ) : (
             <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              {status === "pending" ? "You're all caught up. Nothing is waiting for review." : "No submissions here."}
+              {status === "pending"
+                ? "You're all caught up. Nothing is waiting for review."
+                : "No submissions here."}
             </p>
           )}
         </div>
@@ -121,6 +145,9 @@ export function ApprovalList() {
   );
 }
 
+/** The moment a row is about: when it was decided, or submitted while still waiting. */
+const eventAt = (a: Approval) => a.reviewed_at ?? a.created_at;
+
 function ApprovalRow({ approval: a }: { approval: Approval }) {
   return (
     <li className="relative flex items-center gap-4 rounded-xl bg-card p-3 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
@@ -128,7 +155,12 @@ function ApprovalRow({ approval: a }: { approval: Approval }) {
         {a.preview_url ? (
           // Signed, short-lived URL; next/image can't optimize it.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={a.preview_url} alt="" className="size-full object-cover" loading="lazy" />
+          <img
+            src={a.preview_url}
+            alt=""
+            className="size-full object-cover"
+            loading="lazy"
+          />
         ) : (
           <ImageIcon className="size-5 text-muted-foreground" />
         )}
@@ -142,18 +174,20 @@ function ApprovalRow({ approval: a }: { approval: Approval }) {
           >
             {a.post.title ?? "Untitled post"}
           </Link>
-          <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>{APPROVAL_STATUS_LABEL[a.status]}</Tag>
+          <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>
+            {APPROVAL_STATUS_LABEL[a.status]}
+          </Tag>
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
         </div>
         <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
           <span>
-            Copy v{a.post_version}
-            {a.creative_version != null && ` · creative v${a.creative_version}`}
+            Submitted by{" "}
+            {a.submitted_by?.name ?? a.submitted_by?.email ?? "someone"}{" "}
+            {timeAgo(a.created_at)}
           </span>
-          <span>
-            Submitted by {a.submitted_by?.name ?? a.submitted_by?.email ?? "someone"} {timeAgo(a.created_at)}
-          </span>
-          {a.reviewer && <span>Reviewed by {a.reviewer.name ?? a.reviewer.email}</span>}
+          {a.reviewer && (
+            <span>Reviewed by {a.reviewer.name ?? a.reviewer.email}</span>
+          )}
           {a.comment_count > 0 && (
             <span className="inline-flex items-center gap-1">
               <MessageSquareIcon className="size-3" />
@@ -162,6 +196,12 @@ function ApprovalRow({ approval: a }: { approval: Approval }) {
           )}
         </p>
       </div>
+      <time
+        dateTime={eventAt(a)}
+        className="shrink-0 pr-2 text-sm tabular-nums text-muted-foreground"
+      >
+        {timeOfDay(eventAt(a))}
+      </time>
     </li>
   );
 }

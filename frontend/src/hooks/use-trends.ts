@@ -125,6 +125,9 @@ export const useTrendAction = () =>
     api<TrendDetail>(`/trends/${id}/${action}`, { method: "POST" }),
   );
 
+export const useDeleteTrend = () =>
+  useTrendMutation((id: string) => api<void>(`/trends/${id}`, { method: "DELETE" }));
+
 export function useAIStatus() {
   return useQuery({
     queryKey: ["ai", "status"],

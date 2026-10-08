@@ -478,3 +478,27 @@ async def test_remove_from_shortlist_also_unshortlists_the_trend(client, interne
     assert removed["status"] == "reviewed"
     trend = (await admin.get(f"/api/v1/trends/{topic['trend_id']}")).json()
     assert trend["status"] in ("new", "analyzed")
+
+
+async def test_delete_topic_removes_it_and_its_trend(client, internet, fake_ai):
+    admin, _ = await setup_org(client)
+    await discover(admin)
+    topic = await gpt6_topic(admin)
+    # Only decided topics can be deleted.
+    assert (await admin.delete(f"{API}/{topic['id']}")).status_code == 409
+    topic = await shortlisted_topic(admin)
+
+    assert (await admin.delete(f"{API}/{topic['id']}")).status_code == 204
+    assert (await admin.get(f"{API}/{topic['id']}")).status_code == 404
+    assert (await admin.get(f"/api/v1/trends/{topic['trend_id']}")).status_code == 404
+
+
+async def test_delete_trend_removes_its_topic(client, internet, fake_ai):
+    admin, _ = await setup_org(client)
+    await discover(admin)
+    topic = await shortlisted_topic(admin)
+    trends = "/api/v1/trends"
+
+    assert (await admin.delete(f"{trends}/{topic['trend_id']}")).status_code == 204
+    assert (await admin.get(f"{trends}/{topic['trend_id']}")).status_code == 404
+    assert (await admin.get(f"{API}/{topic['id']}")).status_code == 404

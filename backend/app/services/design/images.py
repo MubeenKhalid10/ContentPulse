@@ -201,6 +201,6 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
         brief,
         post,
         [(f"ai-image.{extension}", image.mime_type, len(image.data), key)],
-        f"Generated with AI ({image.model})",
+        "Generated with AI",
     )
     job.result = {**job.result, "version": number}

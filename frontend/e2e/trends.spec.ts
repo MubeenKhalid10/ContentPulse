@@ -80,7 +80,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   const analyzeNow = page.getByRole("button", { name: "Analyze now" });
   if (await analyzeNow.isVisible()) await analyzeNow.click();
   await expect(page.getByText(/^Rule-based estimate/).first()).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("combobox", { name: "Your call:" }).click();
+  await page.getByRole("combobox", { name: /Relevance rating/ }).click();
   await page.getByRole("option", { name: "Highly relevant", exact: true }).click();
   await expect(page.getByText("Relevance updated")).toBeVisible();
   await expect(page.getByText("· set manually").first()).toBeVisible();

@@ -122,11 +122,16 @@ async def test_changes_requested_revision_and_resubmit(client, internet, design_
     assert (
         uploaded["post"]["status"] == "design_uploaded" and uploaded["creatives"][0]["version"] == 2
     )
+    waiting = (await admin.get(API, params={"status": "changes_requested"})).json()
+    assert waiting["total"] == 1 and waiting["counts"]["changes_requested"] == 1
     resubmitted = await designer.post(
         f"/api/v1/design/tasks/{task_id}/submit", json={"note": "Cut slide 3 to one line."}
     )
     assert resubmitted.status_code == 200 and resubmitted.json()["status"] == "submitted"
 
+    # Resubmitted: the old round is history, nothing is waiting on changes any more.
+    done = (await admin.get(API, params={"status": "changes_requested"})).json()
+    assert done["total"] == 0 and done["items"] == [] and done["counts"]["changes_requested"] == 0
     queue = (await admin.get(API)).json()
     [round2] = queue["items"]
     assert round2["round"] == 2 and round2["creative_version"] == 2 and round2["id"] != item["id"]
@@ -135,7 +140,8 @@ async def test_changes_requested_revision_and_resubmit(client, internet, design_
     assert [c["kind"] for c in detail["comments"]] == ["changes_requested", "resubmitted"]
     assert detail["comments"][1]["creative_version"] == 2
     assert [c["version"] for c in detail["creatives"]] == [2, 1]  # nothing replaced
-    assert (await admin.get(API, params={"status": "reviewed"})).json()["total"] == 1
+    # One row per post: the superseded round is history, not a second reviewed item.
+    assert (await admin.get(API, params={"status": "reviewed"})).json()["total"] == 0
 
 
 async def test_copy_only_changes_resubmit_from_the_studio(client, internet, design_ai):

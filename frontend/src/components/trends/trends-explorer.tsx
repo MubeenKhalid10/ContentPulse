@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useOrgSettings, useOrgId } from "@/hooks/use-organization";
 import {
   type RelevanceFilter,
@@ -51,7 +52,7 @@ export function TrendsExplorer() {
   const can = useCan();
   const canDiscover = can("trends.manage");
   const canReview = can("trends.manage") || can("topics.manage");
-  const [filters, setFilters] = useState<TrendFilters>({
+  const [filters, setFilters] = usePersistedState<TrendFilters>("trends", {
     status: "active",
     relevance: "",
     sort: "score",
@@ -101,7 +102,7 @@ export function TrendsExplorer() {
             {ai.data && (
               <span className="sm:whitespace-nowrap">
                 {ai.data.engine === "ai"
-                  ? `Relevance checked by AI (${ai.data.model}).`
+                  ? "Relevance is checked by AI."
                   : "Relevance is a keyword-based estimate (no AI model set up)."}
               </span>
             )}

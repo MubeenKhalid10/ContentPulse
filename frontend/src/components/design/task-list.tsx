@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
 import { PlatformTag, Tag } from "@/components/shared/tag";
+import { DayGroups } from "@/components/shared/day-groups";
 import { PageHeader } from "@/components/shared/page-header";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Button } from "@/components/ui/button";
@@ -15,11 +16,12 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { type DesignFilters, useDesignTasks } from "@/hooks/use-design";
 import { useCan } from "@/lib/auth";
 import { POST_STATUS_LABEL } from "@/lib/content";
 import { formatLabel } from "@/lib/design";
-import { timeAgo } from "@/lib/format";
+import { timeOfDay } from "@/lib/format";
 import { PLATFORM_OPTIONS } from "@/lib/options";
 import { cn } from "@/lib/utils";
 import type { DesignTask, DesignTaskFilter } from "@/types/api";
@@ -41,7 +43,12 @@ const EMPTY: Record<DesignTaskFilter, string> = {
 
 export function DesignTaskList() {
   const isDesigner = useCan()("design.upload");
-  const [filters, setFilters] = useState<DesignFilters>({ status: "todo", mine: false, platform: "", q: "" });
+  const [filters, setFilters] = usePersistedState<DesignFilters>("design", {
+    status: "todo",
+    mine: false,
+    platform: "",
+    q: "",
+  });
   const [limit, setLimit] = useState(PAGE);
   const tasks = useDesignTasks(filters, limit);
   const update = (patch: Partial<DesignFilters>) => {
@@ -71,7 +78,10 @@ export function DesignTaskList() {
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-6">
           <div className="flex flex-wrap items-center gap-3">
-            <Tabs value={filters.status} onValueChange={(v) => update({ status: v as DesignTaskFilter })}>
+            <Tabs
+              value={filters.status}
+              onValueChange={(v) => update({ status: v as DesignTaskFilter })}
+            >
               <TabsList>
                 {TABS.map((tab) => (
                   <TabsTrigger key={tab.value} value={tab.value}>
@@ -95,15 +105,27 @@ export function DesignTaskList() {
             <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
               {isDesigner && (
                 <div className="flex items-center gap-2">
-                  <Switch id="mine" checked={filters.mine} onCheckedChange={(mine) => update({ mine })} />
+                  <Switch
+                    id="mine"
+                    checked={filters.mine}
+                    onCheckedChange={(mine) => update({ mine })}
+                  />
                   <Label htmlFor="mine">Assigned to me</Label>
                 </div>
               )}
               <SimpleSelect
                 aria-label="Platform"
                 value={filters.platform || "all"}
-                onChange={(v) => update({ platform: v === "all" ? "" : (v as DesignFilters["platform"]) })}
-                options={[{ value: "all", label: "Any platform" }, ...PLATFORM_OPTIONS]}
+                onChange={(v) =>
+                  update({
+                    platform:
+                      v === "all" ? "" : (v as DesignFilters["platform"]),
+                  })
+                }
+                options={[
+                  { value: "all", label: "Any platform" },
+                  ...PLATFORM_OPTIONS,
+                ]}
                 className="w-40"
               />
             </div>
@@ -117,24 +139,35 @@ export function DesignTaskList() {
             </div>
           ) : tasks.data?.items.length ? (
             <>
-              <ul
-                aria-label="Design tasks"
+              <div
                 aria-busy={tasks.isPlaceholderData}
-                className={cn("grid gap-3 transition-opacity", tasks.isPlaceholderData && "opacity-50")}
+                className={cn(
+                  "transition-opacity",
+                  tasks.isPlaceholderData && "opacity-50",
+                )}
               >
-                {tasks.data.items.map((task) => (
-                  <TaskRow key={task.id} task={task} />
-                ))}
-              </ul>
+                <DayGroups
+                  items={tasks.data.items}
+                  dateOf={(t) => t.updated_at}
+                  label="Design tasks"
+                  render={(task) => <TaskRow key={task.id} task={task} />}
+                />
+              </div>
               {tasks.data.total > tasks.data.items.length && (
-                <Button variant="outline" className="justify-self-center" onClick={() => setLimit((n) => n + PAGE)}>
+                <Button
+                  variant="outline"
+                  className="justify-self-center"
+                  onClick={() => setLimit((n) => n + PAGE)}
+                >
                   Show more ({tasks.data.total - tasks.data.items.length} left)
                 </Button>
               )}
             </>
           ) : (
             <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              {filters.q || filters.platform || filters.mine ? "No tasks match these filters." : EMPTY[filters.status]}
+              {filters.q || filters.platform || filters.mine
+                ? "No tasks match these filters."
+                : EMPTY[filters.status]}
             </p>
           )}
         </div>
@@ -157,18 +190,29 @@ function TaskRow({ task }: { task: DesignTask }) {
         <Tag tone={POST_STATUS_TONE[task.post.status]} dot>
           {POST_STATUS_LABEL[task.post.status]}
         </Tag>
-        <span className="ml-auto text-xs text-muted-foreground">{timeAgo(task.updated_at)}</span>
+        <span className="ml-auto text-xs text-muted-foreground">
+          {timeOfDay(task.updated_at)}
+        </span>
       </div>
-      {task.headline && <p className="line-clamp-1 text-sm text-muted-foreground">“{task.headline}”</p>}
+      {task.headline && (
+        <p className="line-clamp-1 text-sm text-muted-foreground">
+          “{task.headline}”
+        </p>
+      )}
       <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
         <span>
           {formatLabel(task.format)}
           {task.dimensions ? ` · ${task.dimensions}` : ""}
         </span>
-        <span>{task.assignee ? `Assigned to ${task.assignee.name ?? task.assignee.email}` : "Unassigned"}</span>
+        <span>
+          {task.assignee
+            ? `Assigned to ${task.assignee.name ?? task.assignee.email}`
+            : "Unassigned"}
+        </span>
         {task.creative_versions > 0 && (
           <span>
-            {task.creative_versions} creative version{task.creative_versions === 1 ? "" : "s"}
+            {task.creative_versions} creative version
+            {task.creative_versions === 1 ? "" : "s"}
           </span>
         )}
       </p>

@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { type TopicFilters, type TopicStatusFilter, useTopics } from "@/hooks/use-topics";
 import { useCan } from "@/lib/auth";
 import { PLATFORM_OPTIONS } from "@/lib/options";
@@ -52,7 +53,7 @@ const EMPTY: Record<TopicStatusFilter, string> = {
 
 export function TopicsExplorer() {
   const canManage = useCan()("topics.manage");
-  const [filters, setFilters] = useState<TopicFilters>({
+  const [filters, setFilters] = usePersistedState<TopicFilters>("topics", {
     status: "open",
     relevance: "",
     platform: "",

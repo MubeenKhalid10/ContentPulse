@@ -1,7 +1,6 @@
 import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 
-import { MastheadClock } from "@/components/landing/masthead-clock";
 import {
   EXAMPLE_CLIENT,
   relevanceOf,
@@ -13,9 +12,9 @@ import { Logo } from "@/components/shared/logo";
 import { cn } from "@/lib/utils";
 
 const inkButton =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-sm bg-foreground px-5 text-sm font-semibold text-background outline-none transition-colors hover:bg-foreground/85 focus-visible:ring-3 focus-visible:ring-ring/60";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-foreground px-5 text-sm font-medium text-background outline-none transition-colors hover:bg-foreground/85 focus-visible:ring-3 focus-visible:ring-ring/60";
 const lineButton =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-foreground px-5 text-sm font-semibold outline-none transition-colors hover:bg-foreground hover:text-background focus-visible:ring-3 focus-visible:ring-ring/60";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-5 text-sm font-medium outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/60";
 
 const STAFF = [
   {
@@ -37,18 +36,17 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
     <div className="min-h-svh bg-background text-foreground">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-sm focus:bg-background focus:px-3 focus:py-2"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-background focus:px-3 focus:py-2"
       >
         Skip to content
       </a>
 
-      {/* The masthead is always set in the night-desk tokens: ink strip, light type. */}
-      <header className="dark border-b border-border bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
           <Link
             href="/"
             aria-label="ContentPulse home"
-            className="rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
+            className="rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/60"
           >
             <Logo className="text-xl" />
           </Link>
@@ -63,20 +61,17 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
               <a
                 key={href}
                 href={href}
-                className="inline-flex h-11 items-center rounded-sm px-3 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/60"
+                className="inline-flex h-11 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/60"
               >
                 {label}
               </a>
             ))}
           </nav>
           <nav aria-label="Account" className="ml-auto flex items-center gap-1">
-            <span className="mr-2 hidden text-muted-foreground sm:inline">
-              <MastheadClock />
-            </span>
             {signedIn ? (
               <Link
                 href="/dashboard"
-                className="inline-flex h-11 items-center gap-2 rounded-sm px-3 text-sm font-semibold outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60"
+                className="inline-flex h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60"
               >
                 Go to dashboard{" "}
                 <ArrowRightIcon className="size-4" aria-hidden />
@@ -85,13 +80,13 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
               <>
                 <Link
                   href="/login"
-                  className="inline-flex h-11 items-center rounded-sm px-3 text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60"
+                  className="inline-flex h-11 items-center rounded-lg px-3 text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/60"
                 >
                   Sign in
                 </Link>
                 <Link
                   href="/register"
-                  className="inline-flex h-11 items-center rounded-sm bg-flash px-4 text-sm font-semibold text-flash-foreground outline-none hover:bg-flash/85 focus-visible:ring-3 focus-visible:ring-ring/60"
+                  className="inline-flex h-11 items-center rounded-lg bg-foreground px-4 text-sm font-medium text-background outline-none hover:bg-foreground/85 focus-visible:ring-3 focus-visible:ring-ring/60"
                 >
                   Start free
                 </Link>
@@ -103,11 +98,11 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
 
       <main id="main">
         {/* First viewport: headline, then the wire and the desk. */}
-        <section className="mx-auto max-w-7xl px-4 pt-8 pb-16 sm:px-6 lg:pt-10">
+        <section className="mx-auto max-w-7xl px-4 pt-12 pb-16 sm:px-6 lg:pt-16">
           <WireDesk
             intro={
               <div>
-                <h1 className="headline text-[clamp(2.75rem,6.4vw,5.25rem)] uppercase">
+                <h1 className="headline max-w-4xl text-[clamp(2.5rem,5.4vw,4.5rem)]">
                   Turn the trends that <span className="text-flash">fit</span>{" "}
                   each client into approved posts.
                 </h1>
@@ -160,14 +155,14 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
         <WhatItRunsOn />
         <Faq />
 
-        <section className="dark bg-background text-foreground">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-6 px-4 py-16 sm:px-6">
-            <h2 className="headline max-w-3xl text-[clamp(2.5rem,6vw,4.5rem)] uppercase">
+        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-6 rounded-2xl bg-foreground px-6 py-10 text-background sm:px-10">
+            <h2 className="headline max-w-3xl text-[clamp(2rem,4.5vw,3.25rem)]">
               Set up your first client in ten minutes.
             </h2>
             <Link
               href={signedIn ? "/dashboard" : "/register"}
-              className="inline-flex h-12 items-center gap-2 rounded-sm bg-flash px-6 text-base font-semibold text-flash-foreground outline-none hover:bg-flash/85 focus-visible:ring-3 focus-visible:ring-ring/60"
+              className="inline-flex h-12 items-center gap-2 rounded-lg bg-background px-6 text-base font-medium text-foreground outline-none hover:bg-background/85 focus-visible:ring-3 focus-visible:ring-ring/60"
             >
               {signedIn ? "Go to dashboard" : "Start free"}{" "}
               <ArrowRightIcon className="size-4" aria-hidden />
@@ -208,8 +203,8 @@ function SectionHead({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-3 border-t-[3px] border-double border-foreground pt-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-10">
-      <h2 id={id} className="headline text-4xl uppercase sm:text-5xl">
+    <div className="grid max-w-3xl gap-3">
+      <h2 id={id} className="headline text-3xl sm:text-4xl">
         {title}
       </h2>
       {children && (
@@ -261,7 +256,7 @@ function FitScale() {
             <span
               key={n}
               aria-hidden
-              className="slug absolute bottom-0 -translate-x-1/2 text-muted-foreground tabular-nums"
+              className="text-xs absolute bottom-0 -translate-x-1/2 text-muted-foreground tabular-nums"
               style={{ left: `${n}%` }}
             >
               {n}
@@ -272,7 +267,7 @@ function FitScale() {
             className="absolute top-0 bottom-6 border-l-2 border-dashed border-flash"
             style={{ left: `${EXAMPLE_CLIENT.threshold}%` }}
           >
-            <span className="slug absolute top-0 left-2 font-semibold whitespace-nowrap text-flash">
+            <span className="text-xs absolute top-0 left-2 font-semibold whitespace-nowrap text-flash">
               Relevant {EXAMPLE_CLIENT.threshold}+
             </span>
           </span>
@@ -316,18 +311,14 @@ function StaffBox() {
           for many clients and switch between them.
         </p>
       </SectionHead>
-      <dl className="mt-8 grid gap-0 sm:max-w-3xl">
+      <dl className="mt-8 grid gap-4 sm:grid-cols-3">
         {STAFF.map((s) => (
           <div
             key={s.role}
-            className="flex flex-wrap items-baseline gap-x-3 border-b border-border py-4"
+            className="rounded-xl bg-card p-5 ring-1 ring-foreground/10"
           >
-            <dt className="headline text-2xl uppercase">{s.role}</dt>
-            <span
-              aria-hidden
-              className="hidden flex-1 border-b border-dotted border-paper-6 sm:block"
-            />
-            <dd className="basis-full text-sm leading-relaxed sm:basis-auto sm:max-w-[42ch]">
+            <dt className="headline text-2xl">{s.role}</dt>
+            <dd className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {s.duty}
             </dd>
           </div>
@@ -351,7 +342,7 @@ function WhatItRunsOn() {
           keep every step working.
         </p>
       </SectionHead>
-      <div className="mt-8 grid gap-8 sm:grid-cols-3">
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
         {[
           [
             "Trend sources",
@@ -366,9 +357,14 @@ function WhatItRunsOn() {
             "Gemini, Groq, Cerebras, Anthropic, OpenAI or OpenRouter for text; Seedream, Cloudflare, Gemini or OpenAI for images.",
           ],
         ].map(([title, body]) => (
-          <div key={title} className="border-t border-foreground pt-3">
-            <h3 className="slug font-semibold">{title}</h3>
-            <p className="mt-2 text-sm leading-relaxed">{body}</p>
+          <div
+            key={title}
+            className="rounded-xl bg-card p-5 ring-1 ring-foreground/10"
+          >
+            <h3 className="text-sm font-semibold">{title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {body}
+            </p>
           </div>
         ))}
       </div>
@@ -411,22 +407,25 @@ function Faq() {
       className="mx-auto max-w-7xl scroll-mt-6 px-4 py-16 sm:px-6"
     >
       <SectionHead id="faq-title" title="Questions" />
-      <div className="mt-8 border-t border-foreground lg:ml-[calc(40%+1rem)]">
+      <div className="mt-8 grid max-w-3xl gap-3">
         {FAQ.map(({ q, a }) => (
-          <details key={q} className="group border-b border-border">
+          <details
+            key={q}
+            className="group rounded-xl bg-card px-5 ring-1 ring-foreground/10"
+          >
             <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 text-base font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/60 [&::-webkit-details-marker]:hidden">
               {q}
               <span
                 aria-hidden
-                className="slug shrink-0 text-muted-foreground group-open:hidden"
+                className="shrink-0 text-lg leading-none text-muted-foreground group-open:hidden"
               >
-                Open
+                +
               </span>
               <span
                 aria-hidden
-                className="slug hidden shrink-0 text-muted-foreground group-open:inline"
+                className="hidden shrink-0 text-lg leading-none text-muted-foreground group-open:inline"
               >
-                Close
+                −
               </span>
             </summary>
             <p className="max-w-[64ch] pb-5 text-sm leading-relaxed text-muted-foreground">

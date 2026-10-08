@@ -6,7 +6,7 @@ from sqlalchemy import case, func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import InvalidStateTransition, NotFound
-from app.models.enums import RelevanceLevel, StrategyStatus, TopicStatus
+from app.models.enums import RelevanceLevel, StrategyStatus, TopicStatus, TrendStatus
 from app.models.topic import ContentStrategy, TopicCandidate
 from app.models.trend import Trend
 from app.schemas.topic import StrategyRead, TopicDetail, TopicListItem, TopicPage
@@ -203,6 +203,40 @@ async def update_topic(
         )
     await db.commit()
     return await topic_detail(db, organization_id, topic.id)
+
+
+DELETABLE = (TopicStatus.SHORTLISTED, TopicStatus.REJECTED, TopicStatus.ARCHIVED)
+
+
+async def delete_topic(
+    db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, topic_id: uuid.UUID
+) -> None:
+    """Permanently remove a shortlisted, rejected or archived topic with its plans
+    (written posts are kept). Its trend goes too when that was also decided on,
+    otherwise the startup backfill would bring the topic back."""
+    topic = await get_topic(db, organization_id, topic_id)
+    if topic.status not in DELETABLE:
+        raise InvalidStateTransition(
+            "Only shortlisted, rejected or archived topics can be deleted."
+        )
+    trend = await db.get(Trend, topic.trend_id) if topic.trend_id else None
+    audit.record(
+        db,
+        organization_id=organization_id,
+        user_id=user_id,
+        action=AuditAction.TOPIC_DELETED,
+        entity_type="topic",
+        entity_id=topic.id,
+        old_value={"status": topic.status, "title": topic.title},
+    )
+    await db.delete(topic)
+    if trend is not None and trend.status in (
+        TrendStatus.SHORTLISTED,
+        TrendStatus.REJECTED,
+        TrendStatus.ARCHIVED,
+    ):
+        await db.delete(trend)
+    await db.commit()
 
 
 async def transition(

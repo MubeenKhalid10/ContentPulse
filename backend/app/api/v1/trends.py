@@ -142,6 +142,11 @@ async def override_relevance(trend_id: uuid.UUID, data: RelevanceOverride, ctx: 
     )
 
 
+@router.delete("/{trend_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_trend(trend_id: uuid.UUID, ctx: CanReview, db: DB) -> None:
+    await service.delete_trend(db, ctx.organization_id, ctx.user.id, trend_id)
+
+
 @router.post("/{trend_id}/shortlist", response_model=TrendDetail)
 async def shortlist(trend_id: uuid.UUID, ctx: CanReview, db: DB):
     return await service.transition(

@@ -65,7 +65,7 @@ export function RelevanceFlag({
   return (
     <span
       className={cn(
-        "slug inline-flex h-5 shrink-0 items-center rounded-[2px] px-1.5 font-semibold whitespace-nowrap",
+        "text-xs inline-flex h-5 shrink-0 items-center rounded-[2px] px-1.5 font-semibold whitespace-nowrap",
         !loud && "ring-1 ring-inset",
         !loud &&
           (inverted
@@ -121,7 +121,7 @@ export function WireDesk({ intro }: { intro?: React.ReactNode }) {
   return (
     <div className="grid min-w-0 gap-12">
       {intro}
-      <div className="grid min-w-0 items-start gap-10 border-t-[3px] border-double border-foreground pt-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-12">
+      <div className="grid min-w-0 items-start gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-12">
         <WireTape
           tick={tick}
           selectedId={selected.id}
@@ -198,12 +198,12 @@ function WireTape({
         if (!e.currentTarget.contains(e.relatedTarget)) onHold(false);
       }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-foreground pb-2">
-        <h2 id="wire-title" className="slug font-semibold text-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border pb-3">
+        <h2 id="wire-title" className="text-xs font-semibold text-foreground">
           Incoming trends · example
         </h2>
         {/* Own line, so the header keeps one height with or without Pause. */}
-        <span className="slug order-last basis-full text-muted-foreground">
+        <span className="text-xs order-last basis-full text-muted-foreground">
           <span className="text-flash">Red</span>: Relevant or better ·{" "}
           <span className="line-through">struck</span>: filtered out
         </span>
@@ -212,7 +212,7 @@ function WireTape({
             type="button"
             onClick={onToggle}
             aria-pressed={stopped}
-            className="slug -my-2 inline-flex h-11 items-center gap-1.5 rounded-sm px-2 font-semibold outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/60"
+            className="text-xs -my-2 inline-flex h-11 items-center gap-1.5 rounded-lg px-2 font-semibold outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/60"
           >
             {stopped ? (
               <PlayIcon className="size-3.5" aria-hidden />
@@ -223,7 +223,7 @@ function WireTape({
           </button>
         )}
       </div>
-      <div className="relative h-[26rem] overflow-hidden border-x border-b border-border bg-card lg:h-[38rem]">
+      <div className="relative h-[26rem] overflow-hidden rounded-xl border border-border bg-card lg:h-[38rem]">
         <span
           aria-hidden
           className="wire-perf absolute inset-y-0 left-0 z-10 w-4 border-r border-dashed border-border"
@@ -301,13 +301,13 @@ function WireList({
                 />
                 <span
                   className={cn(
-                    "slug min-w-0 flex-1",
+                    "text-xs min-w-0 flex-1",
                     active ? "text-background/80" : "text-muted-foreground",
                   )}
                 >
                   {item.source} · {item.time}
                 </span>
-                <span className="slug shrink-0 font-semibold whitespace-nowrap tabular-nums">
+                <span className="text-xs shrink-0 font-semibold whitespace-nowrap tabular-nums">
                   {/* No number until the item is scored. */}
                   Score {read ? item.fit : "—"}
                 </span>
@@ -361,11 +361,11 @@ function Desk({ item, announce }: { item: WireItem; announce: boolean }) {
       aria-live={announce ? "polite" : "off"}
       className="min-w-0"
     >
-      <div className="flex items-baseline justify-between gap-3 border-b border-foreground pb-2">
-        <h2 id="desk-title" className="slug font-semibold text-foreground">
+      <div className="flex items-baseline justify-between gap-3 border-b border-border pb-3">
+        <h2 id="desk-title" className="text-xs font-semibold text-foreground">
           The post it becomes
         </h2>
-        <p className="slug text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           LinkedIn · {EXAMPLE_CLIENT.name}
         </p>
       </div>
@@ -383,7 +383,7 @@ function Desk({ item, announce }: { item: WireItem; announce: boolean }) {
           <div className="flex items-center gap-4 border-y border-dashed border-foreground/40 py-4">
             <SpikeMark className="h-12 w-10 shrink-0 text-foreground" />
             <div className="grid gap-1">
-              <p className="headline text-xl uppercase">Filtered out</p>
+              <p className="headline text-xl">Filtered out</p>
               <p className="text-sm text-muted-foreground">
                 Score {item.fit}: {relevanceOf(item)}. Only trends rated
                 Relevant or better get post ideas: popular isn&apos;t the same
@@ -401,12 +401,12 @@ function PostProof({ item }: { item: WireItem }) {
   return (
     <article
       aria-label={`Example LinkedIn post for ${EXAMPLE_CLIENT.name}`}
-      className="mt-4 rounded-sm border border-border bg-card text-card-foreground shadow-[0_1px_0_var(--paper-4),0_12px_28px_-18px_oklch(0.2_0_0/0.45)]"
+      className="mt-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10"
     >
       <header className="flex items-center gap-3 px-4 pt-4">
         <span
           aria-hidden
-          className="grid size-10 place-items-center rounded-sm bg-foreground text-sm font-semibold text-background"
+          className="grid size-10 place-items-center rounded-lg bg-foreground text-sm font-semibold text-background"
         >
           {EXAMPLE_CLIENT.initials}
         </span>
@@ -417,11 +417,9 @@ function PostProof({ item }: { item: WireItem }) {
             <GlobeIcon className="size-3 shrink-0" aria-label="Public" />
           </span>
         </span>
-        <span className="ok-stamp ml-auto grid shrink-0 -rotate-6 place-items-center rounded-sm border-2 border-flash px-2 py-1 text-center text-flash">
-          <span className="headline text-lg leading-none uppercase">
-            Approved
-          </span>
-          <span className="slug text-[11px] leading-tight">
+        <span className="ok-stamp ml-auto grid shrink-0 place-items-center rounded-lg border-2 border-flash px-2 py-1 text-center text-flash">
+          <span className="headline text-lg leading-none">Approved</span>
+          <span className="text-xs text-[11px] leading-tight">
             Ready to publish
           </span>
         </span>

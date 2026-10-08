@@ -1,17 +1,14 @@
 "use client";
 
 import { CheckCircle2Icon, MessageSquareWarningIcon, XCircleIcon } from "lucide-react";
-import Link from "next/link";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { COMMENT_KIND_LABEL } from "@/lib/approvals";
 import { timeAgo } from "@/lib/format";
-import { useCan } from "@/lib/auth";
 import type { ReviewSummary } from "@/types/api";
 
 /** The latest review decision and its comments, for whoever has to act on it. */
 export function ReviewBanner({ review, children }: { review: ReviewSummary | null; children?: React.ReactNode }) {
-  const canSeeQueue = useCan()("approval.read");
   if (!review || review.status === "pending") return null;
   const decisions = review.comments.filter((c) => c.kind !== "resubmitted");
   const title = {
@@ -30,15 +27,6 @@ export function ReviewBanner({ review, children }: { review: ReviewSummary | nul
         {review.reviewed_at && `, ${timeAgo(review.reviewed_at)}`}
       </AlertTitle>
       <AlertDescription className="grid gap-2">
-        <span className="text-xs">
-          On copy v{review.post_version}
-          {review.creative_version != null && ` and creative v${review.creative_version}`}.{" "}
-          {canSeeQueue && (
-            <Link href={`/approvals/${review.request_id}`} className="underline underline-offset-4">
-              Open the review
-            </Link>
-          )}
-        </span>
         {decisions.length > 0 && (
           <ul className="grid gap-1.5">
             {decisions.map((c, i) => (

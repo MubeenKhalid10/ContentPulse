@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.errors import InvalidStateTransition, NotFound
 from app.models.approval import ApprovalComment, ApprovalRequest
@@ -155,7 +156,18 @@ async def list_approvals(
     limit: int,
     offset: int,
 ) -> ApprovalPage:
-    filters = [ApprovalRequest.organization_id == organization_id]
+    # One row per post: its latest round. Earlier rounds are history, shown on the
+    # review page, so a resubmitted post never appears twice.
+    newer = aliased(ApprovalRequest)
+    superseded = (
+        select(newer.id)
+        .where(
+            newer.post_id == ApprovalRequest.post_id,
+            newer.created_at > ApprovalRequest.created_at,
+        )
+        .exists()
+    )
+    filters = [ApprovalRequest.organization_id == organization_id, ~superseded]
     if platform:
         filters.append(
             ApprovalRequest.post_id.in_(

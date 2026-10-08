@@ -102,10 +102,8 @@ export function ProductTour() {
           className="grid items-center gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14"
         >
           <div className={cn("min-w-0", i % 2 === 1 && "lg:order-2")}>
-            <h3 className="headline text-3xl uppercase sm:text-4xl">
-              {step.title}
-            </h3>
-            <p className="slug mt-2 flex flex-wrap gap-x-3 text-muted-foreground">
+            <h3 className="headline text-3xl sm:text-4xl">{step.title}</h3>
+            <p className="text-xs mt-2 flex flex-wrap gap-x-3 text-muted-foreground">
               <span className="font-semibold text-foreground tabular-nums">
                 Step {i + 1} of {STEPS.length}
               </span>
@@ -128,7 +126,7 @@ export function ProductTour() {
           </div>
           <figure className={cn("min-w-0", i % 2 === 1 && "lg:order-1")}>
             <Screen>{step.screen}</Screen>
-            <figcaption className="slug mt-2 text-muted-foreground">
+            <figcaption className="text-xs mt-2 text-muted-foreground">
               Example screen · invented client
             </figcaption>
           </figure>
@@ -143,13 +141,13 @@ function Screen({ children }: { children: React.ReactNode }) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none overflow-hidden rounded-sm border border-border bg-background shadow-[0_1px_0_var(--paper-4),0_18px_40px_-24px_oklch(0.2_0_0/0.5)] select-none"
+      className="pointer-events-none overflow-hidden rounded-xl border border-border bg-background shadow-sm select-none"
     >
       <div className="flex h-8 items-center gap-2 border-b border-border bg-sidebar px-3">
-        <span className="headline text-sm uppercase">
+        <span className="headline text-sm">
           Content<span className="font-semibold">Pulse</span>
         </span>
-        <span className="slug ml-auto truncate text-muted-foreground">
+        <span className="text-xs ml-auto truncate text-muted-foreground">
           {EXAMPLE_CLIENT.name}
         </span>
       </div>
@@ -177,7 +175,7 @@ function Field({
   return (
     <div className="grid gap-1">
       <span className="text-xs font-medium">{label}</span>
-      <div className="rounded-sm border border-input bg-card px-2.5 py-1.5 text-xs leading-relaxed">
+      <div className="rounded-lg border border-input bg-card px-2.5 py-1.5 text-xs leading-relaxed">
         {children}
       </div>
     </div>
@@ -206,7 +204,7 @@ function SetupScreen() {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-sm border border-border bg-card px-2.5 py-2 text-xs">
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2 text-xs">
           <GlobeIcon className="size-3.5 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1 truncate">harborandpine.example</span>
           <Tag tone="green" dot>
@@ -268,7 +266,7 @@ function TrendsScreen() {
           >
             <span
               className={cn(
-                "slug grid size-9 shrink-0 place-items-center rounded-sm text-xs font-semibold tabular-nums",
+                "text-xs grid size-9 shrink-0 place-items-center rounded-lg text-xs font-semibold tabular-nums",
                 t.score >= 45
                   ? "bg-foreground text-background"
                   : "ring-1 ring-border ring-inset",
@@ -285,7 +283,7 @@ function TrendsScreen() {
               >
                 {t.title}
               </span>
-              <span className="slug text-[10px] text-muted-foreground">
+              <span className="text-xs text-[10px] text-muted-foreground">
                 {t.source}
               </span>
             </span>
@@ -308,7 +306,7 @@ function PlanScreen() {
   return (
     <>
       <ScreenTitle title="EU AI incident reporting" sub="Topic · shortlisted" />
-      <div className="grid gap-3 rounded-sm border border-border bg-card p-3">
+      <div className="grid gap-3 rounded-lg border border-border bg-card p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-semibold">New plan</span>
           <Tag tone="green" dot>
@@ -326,10 +324,10 @@ function PlanScreen() {
         </Field>
         <Field label="Goal">Book compliance reviews</Field>
         <div className="flex justify-end gap-2">
-          <span className="inline-flex h-7 items-center rounded-sm border border-border px-2.5 text-xs font-medium">
+          <span className="inline-flex h-7 items-center rounded-lg border border-border px-2.5 text-xs font-medium">
             Save plan
           </span>
-          <span className="inline-flex h-7 items-center rounded-sm bg-foreground px-2.5 text-xs font-medium text-background">
+          <span className="inline-flex h-7 items-center rounded-lg bg-foreground px-2.5 text-xs font-medium text-background">
             Save &amp; write post
           </span>
         </div>
@@ -346,11 +344,11 @@ function WriteScreen() {
         <div className="flex flex-wrap items-center gap-1.5">
           <PlatformTag platform="linkedin" />
           <Tag tone="neutral">Draft</Tag>
-          <span className="slug ml-auto text-[10px] text-muted-foreground tabular-nums">
+          <span className="text-xs ml-auto text-[10px] text-muted-foreground tabular-nums">
             612 / 3,000
           </span>
         </div>
-        <div className="rounded-sm border border-input bg-card p-3 text-xs leading-relaxed whitespace-pre-line">
+        <div className="rounded-lg border border-input bg-card p-3 text-xs leading-relaxed whitespace-pre-line">
           {
             "The EU's draft guidance on AI incident reporting landed this morning, and small firms are in scope.\n\nThree things to check this week:\n1. Do you know which of your tools use AI?\n2. Who decides whether an incident is reportable?\n3. Can you produce a timeline within 72 hours?"
           }
@@ -358,10 +356,10 @@ function WriteScreen() {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <FileTextIcon className="size-3.5 text-muted-foreground" />
           <span className="text-muted-foreground">Backed by:</span>
-          <span className="rounded-sm bg-muted px-1.5 py-0.5">
+          <span className="rounded-lg bg-muted px-1.5 py-0.5">
             Incident response service page
           </span>
-          <span className="rounded-sm bg-muted px-1.5 py-0.5">
+          <span className="rounded-lg bg-muted px-1.5 py-0.5">
             Compliance checklist (PDF)
           </span>
         </div>
@@ -375,15 +373,15 @@ function DesignScreen() {
     <>
       <ScreenTitle title="Design" sub="LinkedIn image · 1200 × 1200" />
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="relative grid aspect-square place-items-center overflow-hidden rounded-sm bg-[oklch(0.22_0.03_255)] p-4 text-[oklch(0.96_0.01_95)]">
-          <span className="headline text-center text-2xl leading-none uppercase">
+        <div className="relative grid aspect-square place-items-center overflow-hidden rounded-lg bg-[oklch(0.22_0.03_255)] p-4 text-[oklch(0.96_0.01_95)]">
+          <span className="headline text-center text-2xl leading-none">
             3 questions
             <br />
             before the
             <br />
             <span className="text-[oklch(0.75_0.17_29)]">EU deadline</span>
           </span>
-          <span className="slug absolute bottom-2 left-2 text-[10px]">
+          <span className="text-xs absolute bottom-2 left-2 text-[10px]">
             Harbor &amp; Pine
           </span>
         </div>
@@ -392,10 +390,10 @@ function DesignScreen() {
             <span className="font-medium text-foreground">Brief:</span> bold
             headline, navy ground, one red accent. Square for the feed.
           </p>
-          <span className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm border border-border text-xs font-medium">
+          <span className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-border text-xs font-medium">
             <UploadIcon className="size-3.5" /> Upload a design
           </span>
-          <span className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm border border-border text-xs font-medium">
+          <span className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-border text-xs font-medium">
             <SparklesIcon className="size-3.5" /> Generate image with AI
           </span>
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -415,9 +413,9 @@ function ApproveScreen() {
         sub="Copy v2 · design v1 · sent by a creator"
       />
       <div className="grid gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className="rounded-sm border border-border bg-card p-3">
+        <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-center gap-2">
-            <span className="grid size-7 place-items-center rounded-sm bg-foreground text-[10px] font-semibold text-background">
+            <span className="grid size-7 place-items-center rounded-lg bg-foreground text-[10px] font-semibold text-background">
               {EXAMPLE_CLIENT.initials}
             </span>
             <span className="text-xs font-semibold">{EXAMPLE_CLIENT.name}</span>
@@ -427,18 +425,18 @@ function ApproveScreen() {
             morning, and small firms are in scope. Three things to check this
             week…
           </p>
-          <div className="mt-2 grid aspect-[2/1] place-items-center rounded-sm bg-[oklch(0.22_0.03_255)] text-[oklch(0.96_0.01_95)]">
-            <span className="headline text-lg uppercase">3 questions</span>
+          <div className="mt-2 grid aspect-[2/1] place-items-center rounded-lg bg-[oklch(0.22_0.03_255)] text-[oklch(0.96_0.01_95)]">
+            <span className="headline text-lg">3 questions</span>
           </div>
         </div>
         <div className="grid content-start gap-2">
           <Tag tone="violet" dot className="justify-self-start">
             Waiting for approval
           </Tag>
-          <span className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm bg-foreground text-xs font-medium text-background">
+          <span className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-foreground text-xs font-medium text-background">
             <CheckIcon className="size-3.5" /> Approve
           </span>
-          <span className="inline-flex h-8 items-center justify-center rounded-sm border border-border text-xs font-medium">
+          <span className="inline-flex h-8 items-center justify-center rounded-lg border border-border text-xs font-medium">
             Request changes
           </span>
           <p className="text-[11px] leading-relaxed text-muted-foreground">

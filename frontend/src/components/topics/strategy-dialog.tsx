@@ -34,8 +34,9 @@ import { useOrgSettings } from "@/hooks/use-organization";
 import { useAIStatus } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
+import { stripCitations } from "@/lib/format";
 import { PLATFORM_LABEL } from "@/lib/topics";
-import type { Platform, SearchIntent, Strategy, StrategyDetails, StrategySuggestion, TopicDetail } from "@/types/api";
+import type { ContentAngle, Platform, SearchIntent, Strategy, StrategyDetails, StrategySuggestion, TopicDetail } from "@/types/api";
 
 const text = (max: number) => z.string().trim().max(max, `Keep it under ${max} characters.`);
 const lines = (value: string) =>
@@ -143,12 +144,15 @@ export function StrategyDialog({
   open,
   platform,
   editing,
+  angle = null,
   onClose,
 }: {
   topic: TopicDetail;
   open: boolean;
   platform: Platform | null;
   editing: Strategy | null;
+  /** A content angle from the analysis to start the plan from. */
+  angle?: ContentAngle | null;
   onClose: () => void;
 }) {
   return (
@@ -156,10 +160,11 @@ export function StrategyDialog({
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
         {open && (
           <StrategyForm
-            key={editing?.id ?? platform ?? "new"}
+            key={editing?.id ?? `${platform ?? "new"}:${angle?.title ?? ""}`}
             topic={topic}
             initialPlatform={editing?.platform ?? platform ?? topic.recommended_platforms[0] ?? "linkedin"}
             editing={editing}
+            angle={angle}
             onClose={onClose}
           />
         )}
@@ -172,11 +177,13 @@ function StrategyForm({
   topic,
   initialPlatform,
   editing,
+  angle,
   onClose,
 }: {
   topic: TopicDetail;
   initialPlatform: Platform;
   editing: Strategy | null;
+  angle: ContentAngle | null;
   onClose: () => void;
 }) {
   const rules = usePlatformRules();
@@ -189,7 +196,11 @@ function StrategyForm({
   const [notice, setNotice] = useState<string | null>(null);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: toValues(initialPlatform, editing ?? undefined, topic.target_audience),
+    defaultValues: toValues(
+      initialPlatform,
+      editing ?? (angle ? { content_angle: `${angle.title}: ${stripCitations(angle.angle)}` } : undefined),
+      topic.target_audience,
+    ),
   });
   const { errors } = form.formState;
   const [platform, postType, objective] = useWatch({

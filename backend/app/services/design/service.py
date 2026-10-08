@@ -91,6 +91,33 @@ async def open_brief(db: AsyncSession, post: Post, user_id: uuid.UUID) -> Design
     return brief
 
 
+async def ensure_briefs(db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """Posts waiting in design must have an open task. Heals posts that reached
+    design without one, so the dashboard count and the task list agree."""
+    has_task = select(DesignBrief.post_id).where(
+        DesignBrief.status.in_([*ACTIVE, B.SUBMITTED]),
+    )
+    orphans = await db.scalars(
+        select(Post).where(
+            Post.organization_id == organization_id,
+            Post.status.in_(
+                [
+                    PostStatus.DESIGN_PENDING,
+                    PostStatus.DESIGN_IN_PROGRESS,
+                    PostStatus.DESIGN_UPLOADED,
+                ]
+            ),
+            Post.id.not_in(has_task),
+        )
+    )
+    healed = False
+    for post in orphans:
+        await open_brief(db, post, user_id)
+        healed = True
+    if healed:
+        await db.commit()
+
+
 async def cancel_briefs(db: AsyncSession, post: Post) -> None:
     """The post left design (back to draft, archived): close its open task."""
     rows = await db.scalars(
@@ -208,6 +235,7 @@ async def list_tasks(
     limit: int,
     offset: int,
 ) -> TaskPage:
+    await ensure_briefs(db, organization_id, user_id)
     filters = [DesignBrief.organization_id == organization_id]
     if mine:
         filters.append(DesignBrief.assignee_id == user_id)

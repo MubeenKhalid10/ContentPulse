@@ -76,6 +76,9 @@ export const useTopicAction = () =>
     api<TopicDetail>(`/topics/${id}/${action}`, { method: "POST" }),
   );
 
+export const useDeleteTopic = () =>
+  useTopicMutation((id: string) => api<void>(`/topics/${id}`, { method: "DELETE" }));
+
 export const useUpdateTopic = () =>
   useTopicMutation(
     ({ id, ...body }: { id: string; title?: string; summary?: string | null; target_audience?: string | null }) =>

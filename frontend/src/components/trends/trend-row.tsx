@@ -2,14 +2,15 @@
 
 import { CheckIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { DeleteButton } from "@/components/shared/delete-button";
 import { Tag } from "@/components/shared/tag";
 import { RelevanceBadge } from "@/components/trends/relevance";
 import { Score } from "@/components/trends/score";
 import { Button } from "@/components/ui/button";
-import { useTrendAction } from "@/hooks/use-trends";
+import { useDeleteTrend, useTrendAction } from "@/hooks/use-trends";
 import { errorMessage } from "@/lib/api";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import { marketLabel, sourceName } from "@/lib/trends";
@@ -19,24 +20,46 @@ import type { Trend } from "@/types/api";
 export function TrendActions({ trend, compact = false }: { trend: Trend; compact?: boolean }) {
   const action = useTrendAction();
   const router = useRouter();
+  const remove = useDeleteTrend();
+  const pathname = usePathname();
   const onError = (e: unknown) => toast.error(errorMessage(e));
+  const deleteButton = (
+    <DeleteButton
+      title={`Delete “${trend.topic}”?`}
+      description="This permanently deletes the trend, its evidence and its topic with any post plans. Posts already written for it are kept. This can't be undone."
+      pending={action.isPending || remove.isPending}
+      onConfirm={() =>
+        remove.mutate(trend.id, {
+          onSuccess: () => {
+            toast.success(`Deleted “${trend.topic}”`);
+            if (pathname.startsWith("/trends/")) router.push("/trends");
+          },
+          onError,
+        })
+      }
+    />
+  );
 
+  if (trend.status === "archived") return deleteButton;
   if (trend.status === "rejected") {
     return (
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={action.isPending}
-        onClick={() =>
-          action.mutate({ id: trend.id, action: "restore" }, { onSuccess: () => toast.success("Trend restored"), onError })
-        }
-      >
-        <RotateCcwIcon />
-        Restore
-      </Button>
+      <div className="flex gap-1.5">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={action.isPending}
+          onClick={() =>
+            action.mutate({ id: trend.id, action: "restore" }, { onSuccess: () => toast.success("Trend restored"), onError })
+          }
+        >
+          <RotateCcwIcon />
+          Restore
+        </Button>
+        {deleteButton}
+      </div>
     );
   }
-  if (trend.status === "shortlisted") return null;
+  if (trend.status === "shortlisted") return deleteButton;
   return (
     <div className="flex gap-1.5">
       <Button

@@ -72,6 +72,11 @@ async def update_topic(topic_id: uuid.UUID, data: TopicUpdate, ctx: CanManage, d
     )
 
 
+@router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_topic(topic_id: uuid.UUID, ctx: CanManage, db: DB) -> None:
+    await service.delete_topic(db, ctx.organization_id, ctx.user.id, topic_id)
+
+
 def _transition(target: TopicStatus):
     async def endpoint(topic_id: uuid.UUID, ctx: CanManage, db: DB) -> TopicDetail:
         return await service.transition(db, ctx.organization_id, ctx.user.id, topic_id, target)

@@ -1,11 +1,16 @@
 "use client";
 
-import { AlertTriangleIcon, LoaderCircleIcon, SparklesIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  LoaderCircleIcon,
+  SparklesIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
 import { PlatformTag, Tag } from "@/components/shared/tag";
+import { DayGroups } from "@/components/shared/day-groups";
 import { PageHeader } from "@/components/shared/page-header";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -13,9 +18,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { type ContentFilters, usePosts } from "@/hooks/use-content";
 import { POST_STATUS_LABEL } from "@/lib/content";
-import { timeAgo } from "@/lib/format";
+import { timeAgo, timeOfDay } from "@/lib/format";
 import { PLATFORM_OPTIONS } from "@/lib/options";
 import { cn } from "@/lib/utils";
 import type { Post, PostGroup } from "@/types/api";
@@ -29,7 +35,8 @@ const TABS: { value: PostGroup; label: string }[] = [
   { value: "archived", label: "Archived" },
 ];
 const EMPTY: Record<PostGroup, string> = {
-  drafts: "No drafts. Open a shortlisted topic, plan a post and click Write post.",
+  drafts:
+    "No drafts. Open a shortlisted topic, plan a post and click Write post.",
   design: "Nothing in design right now.",
   approval: "Nothing waiting for approval.",
   approved: "Nothing ready to publish yet.",
@@ -38,7 +45,11 @@ const EMPTY: Record<PostGroup, string> = {
 };
 
 export function ContentList() {
-  const [filters, setFilters] = useState<ContentFilters>({ status: "drafts", platform: "", q: "" });
+  const [filters, setFilters] = usePersistedState<ContentFilters>("content", {
+    status: "drafts",
+    platform: "",
+    q: "",
+  });
   const [limit, setLimit] = useState(PAGE);
   const posts = usePosts(filters, limit);
   const update = (patch: Partial<ContentFilters>) => {
@@ -63,10 +74,14 @@ export function ContentList() {
             <div className="grid max-w-md gap-1.5">
               <p className="text-lg font-medium">No posts yet</p>
               <p className="text-sm text-muted-foreground">
-                Shortlist a topic, plan a post for a platform, then click Write post on the topic page.
+                Shortlist a topic, plan a post for a platform, then click Write
+                post on the topic page.
               </p>
             </div>
-            <Link href="/topics" className={buttonVariants({ variant: "outline" })}>
+            <Link
+              href="/topics"
+              className={buttonVariants({ variant: "outline" })}
+            >
               Go to Topics
             </Link>
           </CardContent>
@@ -74,7 +89,10 @@ export function ContentList() {
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-6">
           <div className="flex flex-wrap items-center gap-3">
-            <Tabs value={filters.status} onValueChange={(v) => update({ status: v as PostGroup })}>
+            <Tabs
+              value={filters.status}
+              onValueChange={(v) => update({ status: v as PostGroup })}
+            >
               <TabsList>
                 {TABS.map((tab) => (
                   <TabsTrigger key={tab.value} value={tab.value}>
@@ -98,8 +116,16 @@ export function ContentList() {
             <SimpleSelect
               aria-label="Platform"
               value={filters.platform || "all"}
-              onChange={(v) => update({ platform: v === "all" ? "" : (v as ContentFilters["platform"]) })}
-              options={[{ value: "all", label: "Any platform" }, ...PLATFORM_OPTIONS]}
+              onChange={(v) =>
+                update({
+                  platform:
+                    v === "all" ? "" : (v as ContentFilters["platform"]),
+                })
+              }
+              options={[
+                { value: "all", label: "Any platform" },
+                ...PLATFORM_OPTIONS,
+              ]}
               className="w-40 sm:ml-auto"
             />
           </div>
@@ -112,24 +138,35 @@ export function ContentList() {
             </div>
           ) : posts.data?.items.length ? (
             <>
-              <ul
-                aria-label="Posts"
+              <div
                 aria-busy={posts.isPlaceholderData}
-                className={cn("grid gap-3 transition-opacity", posts.isPlaceholderData && "opacity-50")}
+                className={cn(
+                  "transition-opacity",
+                  posts.isPlaceholderData && "opacity-50",
+                )}
               >
-                {posts.data.items.map((post) => (
-                  <PostRow key={post.id} post={post} />
-                ))}
-              </ul>
+                <DayGroups
+                  items={posts.data.items}
+                  dateOf={(p) => p.updated_at}
+                  label="Posts"
+                  render={(post) => <PostRow key={post.id} post={post} />}
+                />
+              </div>
               {posts.data.total > posts.data.items.length && (
-                <Button variant="outline" className="justify-self-center" onClick={() => setLimit((n) => n + PAGE)}>
+                <Button
+                  variant="outline"
+                  className="justify-self-center"
+                  onClick={() => setLimit((n) => n + PAGE)}
+                >
                   Show more ({posts.data.total - posts.data.items.length} left)
                 </Button>
               )}
             </>
           ) : (
             <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              {filters.q || filters.platform ? "No posts match these filters." : EMPTY[filters.status]}
+              {filters.q || filters.platform
+                ? "No posts match these filters."
+                : EMPTY[filters.status]}
             </p>
           )}
         </div>
@@ -138,9 +175,16 @@ export function ContentList() {
   );
 }
 
-export function PostRow({ post, compact = false }: { post: Post; compact?: boolean }) {
+export function PostRow({
+  post,
+  compact = false,
+}: {
+  post: Post;
+  compact?: boolean;
+}) {
   const generation = post.generation;
-  const busy = generation?.status === "queued" || generation?.status === "running";
+  const busy =
+    generation?.status === "queued" || generation?.status === "running";
   const failed = generation?.status === "failed" && !post.current_version;
   return (
     <li className="relative grid gap-1.5 rounded-xl bg-card p-4 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
@@ -152,15 +196,20 @@ export function PostRow({ post, compact = false }: { post: Post; compact?: boole
         >
           {post.title ?? "Untitled post"}
         </Link>
-        <Tag tone={POST_STATUS_TONE[post.status]} dot>{POST_STATUS_LABEL[post.status]}</Tag>
+        <Tag tone={POST_STATUS_TONE[post.status]} dot>
+          {POST_STATUS_LABEL[post.status]}
+        </Tag>
         {post.variant_of_id && <Tag tone="neutral">Variant</Tag>}
         <span className="ml-auto text-xs text-muted-foreground">
           {post.current_version ? `v${post.current_version} · ` : ""}
-          {timeAgo(post.updated_at)}
+          {compact ? timeAgo(post.updated_at) : timeOfDay(post.updated_at)}
         </span>
       </div>
       {busy ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+        <p
+          className="flex items-center gap-2 text-sm text-muted-foreground"
+          role="status"
+        >
           <LoaderCircleIcon className="size-4 animate-spin text-primary" />
           Writing…
         </p>
@@ -170,7 +219,16 @@ export function PostRow({ post, compact = false }: { post: Post; compact?: boole
           Generation failed. Open the post to try again.
         </p>
       ) : (
-        post.hook && <p className={cn("text-sm text-muted-foreground", compact ? "line-clamp-1" : "line-clamp-2")}>{post.hook}</p>
+        post.hook && (
+          <p
+            className={cn(
+              "text-sm text-muted-foreground",
+              compact ? "line-clamp-1" : "line-clamp-2",
+            )}
+          >
+            {post.hook}
+          </p>
+        )
       )}
     </li>
   );

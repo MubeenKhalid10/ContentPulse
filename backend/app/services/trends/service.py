@@ -7,7 +7,7 @@ from sqlalchemy import Text, cast, func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
-from app.core.errors import AppError, ErrorCode, NotFound
+from app.core.errors import AppError, ErrorCode, InvalidStateTransition, NotFound
 from app.models.ai import AIGenerationJob
 from app.models.enums import (
     DiscoveryRunStatus,
@@ -319,6 +319,35 @@ async def override_relevance(
     await alignment.override_relevance(db, trend, level, user_id)
     await db.commit()
     return await trend_detail(db, organization_id, trend.id)
+
+
+DELETABLE = (TrendStatus.SHORTLISTED, TrendStatus.REJECTED, TrendStatus.ARCHIVED)
+
+
+async def delete_trend(
+    db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, trend_id: uuid.UUID
+) -> None:
+    """Permanently remove a shortlisted, rejected or archived trend with its
+    mentions and its topic (whose plans go with it; written posts are kept)."""
+    trend = await _get_trend(db, organization_id, trend_id)
+    if trend.status not in DELETABLE:
+        raise InvalidStateTransition(
+            "Only shortlisted, rejected or archived trends can be deleted."
+        )
+    topic = await topic_sync.topic_for_trend(db, trend)
+    if topic is not None:
+        await db.delete(topic)
+    audit.record(
+        db,
+        organization_id=organization_id,
+        user_id=user_id,
+        action=AuditAction.TREND_DELETED,
+        entity_type="trend",
+        entity_id=trend.id,
+        old_value={"status": trend.status, "topic": trend.topic},
+    )
+    await db.delete(trend)
+    await db.commit()
 
 
 _ACTIONS = {

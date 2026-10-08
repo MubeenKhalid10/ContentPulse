@@ -77,3 +77,27 @@ export function humanize(field: string): string {
   const s = field.replaceAll("_", " ");
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+/** Removes knowledge-base markers such as [K1] or [K1, K4, K6] from AI text. */
+export function stripCitations(text: string): string {
+  return text.replace(/\s*\[\s*K\d+(?:\s*[,;]\s*K?\d+)*\s*\]/g, "");
+}
+
+/** Hides technical details (such as the AI model) from auto-generated notes. */
+export function cleanNote(note: string): string {
+  return note.replace(/^(Generated with AI)\s*\(.*\)\s*$/, "$1");
+}
+
+/** "Today", "Yesterday" or a date, for grouping a list by day. */
+export function dayLabel(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(d)) / 86_400_000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+}
+
+export function timeOfDay(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
