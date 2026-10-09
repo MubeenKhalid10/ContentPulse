@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { TREND_STATUS_TONE } from "@/lib/tones";
+import { CollapsibleCard } from "@/components/shared/collapsible-card";
 import { Tag } from "@/components/shared/tag";
 import { AlignmentPanel } from "@/components/trends/alignment-panel";
 import { RelevanceBadge } from "@/components/trends/relevance";
@@ -13,7 +14,13 @@ import { TrendActions } from "@/components/trends/trend-row";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMarkets, useTrend } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -35,22 +42,33 @@ export function TrendDetailView({ id }: { id: string }) {
   const markets = useMarkets();
   const can = useCan();
   const canReview = can("trends.manage") || can("topics.manage");
-  const marketNames = useMemo(() => new Map(markets.data?.map((m) => [m.code, m.name])), [markets.data]);
+  const marketNames = useMemo(
+    () => new Map(markets.data?.map((m) => [m.code, m.name])),
+    [markets.data],
+  );
 
   const back = (
-    <Link href="/trends" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    <Link
+      href="/trends"
+      className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+    >
       <ArrowLeftIcon className="size-4" />
       Trends
     </Link>
   );
 
   if (trend.isError) {
-    const notFound = trend.error instanceof ApiError && trend.error.status === 404;
+    const notFound =
+      trend.error instanceof ApiError && trend.error.status === 404;
     return (
       <>
         {back}
         <Alert variant="destructive">
-          <AlertDescription>{notFound ? "This trend doesn't exist or isn't in your organization." : errorMessage(trend.error)}</AlertDescription>
+          <AlertDescription>
+            {notFound
+              ? "This trend doesn't exist or isn't in your organization."
+              : errorMessage(trend.error)}
+          </AlertDescription>
         </Alert>
       </>
     );
@@ -79,18 +97,33 @@ export function TrendDetailView({ id }: { id: string }) {
         <div className="grid min-w-0 flex-1 gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">{t.topic}</h1>
-            <Tag tone={TREND_STATUS_TONE[t.status] ?? "neutral"} dot>{STATUS_LABEL[t.status]}</Tag>
-            <RelevanceBadge level={t.relevance_level} overridden={t.relevance_overridden} />
+            <Tag tone={TREND_STATUS_TONE[t.status] ?? "neutral"} dot>
+              {STATUS_LABEL[t.status]}
+            </Tag>
+            <RelevanceBadge
+              level={t.relevance_level}
+              overridden={t.relevance_overridden}
+            />
           </div>
           <p className="text-sm text-muted-foreground">
-            Opportunity score {t.opportunity_score == null ? "—" : Math.round(t.opportunity_score)} of 100 ·{" "}
-            {t.mention_count} mention{t.mention_count === 1 ? "" : "s"} across {t.sources.length} source
+            Opportunity score{" "}
+            {t.opportunity_score == null
+              ? "—"
+              : Math.round(t.opportunity_score)}{" "}
+            of 100 · {t.mention_count} mention{t.mention_count === 1 ? "" : "s"}{" "}
+            across {t.sources.length} source
             {t.sources.length === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {t.topic_id && (
-            <Link href={`/topics/${t.topic_id}`} className={buttonVariants({ variant: t.status === "shortlisted" ? "default" : "outline", size: "sm" })}>
+            <Link
+              href={`/topics/${t.topic_id}`}
+              className={buttonVariants({
+                variant: t.status === "shortlisted" ? "default" : "outline",
+                size: "sm",
+              })}
+            >
               <ListChecksIcon />
               Open topic
             </Link>
@@ -105,36 +138,50 @@ export function TrendDetailView({ id }: { id: string }) {
           <Card>
             <CardHeader>
               <CardTitle>Why it&apos;s trending</CardTitle>
-              <CardDescription>The signals behind the opportunity score.</CardDescription>
+              <CardDescription>
+                The signals behind the opportunity score.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <SignalBreakdown signals={t.signals} />
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Evidence</CardTitle>
-              <CardDescription>Every mention we found, with links to the original source.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-6">
-              {bySource.map(([source, mentions]) => (
-                <section key={source} aria-label={sourceName(source)} className="grid gap-2">
-                  <h2 className="text-sm font-medium">
-                    {sourceName(source)} <span className="font-normal text-muted-foreground">({mentions.length})</span>
-                  </h2>
-                  <ul className="grid gap-2">
-                    {mentions.slice(0, 8).map((m) => (
-                      <MentionItem key={m.id} mention={m} marketNames={marketNames} />
-                    ))}
-                  </ul>
-                  {mentions.length > 8 && (
-                    <p className="text-xs text-muted-foreground">+ {mentions.length - 8} more</p>
-                  )}
-                </section>
-              ))}
-            </CardContent>
-          </Card>
+          <CollapsibleCard
+            title="Evidence"
+            count={t.mentions.length}
+            description="Every mention we found, with links to the original source."
+            contentClassName="grid gap-6"
+          >
+            {bySource.map(([source, mentions]) => (
+              <section
+                key={source}
+                aria-label={sourceName(source)}
+                className="grid gap-2"
+              >
+                <h2 className="text-sm font-medium">
+                  {sourceName(source)}{" "}
+                  <span className="font-normal text-muted-foreground">
+                    ({mentions.length})
+                  </span>
+                </h2>
+                <ul className="grid gap-2">
+                  {mentions.slice(0, 8).map((m) => (
+                    <MentionItem
+                      key={m.id}
+                      mention={m}
+                      marketNames={marketNames}
+                    />
+                  ))}
+                </ul>
+                {mentions.length > 8 && (
+                  <p className="text-xs text-muted-foreground">
+                    + {mentions.length - 8} more
+                  </p>
+                )}
+              </section>
+            ))}
+          </CollapsibleCard>
         </div>
 
         <div className="grid content-start gap-6">
@@ -144,14 +191,35 @@ export function TrendDetailView({ id }: { id: string }) {
             </CardHeader>
             <CardContent>
               <dl className="grid gap-3 text-sm">
-                <Detail label="First seen" value={<time title={formatDateTime(t.first_seen_at)}>{timeAgo(t.first_seen_at)}</time>} />
-                <Detail label="Last seen" value={<time title={formatDateTime(t.last_seen_at)}>{timeAgo(t.last_seen_at)}</time>} />
-                <Detail label="Locations" value={t.locations.map((c) => marketLabel(c, marketNames)).join(", ")} />
+                <Detail
+                  label="First seen"
+                  value={
+                    <time title={formatDateTime(t.first_seen_at)}>
+                      {timeAgo(t.first_seen_at)}
+                    </time>
+                  }
+                />
+                <Detail
+                  label="Last seen"
+                  value={
+                    <time title={formatDateTime(t.last_seen_at)}>
+                      {timeAgo(t.last_seen_at)}
+                    </time>
+                  }
+                />
+                <Detail
+                  label="Locations"
+                  value={t.locations
+                    .map((c) => marketLabel(c, marketNames))
+                    .join(", ")}
+                />
                 {t.category && <Detail label="Category" value={t.category} />}
               </dl>
               {t.keywords.length > 0 && (
                 <div className="mt-4 grid gap-2">
-                  <p className="text-xs text-muted-foreground">Related keywords</p>
+                  <p className="text-xs text-muted-foreground">
+                    Related keywords
+                  </p>
                   <ul className="flex flex-wrap gap-1.5">
                     {t.keywords.map((k) => (
                       <li key={k}>
@@ -163,7 +231,6 @@ export function TrendDetailView({ id }: { id: string }) {
               )}
             </CardContent>
           </Card>
-
         </div>
       </div>
     </>
@@ -179,13 +246,22 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function groupBySource(mentions: TrendMention[]): [string, TrendMention[]][] {
+export function groupBySource(
+  mentions: TrendMention[],
+): [string, TrendMention[]][] {
   const groups = new Map<string, TrendMention[]>();
-  for (const m of mentions) groups.set(m.source, [...(groups.get(m.source) ?? []), m]);
+  for (const m of mentions)
+    groups.set(m.source, [...(groups.get(m.source) ?? []), m]);
   return [...groups.entries()];
 }
 
-export function MentionItem({ mention: m, marketNames }: { mention: TrendMention; marketNames: Map<string, string> }) {
+export function MentionItem({
+  mention: m,
+  marketNames,
+}: {
+  mention: TrendMention;
+  marketNames: Map<string, string>;
+}) {
   const when = m.published_at ?? m.detected_at;
   return (
     <li className="grid gap-0.5 rounded-lg border p-3">
@@ -202,11 +278,21 @@ export function MentionItem({ mention: m, marketNames }: { mention: TrendMention
       ) : (
         <p className="text-sm font-medium">{m.title}</p>
       )}
-      {m.description && <p className="line-clamp-2 text-xs text-muted-foreground">{m.description}</p>}
+      {m.description && (
+        <p className="line-clamp-2 text-xs text-muted-foreground">
+          {m.description}
+        </p>
+      )}
       <p className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
         {m.author && <span>{m.author}</span>}
-        {m.engagement_label && <span className="font-medium text-foreground">{m.engagement_label}</span>}
-        {m.location && m.location !== "GLOBAL" && <span>{marketLabel(m.location, marketNames)}</span>}
+        {m.engagement_label && (
+          <span className="font-medium text-foreground">
+            {m.engagement_label}
+          </span>
+        )}
+        {m.location && m.location !== "GLOBAL" && (
+          <span>{marketLabel(m.location, marketNames)}</span>
+        )}
         <time dateTime={when} title={formatDateTime(when)}>
           {timeAgo(when)}
         </time>

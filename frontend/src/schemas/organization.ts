@@ -1,3 +1,4 @@
+import { LOGO_POSITIONS } from "@/lib/logo";
 import { z } from "zod";
 
 /** Optional text: blank input is sent as null so the backend clears the field. */
@@ -47,6 +48,7 @@ export const brandSchema = z.object({
   hashtag_guidelines: optionalText(),
   brand_colors: z.array(z.string()),
   typography: optionalText(),
+  logo_position: z.enum(LOGO_POSITIONS),
 });
 
 export const settingsSchema = z.object({

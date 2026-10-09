@@ -69,6 +69,20 @@ class S3Storage:
         except (BotoCoreError, ClientError) as exc:
             raise StorageUnavailable(str(exc)) from exc
 
+    async def get(self, key: str) -> bytes | None:
+        def read() -> bytes:
+            response = self.client.get_object(Bucket=self.bucket, Key=check_key(key))
+            return response["Body"].read()
+
+        try:
+            return await asyncio.to_thread(read)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+                return None
+            raise StorageUnavailable(f"Storage error: {exc}") from exc
+        except BotoCoreError as exc:
+            raise StorageUnavailable(f"Storage unreachable: {exc}") from exc
+
     async def head(self, key: str) -> ObjectInfo | None:
         try:
             resp = await asyncio.to_thread(

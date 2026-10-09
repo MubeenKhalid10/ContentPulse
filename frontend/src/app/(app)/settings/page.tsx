@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
-import { SettingsEditor } from "@/components/organization/settings-editor";
+import { AccountSettings } from "@/components/account/account-settings";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default function SettingsPage() {
-  return <SettingsEditor />;
+  return <AccountSettings />;
 }

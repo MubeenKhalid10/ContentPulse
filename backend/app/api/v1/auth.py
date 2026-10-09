@@ -24,8 +24,10 @@ from app.schemas.auth import (
     InvitePreview,
     LoginRequest,
     MeResponse,
+    PasswordChange,
     PasswordResetConfirm,
     PasswordResetRequest,
+    ProfileUpdate,
     RegisterRequest,
     SessionResponse,
 )
@@ -133,6 +135,32 @@ async def me(
     x_organization_id: Annotated[uuid.UUID | None, Header()] = None,
 ) -> MeResponse:
     return await auth_service.build_me(db, user, x_organization_id)
+
+
+@router.patch("/me", response_model=MeResponse)
+async def update_me(
+    data: ProfileUpdate,
+    user: CurrentUser,
+    db: DB,
+    x_organization_id: Annotated[uuid.UUID | None, Header()] = None,
+) -> MeResponse:
+    user = await auth_service.update_profile(db, user, data.full_name)
+    return await auth_service.build_me(db, user, x_organization_id)
+
+
+@router.post(
+    "/password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[per_ip(LOGIN_PER_IP)],
+)
+async def change_password(
+    data: PasswordChange, user: CurrentUser, db: DB, settings: AppSettings
+) -> None:
+    # Same limits as sign-in: the current password can't be guessed from here.
+    await limiter.check(LOGIN_PER_ACCOUNT, user.email.lower())
+    await auth_service.change_password(
+        db, user, data.current_password, data.new_password, settings
+    )
 
 
 @router.get("/invites/{token}", response_model=InvitePreview)

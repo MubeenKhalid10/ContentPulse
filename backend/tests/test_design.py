@@ -719,3 +719,34 @@ def test_broken_s3_client_falls_back_to_local_storage(monkeypatch):
     finally:
         storage_module._storage.cache_clear()
         storage_module._s3_ready.cache_clear()
+
+
+async def test_post_colors_override_the_brand_for_this_post_only(
+    client, internet, design_ai, fake_images
+):
+    admin, org = await setup_org(client)
+    _, task = await in_design(admin, org)
+    url = f"{API}/{task['id']}"
+    assert task["brand_requirements"].get("colors") in (None, ["#0F766E", "#111827"])
+
+    resp = await admin.patch(url, json={"colors": [" #FF5500 ", "#FF5500", "navy"]})
+    assert resp.status_code == 200, resp.text
+    task = resp.json()
+    assert task["brand_requirements"]["colors"] == ["#FF5500", "navy"]  # trimmed, deduped
+    assert task["brand"]["colors"] == ["#0F766E", "#111827"]  # Brand settings untouched
+    assert task["source"] == "edited"
+
+    # AI images use this post's palette.
+    await admin.post(f"{url}/generate-image")
+    await runner.wait_idle()
+    prompt, _ = fake_images.prompts[0]
+    assert "#FF5500, navy" in prompt and "#0F766E" not in prompt
+
+    # Back to the brand's colours.
+    task = (await admin.patch(url, json={"colors": None})).json()
+    assert "colors" not in task["brand_requirements"]
+
+    viewer = await add_member(client, admin, org["id"], "vee@acme.example.com", "viewer")
+    assert (await viewer.patch(url, json={"colors": ["#000000"]})).status_code == 403
+    too_many = await admin.patch(url, json={"colors": [f"#00000{i:x}" for i in range(13)]})
+    assert too_many.status_code == 422

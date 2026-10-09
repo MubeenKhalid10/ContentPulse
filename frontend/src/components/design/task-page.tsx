@@ -10,6 +10,8 @@ import { PlatformTag, Tag } from "@/components/shared/tag";
 import { ReviewBanner } from "@/components/approvals/review-banner";
 import { BriefDialog } from "@/components/design/brief-dialog";
 import { CreativeUploader, CreativeVersions } from "@/components/design/creatives";
+import { PostColors } from "@/components/design/post-colors";
+import { PostLogo } from "@/components/design/post-logo";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -112,7 +114,7 @@ export function DesignTaskPage({ id }: { id: string }) {
         <div className="grid min-w-0 grid-cols-1 content-start gap-6 lg:col-span-2">
           <BriefCard task={t} canEdit={canEditBrief} onEdit={() => setEditing(true)} />
           <ContentCard task={t} />
-          <BrandCard task={t} />
+          <BrandCard task={t} canEdit={canEditBrief} canEditBrand={can("organization.write")} />
         </div>
         <div className="grid min-w-0 grid-cols-1 content-start gap-6">
           {canWork && <CreativeUploader task={t} canSubmit={can("design.submit")} />}
@@ -273,16 +275,23 @@ function ContentCard({ task: t }: { task: DesignTaskDetail }) {
   );
 }
 
-function BrandCard({ task: t }: { task: DesignTaskDetail }) {
+function BrandCard({
+  task: t,
+  canEdit,
+  canEditBrand,
+}: {
+  task: DesignTaskDetail;
+  canEdit: boolean;
+  canEditBrand: boolean;
+}) {
   const req = t.brand_requirements;
-  const colors = req.colors?.length ? req.colors : t.brand.colors;
   return (
     <Card>
       <CardHeader>
         <CardTitle>Brand guidelines</CardTitle>
         <CardDescription>
           From your Brand settings.{" "}
-          {!colors.length && !t.brand.typography && (
+          {!t.brand.colors.length && !t.brand.typography && (
             <Link href="/organization/brand" className="underline underline-offset-4">
               Add colors and typography
             </Link>
@@ -290,16 +299,8 @@ function BrandCard({ task: t }: { task: DesignTaskDetail }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm">
-        {colors.length > 0 && (
-          <ul className="flex flex-wrap gap-3" aria-label="Brand colors">
-            {colors.map((c) => (
-              <li key={c} className="flex items-center gap-2">
-                <span className="size-6 rounded-md ring-1 ring-foreground/10" style={{ background: c }} aria-hidden />
-                <span className="font-mono text-xs">{c}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <PostColors task={t} canEdit={canEdit} />
+        <PostLogo task={t} canEdit={canEdit} canEditBrand={canEditBrand} />
         <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-[9rem_1fr]">
           {[
             ["Typography", req.typography ?? t.brand.typography],

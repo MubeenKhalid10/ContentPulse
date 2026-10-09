@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { RadarIcon, SettingsIcon, TrendingUpIcon } from "lucide-react";
+import { ArrowRightIcon, RadarIcon, TrendingUpIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -16,7 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useOrgSettings, useOrgId } from "@/hooks/use-organization";
+import {
+  useOrgSettings,
+  useOrgId,
+  useUpdateSettings,
+} from "@/hooks/use-organization";
 import {
   type RelevanceFilter,
   type TrendFilters,
@@ -29,6 +33,8 @@ import {
 } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
+import { FREQUENCY_OPTIONS } from "@/lib/options";
+import type { TrendSourceInfo } from "@/types/api";
 import { sourceName } from "@/lib/trends";
 import { cn } from "@/lib/utils";
 
@@ -72,15 +78,25 @@ export function TrendsExplorer() {
   const running = latest?.status === "queued" || latest?.status === "running";
   useRunCompletion(latest?.id, latest?.status);
 
-  const marketNames = useMemo(() => new Map(markets.data?.map((m) => [m.code, m.name])), [markets.data]);
+  const marketNames = useMemo(
+    () => new Map(markets.data?.map((m) => [m.code, m.name])),
+    [markets.data],
+  );
   const sourceOptions = [
     { value: "all", label: "All sources" },
-    ...(sources.data ?? []).filter((s) => s.enabled).map((s) => ({ value: s.key, label: s.name })),
+    ...(sources.data ?? [])
+      .filter((s) => s.enabled)
+      .map((s) => ({ value: s.key, label: s.name })),
   ];
-  const locationCodes = Array.from(new Set(trends.data?.items.flatMap((t) => t.locations) ?? []));
+  const locationCodes = Array.from(
+    new Set(trends.data?.items.flatMap((t) => t.locations) ?? []),
+  );
   const locationOptions = [
     { value: "all", label: "All locations" },
-    ...locationCodes.map((c) => ({ value: c, label: marketNames.get(c) ?? (c === "GLOBAL" ? "Global" : c) })),
+    ...locationCodes.map((c) => ({
+      value: c,
+      label: marketNames.get(c) ?? (c === "GLOBAL" ? "Global" : c),
+    })),
   ];
 
   const update = (patch: Partial<TrendFilters>) => {
@@ -97,8 +113,8 @@ export function TrendsExplorer() {
         title="Trends"
         description={
           <>
-            What&apos;s rising in your markets, scored for your organization. Shortlist the trends
-            worth posting about.{" "}
+            What&apos;s rising in your markets, scored for your organization.
+            Shortlist the trends worth posting about.{" "}
             {ai.data && (
               <span className="sm:whitespace-nowrap">
                 {ai.data.engine === "ai"
@@ -110,19 +126,18 @@ export function TrendsExplorer() {
         }
         actions={
           <>
-            <Link href="/trends/sources" className={buttonVariants({ variant: "outline" })}>
-              <SettingsIcon />
-              Sources
-            </Link>
             {canDiscover && (
               <Button
                 disabled={running || discover.isPending || enabledCount === 0}
                 onClick={() =>
-                  discover.mutate({}, { onSuccess: onDiscoverStarted, onError: onDiscoverError })
+                  discover.mutate(
+                    {},
+                    { onSuccess: onDiscoverStarted, onError: onDiscoverError },
+                  )
                 }
               >
                 <RadarIcon />
-                {running ? "Discovering…" : "Discover now"}
+                {running ? "Discovering…" : "Discover New Trends now"}
               </Button>
             )}
           </>
@@ -130,6 +145,7 @@ export function TrendsExplorer() {
       />
 
       <div className="grid min-w-0 grid-cols-1 gap-6">
+        {sources.data && <SourcesStrip sources={sources.data} />}
         {latest && <RunStatus run={latest} />}
 
         {noRunsYet ? (
@@ -148,14 +164,25 @@ export function TrendsExplorer() {
               </div>
               {canDiscover && enabledCount > 0 ? (
                 <Button
-                  onClick={() => discover.mutate({}, { onSuccess: onDiscoverStarted, onError: onDiscoverError })}
+                  onClick={() =>
+                    discover.mutate(
+                      {},
+                      {
+                        onSuccess: onDiscoverStarted,
+                        onError: onDiscoverError,
+                      },
+                    )
+                  }
                   disabled={discover.isPending}
                 >
                   <RadarIcon />
-                  Discover trends now
+                  Discover New Trends now
                 </Button>
               ) : (
-                <Link href="/trends/sources" className={buttonVariants({ variant: "outline" })}>
+                <Link
+                  href="/trends/sources"
+                  className={buttonVariants({ variant: "outline" })}
+                >
                   Set up sources
                 </Link>
               )}
@@ -164,7 +191,12 @@ export function TrendsExplorer() {
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-3">
-              <Tabs value={filters.status} onValueChange={(v) => update({ status: v as TrendFilters["status"] })}>
+              <Tabs
+                value={filters.status}
+                onValueChange={(v) =>
+                  update({ status: v as TrendFilters["status"] })
+                }
+              >
                 <TabsList>
                   <TabsTrigger value="active">Active</TabsTrigger>
                   <TabsTrigger value="shortlisted">Shortlisted</TabsTrigger>
@@ -178,11 +210,16 @@ export function TrendsExplorer() {
                 onChange={(e) => update({ q: e.target.value })}
                 className="w-full sm:w-56"
               />
+              <CheckFrequency />
               <div className="flex flex-wrap gap-2 sm:ml-auto">
                 <SimpleSelect
                   aria-label="Relevance"
                   value={filters.relevance || "all"}
-                  onChange={(v) => update({ relevance: v === "all" ? "" : (v as RelevanceFilter) })}
+                  onChange={(v) =>
+                    update({
+                      relevance: v === "all" ? "" : (v as RelevanceFilter),
+                    })
+                  }
                   options={RELEVANCE_FILTERS}
                   className="w-44"
                 />
@@ -219,23 +256,39 @@ export function TrendsExplorer() {
             ) : trends.data?.items.length ? (
               <>
                 <ul
-                  className={cn("grid min-w-0 grid-cols-1 gap-3 transition-opacity", trends.isPlaceholderData && "opacity-50")}
+                  className={cn(
+                    "grid min-w-0 grid-cols-1 gap-3 transition-opacity",
+                    trends.isPlaceholderData && "opacity-50",
+                  )}
                   aria-label="Trends"
                   aria-busy={trends.isPlaceholderData}
                 >
                   {trends.data.items.map((trend) => (
-                    <TrendRow key={trend.id} trend={trend} canReview={canReview} marketNames={marketNames} />
+                    <TrendRow
+                      key={trend.id}
+                      trend={trend}
+                      canReview={canReview}
+                      marketNames={marketNames}
+                    />
                   ))}
                 </ul>
                 {trends.data.total > trends.data.items.length && (
-                  <Button variant="outline" className="justify-self-center" onClick={() => setLimit((n) => n + PAGE)}>
-                    Show more ({trends.data.total - trends.data.items.length} left)
+                  <Button
+                    variant="outline"
+                    className="justify-self-center"
+                    onClick={() => setLimit((n) => n + PAGE)}
+                  >
+                    Show more ({trends.data.total - trends.data.items.length}{" "}
+                    left)
                   </Button>
                 )}
               </>
             ) : (
               <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                {filters.q || filters.source || filters.location || filters.relevance
+                {filters.q ||
+                filters.source ||
+                filters.location ||
+                filters.relevance
                   ? "No trends match these filters."
                   : filters.status === "active"
                     ? running
@@ -252,18 +305,24 @@ export function TrendsExplorer() {
   );
 }
 
-const onDiscoverStarted = () => toast.success("Discovery started. Results appear here in a minute.");
+const onDiscoverStarted = () =>
+  toast.success("Discovery started. Results appear here in a minute.");
 
 function onDiscoverError(error: unknown) {
   if (error instanceof ApiError && error.status === 409) {
-    toast.message("Discovery is already running. Results will appear here shortly.");
+    toast.message(
+      "Discovery is already running. Results will appear here shortly.",
+    );
   } else {
     toast.error(errorMessage(error));
   }
 }
 
 /** Refresh trends and notify when a discovery run finishes. */
-function useRunCompletion(runId: string | undefined, status: string | undefined) {
+function useRunCompletion(
+  runId: string | undefined,
+  status: string | undefined,
+) {
   const queryClient = useQueryClient();
   const orgId = useOrgId();
   const previous = useRef<{ id?: string; status?: string }>({});
@@ -272,13 +331,94 @@ function useRunCompletion(runId: string | undefined, status: string | undefined)
     const before = previous.current;
     previous.current = { id: runId, status };
     const wasActive = before.status === "queued" || before.status === "running";
-    if (!runId || before.id !== runId || !wasActive || status === before.status) return;
+    if (!runId || before.id !== runId || !wasActive || status === before.status)
+      return;
     if (status === "succeeded") {
       toast.success("New trends are in");
       queryClient.invalidateQueries({ queryKey: ["org", orgId, "trends"] });
       queryClient.invalidateQueries({ queryKey: ["org", orgId, "dashboard"] });
     } else if (status === "failed") {
-      toast.error("Trend discovery failed. See the run details for each source.");
+      toast.error(
+        "Trend discovery failed. See the run details for each source.",
+      );
     }
   }, [runId, status, queryClient, orgId]);
+}
+
+/** Which sources are being watched, one click from managing them. */
+function SourcesStrip({ sources }: { sources: TrendSourceInfo[] }) {
+  const on = sources.filter((s) => s.enabled && s.configured);
+  const needSetup = sources.filter(
+    (s) => s.enabled && !s.configured && s.pricing !== "unavailable",
+  );
+  const shown = on.slice(0, 4).map((s) => s.name);
+  return (
+    <section
+      aria-label="Trend sources"
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-card px-4 py-3"
+    >
+      <RadarIcon
+        className="size-4 shrink-0 text-muted-foreground"
+        aria-hidden
+      />
+      <p className="min-w-0 flex-1 text-sm">
+        {on.length ? (
+          <>
+            Watching{" "}
+            <span className="font-medium">
+              {on.length} source{on.length === 1 ? "" : "s"}
+            </span>
+            <span className="text-muted-foreground">
+              : {shown.join(", ")}
+              {on.length > shown.length
+                ? ` and ${on.length - shown.length} more`
+                : ""}
+              .
+            </span>
+          </>
+        ) : (
+          <span className="font-medium">No sources are on yet.</span>
+        )}
+        {needSetup.length > 0 && (
+          <span className="text-muted-foreground">
+            {" "}
+            {needSetup.length} {needSetup.length === 1 ? "needs" : "need"}{" "}
+            setup.
+          </span>
+        )}
+      </p>
+      <Link href="/trends/sources" className={buttonVariants({ size: "sm" })}>
+        Manage sources <ArrowRightIcon />
+      </Link>
+    </section>
+  );
+}
+
+/** How often discovery runs, set right where the trends appear (admins). */
+function CheckFrequency() {
+  const settings = useOrgSettings();
+  const update = useUpdateSettings();
+  const canEdit = useCan()("organization.write");
+  if (!settings.data) return null;
+  return (
+    <label className="flex items-center gap-2 text-sm sm:ml-49">
+      <span className="font-bold whitespace-nowrap">How often to check for new trends</span>
+      <SimpleSelect
+        aria-label="How often to check for new trends"
+        value={settings.data.trend_frequency}
+        options={FREQUENCY_OPTIONS}
+        disabled={!canEdit || update.isPending}
+        onChange={(trend_frequency) =>
+          update.mutate(
+            { trend_frequency },
+            {
+              onSuccess: () => toast.success("Discovery schedule saved"),
+              onError: (e) => toast.error(errorMessage(e)),
+            },
+          )
+        }
+        className="w-40"
+      />
+    </label>
+  );
 }

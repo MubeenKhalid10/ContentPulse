@@ -17,7 +17,13 @@ import { marketLabel, sourceName } from "@/lib/trends";
 import type { Trend } from "@/types/api";
 
 /** Shortlisting a trend adds it to Topics, where its posts are planned. */
-export function TrendActions({ trend, compact = false }: { trend: Trend; compact?: boolean }) {
+export function TrendActions({
+  trend,
+  compact = false,
+}: {
+  trend: Trend;
+  compact?: boolean;
+}) {
   const action = useTrendAction();
   const router = useRouter();
   const remove = useDeleteTrend();
@@ -49,7 +55,10 @@ export function TrendActions({ trend, compact = false }: { trend: Trend; compact
           size="sm"
           disabled={action.isPending}
           onClick={() =>
-            action.mutate({ id: trend.id, action: "restore" }, { onSuccess: () => toast.success("Trend restored"), onError })
+            action.mutate(
+              { id: trend.id, action: "restore" },
+              { onSuccess: () => toast.success("Trend restored"), onError },
+            )
           }
         >
           <RotateCcwIcon />
@@ -75,7 +84,10 @@ export function TrendActions({ trend, compact = false }: { trend: Trend; compact
                 toast.success(`Shortlisted “${trend.topic}”`, {
                   description: "It's in Topics now, ready for a post plan.",
                   action: t.topic_id
-                    ? { label: "Plan a post", onClick: () => router.push(`/topics/${t.topic_id}`) }
+                    ? {
+                        label: "Plan a post",
+                        onClick: () => router.push(`/topics/${t.topic_id}`),
+                      }
                     : undefined,
                 }),
               onError,
@@ -93,7 +105,13 @@ export function TrendActions({ trend, compact = false }: { trend: Trend; compact
           disabled={action.isPending}
           aria-label={`Reject ${trend.topic}`}
           onClick={() =>
-            action.mutate({ id: trend.id, action: "reject" }, { onSuccess: () => toast.success(`Rejected “${trend.topic}”`), onError })
+            action.mutate(
+              { id: trend.id, action: "reject" },
+              {
+                onSuccess: () => toast.success(`Rejected “${trend.topic}”`),
+                onError,
+              },
+            )
           }
         >
           <XIcon />
@@ -124,22 +142,36 @@ export function TrendRow({
           >
             {trend.topic}
           </Link>
-          <RelevanceBadge level={trend.relevance_level} overridden={trend.relevance_overridden} />
-          {trend.status === "shortlisted" && <Tag tone="green" dot>Shortlisted</Tag>}
+          <RelevanceBadge
+            level={trend.relevance_level}
+            overridden={trend.relevance_overridden}
+          />
+          {trend.status === "shortlisted" && (
+            <Tag tone="green" dot>
+              Shortlisted
+            </Tag>
+          )}
         </div>
         {(trend.description ?? trend.title) && trend.title !== trend.topic && (
-          <p className="line-clamp-1 text-sm text-muted-foreground">{trend.description ?? trend.title}</p>
+          <p className="line-clamp-1 text-sm text-muted-foreground">
+            {trend.description ?? trend.title}
+          </p>
         )}
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span>{trend.sources.map(sourceName).join(" · ")}</span>
           <span aria-hidden>•</span>
-          <span>{trend.locations.map((c) => marketLabel(c, marketNames)).join(", ")}</span>
+          <span>
+            {trend.locations.map((c) => marketLabel(c, marketNames)).join(", ")}
+          </span>
           <span aria-hidden>•</span>
           <span>
             {trend.mention_count} mention{trend.mention_count === 1 ? "" : "s"}
           </span>
           <span aria-hidden>•</span>
-          <time dateTime={trend.last_seen_at} title={formatDateTime(trend.last_seen_at)}>
+          <time
+            dateTime={trend.last_seen_at}
+            title={formatDateTime(trend.last_seen_at)}
+          >
             seen {timeAgo(trend.last_seen_at)}
           </time>
         </p>

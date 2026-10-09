@@ -10,16 +10,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.images import aspect_ratio, generate_image, get_image_provider
 from app.ai.provider import AIError, AIErrorKind
+from app.core.config import get_settings
 from app.core.errors import AppError, Conflict, ErrorCode
 from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.models.ai import AIGenerationJob
 from app.models.design import DesignBrief
 from app.models.enums import JobStatus, Platform
-from app.models.organization import BrandProfile
+from app.models.organization import BrandProfile, Organization
 from app.models.post import Post, PostVersion
 from app.schemas.design import TaskDetail
 from app.services.design import service as design
+from app.services.design.logo import (
+    POSITION_LABEL,
+    LogoError,
+    add_logo,
+    effective_position,
+    has_logo,
+)
 from app.services.topics.platforms import PLATFORM_LABELS
 from app.storage import get_storage
 from app.workers.tasks import enqueue, schedule_retry
@@ -52,7 +60,11 @@ async def latest_job(db: AsyncSession, brief_id: uuid.UUID) -> AIGenerationJob |
 
 
 def image_prompt(
-    brief: DesignBrief, post: Post, version: PostVersion | None, brand: BrandProfile | None
+    brief: DesignBrief,
+    post: Post,
+    version: PostVersion | None,
+    brand: BrandProfile | None,
+    logo_spot: str | None = None,
 ) -> str:
     """Everything the brief says, plus the post it illustrates."""
     platform = PLATFORM_LABELS[Platform(post.platform)]
@@ -70,9 +82,13 @@ def image_prompt(
         lines.append("This is the cover slide of a carousel.")
     if brief.visual_elements:
         lines.append("Include: " + "; ".join(brief.visual_elements) + ".")
+    # Colours chosen for this post win over the brand's defaults.
+    palette = (brief.brand_requirements or {}).get("colors") or (
+        brand.brand_colors if brand else []
+    )
+    if palette:
+        lines.append("Color palette: " + ", ".join(palette) + ".")
     if brand:
-        if brand.brand_colors:
-            lines.append("Color palette: " + ", ".join(brand.brand_colors) + ".")
         if brand.tone:
             lines.append(f"Mood: {brand.tone}.")
         if brand.typography:
@@ -92,8 +108,13 @@ def image_prompt(
     if brand and brand.forbidden_terms:
         lines.append("Never show these words: " + ", ".join(brand.forbidden_terms) + ".")
     lines.append(
-        "Don't invent logos, watermarks or brand names; if a logo is wanted, leave clean "
-        "space for it in a corner."
+        "Don't draw any logo, watermark or brand name."
+        + (
+            f" Keep the {POSITION_LABEL[logo_spot]} plain and uncluttered, with nothing "
+            "important there: the real logo is placed there afterwards."
+            if logo_spot
+            else ""
+        )
     )
     return "\n".join(lines)
 
@@ -183,16 +204,31 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
     brand = await db.scalar(
         select(BrandProfile).where(BrandProfile.organization_id == brief.organization_id)
     )
+    organization = await db.get(Organization, brief.organization_id)
+    position = effective_position(brief.brand_requirements, brand.logo_position if brand else None)
+    # The real logo goes on afterwards: only when there is one and it's wanted.
+    logo_spot = position if has_logo(organization) else None
     image = await generate_image(
-        image_prompt(brief, post, version, brand),
+        image_prompt(brief, post, version, brand, logo_spot),
         aspect_ratio(brief.dimensions),
         organization_id=brief.organization_id,
         job_id=job.id,
     )
     job.provider, job.model = image.provider, image.model
-    extension = EXTENSIONS.get(image.mime_type, "png")
+    data, mime_type, note = image.data, image.mime_type, "Generated with AI"
+    if logo_spot:
+        try:
+            placed = await add_logo(data, organization, logo_spot, get_settings())
+        except LogoError as exc:
+            # A broken logo link never costs the image: keep it, say why.
+            logger.warning("Logo not placed on design image %s: %s", job.id, exc.reason)
+            note += f" · logo not added: {exc.reason}"
+        else:
+            data, mime_type = placed.data, placed.mime_type
+            note += f" · your logo in the {POSITION_LABEL[logo_spot]}"
+    extension = EXTENSIONS.get(mime_type, "png")
     key = f"{design._prefix(brief)}{uuid.uuid4().hex[:12]}-ai-image.{extension}"
-    await get_storage().put(key, image.data, image.mime_type)
+    await get_storage().put(key, data, mime_type)
     requested_by = job.result.get("requested_by")
     number = await design.record_version(
         db,
@@ -200,7 +236,7 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
         uuid.UUID(requested_by) if requested_by else None,
         brief,
         post,
-        [(f"ai-image.{extension}", image.mime_type, len(image.data), key)],
-        "Generated with AI",
+        [(f"ai-image.{extension}", mime_type, len(data), key)],
+        note,
     )
     job.result = {**job.result, "version": number}

@@ -8,6 +8,7 @@ from app.core.permissions import Role
 from app.models.enums import MemberStatus, OfferingKind, Platform, TrendFrequency
 from app.schemas.common import (
     HttpUrlStr,
+    LogoPosition,
     LongText,
     Name,
     ORMModel,
@@ -63,6 +64,8 @@ class OrganizationRead(ORMModel):
     description: str | None
     industry: str | None
     logo_url: str | None
+    # An uploaded logo exists (shown at /organizations/{id}/logo); it wins over logo_url.
+    has_logo_file: bool = False
     timezone: str
     created_at: datetime
     updated_at: datetime
@@ -115,7 +118,9 @@ class SettingsRead(ORMModel):
 
 # --- Brand ------------------------------------------------------------------
 class BrandUpdate(PatchModel):
-    non_nullable = frozenset({"preferred_terms", "forbidden_terms", "brand_colors"})
+    non_nullable = frozenset(
+        {"preferred_terms", "forbidden_terms", "brand_colors", "logo_position"}
+    )
 
     brand_voice: LongText | None = None
     tone: LongText | None = None
@@ -127,6 +132,7 @@ class BrandUpdate(PatchModel):
     hashtag_guidelines: LongText | None = None
     brand_colors: TagList | None = None
     typography: LongText | None = None
+    logo_position: LogoPosition | None = None
 
 
 class BrandRead(ORMModel):
@@ -140,6 +146,7 @@ class BrandRead(ORMModel):
     hashtag_guidelines: str | None
     brand_colors: list[str]
     typography: str | None
+    logo_position: LogoPosition
     updated_at: datetime
 
 

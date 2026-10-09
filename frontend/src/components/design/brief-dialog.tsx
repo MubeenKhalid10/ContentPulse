@@ -104,7 +104,7 @@ function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => v
       <DialogHeader>
         <DialogTitle>Edit design brief</DialogTitle>
         <DialogDescription>
-          Brand colors, typography and logo rules come from your Brand settings and are always attached.
+          Typography and logo rules come from your Brand settings and are always attached. Colors can be adjusted for this post under Brand guidelines.
         </DialogDescription>
       </DialogHeader>
       {update.isError && (

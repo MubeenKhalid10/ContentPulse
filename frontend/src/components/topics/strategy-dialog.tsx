@@ -316,8 +316,8 @@ function StrategyForm({
         <p className="-mt-2 text-xs text-muted-foreground">
           {notEnabled.map((p) => PLATFORM_LABEL[p]).join(", ")} {notEnabled.length === 1 ? "isn't" : "aren't"} enabled
           for your organization.{" "}
-          <Link href="/settings" className="underline underline-offset-4">
-            Turn on platforms in Settings
+          <Link href="/organization/content-setup#platforms" className="underline underline-offset-4">
+            Turn on platforms in Content setup
           </Link>
           .
         </p>

@@ -32,7 +32,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await page.getByRole("button", { name: "Skip tour" }).click();
 
   // Blog is offered alongside the social platforms; publish only there.
-  await page.getByRole("link", { name: "Settings" }).first().click();
+  await page.getByRole("link", { name: "Content setup" }).click();
   await page.getByLabel("Target markets").fill("USA");
   await page.getByLabel("Target markets").press("Enter");
   await page.getByLabel("Keywords to track").fill("artificial intelligence");
@@ -46,12 +46,12 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   if ((await blogChip.getAttribute("aria-pressed")) !== "true") await blogChip.click();
   await expect(blogChip).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText("Settings saved")).toBeVisible();
+  await expect(page.getByText("Content setup saved")).toBeVisible();
 
   // Discover, then shortlist the top trend.
   await page.getByRole("link", { name: "Trends", exact: true }).first().click();
-  const startFirst = page.getByRole("button", { name: "Discover trends now" });
-  const startAgain = page.getByRole("button", { name: "Discover now" });
+  const startFirst = page.getByRole("button", { name: "Discover New Trends now" }).first();
+  const startAgain = page.getByRole("button", { name: "Discover New Trends now" }).last();
   const inProgress = page.getByRole("button", { name: "Discovering…" });
   await expect(startFirst.or(startAgain).or(inProgress).first()).toBeVisible();
   if (await startFirst.isVisible()) await startFirst.click();

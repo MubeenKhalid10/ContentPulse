@@ -11,7 +11,13 @@ import { fieldAria, FormField } from "@/components/shared/form-field";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errorMessage, setActiveOrgId } from "@/lib/api";
@@ -43,13 +49,16 @@ export function CreateOrganization() {
   useEffect(() => form.setValue("timezone", browserTimezone()), [form]);
 
   const create = useMutation({
-    mutationFn: (values: Output) => api<Organization>("/organizations", { method: "POST", body: values }),
+    mutationFn: (values: Output) =>
+      api<Organization>("/organizations", { method: "POST", body: values }),
     onSuccess: async (org) => {
       setActiveOrgId(org.id);
       // Prime the session before navigating: a stale "no organization" me
       // would make the app shell bounce straight back here.
       queryClient.setQueryData(meQueryKey, await api<Me>("/auth/me"));
-      await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "auth" });
+      await queryClient.invalidateQueries({
+        predicate: (q) => q.queryKey[0] !== "auth",
+      });
       router.replace("/dashboard");
     },
   });
@@ -57,21 +66,35 @@ export function CreateOrganization() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle role="heading" aria-level={1} className="text-xl">Set up your organization</CardTitle>
+        <CardTitle role="heading" aria-level={1} className="text-xl">
+          Set up your organization
+        </CardTitle>
         <CardDescription>
-          ContentPulse uses this to judge which trends matter to you. You can refine everything
-          later.
+          ContentPulse uses this to judge which trends matter to you. You can
+          refine everything later.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit((v) => create.mutate(v))} noValidate className="grid gap-4">
+        <form
+          onSubmit={form.handleSubmit((v) => create.mutate(v))}
+          noValidate
+          className="grid gap-4"
+        >
           {create.isError && (
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(create.error)}</AlertDescription>
             </Alert>
           )}
-          <FormField id="name" label="Organization name" error={errors.name?.message}>
-            <Input {...fieldAria("name", errors.name?.message)} autoFocus {...form.register("name")} />
+          <FormField
+            id="name"
+            label="Organization name"
+            error={errors.name?.message}
+          >
+            <Input
+              {...fieldAria("name", errors.name?.message)}
+              autoFocus
+              {...form.register("name")}
+            />
           </FormField>
           <FormField
             id="website_url"
@@ -86,7 +109,11 @@ export function CreateOrganization() {
               {...form.register("website_url")}
             />
           </FormField>
-          <FormField id="industry" label="Industry" error={errors.industry?.message}>
+          <FormField
+            id="industry"
+            label="Industry"
+            error={errors.industry?.message}
+          >
             <Input
               {...fieldAria("industry", errors.industry?.message)}
               placeholder="e.g. Software development"
@@ -106,7 +133,11 @@ export function CreateOrganization() {
               {...form.register("description")}
             />
           </FormField>
-          <FormField id="timezone" label="Timezone" error={errors.timezone?.message}>
+          <FormField
+            id="timezone"
+            label="Timezone"
+            error={errors.timezone?.message}
+          >
             <Controller
               control={form.control}
               name="timezone"

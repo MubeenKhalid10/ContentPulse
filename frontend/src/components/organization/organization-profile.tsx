@@ -8,11 +8,22 @@ import { z } from "zod";
 import { FormSkeleton, SaveBar } from "@/components/shared/form-skeleton";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { PageHeader, ReadOnlyNotice } from "@/components/shared/page-header";
+import { DangerZone } from "@/components/organization/danger-zone";
+import { LogoCard } from "@/components/organization/logo-card";
 import { SimpleSelect } from "@/components/shared/simple-select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useOrganization, useUpdateOrganization } from "@/hooks/use-organization";
+import {
+  useOrganization,
+  useUpdateOrganization,
+} from "@/hooks/use-organization";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { timezoneOptions } from "@/lib/options";
@@ -24,7 +35,9 @@ type Output = z.output<typeof organizationProfileSchema>;
 
 export function OrganizationProfile() {
   const org = useOrganization();
-  const canEdit = useCan()("organization.write");
+  const can = useCan();
+  const canEdit = can("organization.write");
+  const isAdmin = can("users.manage");
 
   return (
     <>
@@ -34,7 +47,15 @@ export function OrganizationProfile() {
       />
       {!canEdit && <ReadOnlyNotice />}
       {org.data ? (
-        <ProfileForm key={org.data.updated_at} org={org.data} canEdit={canEdit} />
+        <div className="grid gap-6">
+          <ProfileForm
+            key={org.data.updated_at}
+            org={org.data}
+            canEdit={canEdit}
+          />
+          <LogoCard org={org.data} canEdit={canEdit} />
+          {isAdmin && <DangerZone />}
+        </div>
       ) : (
         <FormSkeleton fields={5} />
       )}
@@ -53,7 +74,13 @@ function toInput(org: Organization): Input {
   };
 }
 
-function ProfileForm({ org, canEdit }: { org: Organization; canEdit: boolean }) {
+function ProfileForm({
+  org,
+  canEdit,
+}: {
+  org: Organization;
+  canEdit: boolean;
+}) {
   const update = useUpdateOrganization();
   const form = useForm<Input, unknown, Output>({
     resolver: zodResolver(organizationProfileSchema),
@@ -74,20 +101,33 @@ function ProfileForm({ org, canEdit }: { org: Organization; canEdit: boolean }) 
         <Card>
           <CardHeader>
             <CardTitle>Basics</CardTitle>
-            <CardDescription>Shown across the workspace and used in AI prompts.</CardDescription>
+            <CardDescription>
+              Shown across the workspace and used in AI prompts.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5 sm:grid-cols-2">
             <FormField id="name" label="Name" error={errors.name?.message}>
-              <Input {...fieldAria("name", errors.name?.message)} {...form.register("name")} />
+              <Input
+                {...fieldAria("name", errors.name?.message)}
+                {...form.register("name")}
+              />
             </FormField>
-            <FormField id="industry" label="Industry" error={errors.industry?.message}>
+            <FormField
+              id="industry"
+              label="Industry"
+              error={errors.industry?.message}
+            >
               <Input
                 {...fieldAria("industry", errors.industry?.message)}
                 placeholder="e.g. Software development"
                 {...form.register("industry")}
               />
             </FormField>
-            <FormField id="website_url" label="Website" error={errors.website_url?.message}>
+            <FormField
+              id="website_url"
+              label="Website"
+              error={errors.website_url?.message}
+            >
               <Input
                 {...fieldAria("website_url", errors.website_url?.message)}
                 type="url"
@@ -95,7 +135,11 @@ function ProfileForm({ org, canEdit }: { org: Organization; canEdit: boolean }) 
                 {...form.register("website_url")}
               />
             </FormField>
-            <FormField id="timezone" label="Timezone" error={errors.timezone?.message}>
+            <FormField
+              id="timezone"
+              label="Timezone"
+              error={errors.timezone?.message}
+            >
               <Controller
                 control={form.control}
                 name="timezone"
@@ -113,7 +157,7 @@ function ProfileForm({ org, canEdit }: { org: Organization; canEdit: boolean }) 
             <FormField
               id="logo_url"
               label="Logo URL"
-              hint="Included in design briefs for designers."
+              hint="Used when no logo file is uploaded below. Also included in design briefs."
               error={errors.logo_url?.message}
               className="sm:col-span-2"
             >
@@ -141,7 +185,11 @@ function ProfileForm({ org, canEdit }: { org: Organization; canEdit: boolean }) 
         </Card>
       </fieldset>
       {canEdit && (
-        <SaveBar dirty={isDirty} pending={update.isPending} onReset={() => form.reset()} />
+        <SaveBar
+          dirty={isDirty}
+          pending={update.isPending}
+          onReset={() => form.reset()}
+        />
       )}
     </form>
   );

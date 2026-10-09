@@ -3,7 +3,11 @@
 import { AlertTriangleIcon, LoaderCircleIcon } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import { sourceName } from "@/lib/trends";
 import { cn } from "@/lib/utils";
@@ -60,12 +64,15 @@ export function RunStatus({ run }: { run: DiscoveryRun }) {
           )}
           {!active && run.status === "succeeded" && (
             <span className="text-muted-foreground">
-              {run.items_collected} items · {run.trends_created} new trend{run.trends_created === 1 ? "" : "s"}
+              {run.items_collected} items · {run.trends_created} new trend
+              {run.trends_created === 1 ? "" : "s"}
               {run.trigger === "scheduled" && " · scheduled run"}
             </span>
           )}
         </div>
-        {run.status === "failed" && run.error && <p className="text-sm text-muted-foreground">{run.error}</p>}
+        {run.status === "failed" && run.error && (
+          <p className="text-sm text-muted-foreground">{run.error}</p>
+        )}
         <ul className="flex flex-wrap gap-2" aria-label="Source results">
           {Object.entries(run.results).map(([key, result]) => (
             <li key={key}>
@@ -78,12 +85,21 @@ export function RunStatus({ run }: { run: DiscoveryRun }) {
                     />
                   }
                 >
-                  <span className={cn("size-1.5 rounded-full", DOT[result.status])} aria-hidden />
+                  <span
+                    className={cn("size-1.5 rounded-full", DOT[result.status])}
+                    aria-hidden
+                  />
                   {sourceName(key)}
-                  {result.status === "ok" && <span className="font-mono text-muted-foreground">{result.items}</span>}
+                  {result.status === "ok" && (
+                    <span className="font-mono text-muted-foreground">
+                      {result.items}
+                    </span>
+                  )}
                   <span className="sr-only">: {describe(result)}</span>
                 </TooltipTrigger>
-                <TooltipContent className="max-w-72">{describe(result)}</TooltipContent>
+                <TooltipContent className="max-w-72">
+                  {describe(result)}
+                </TooltipContent>
               </Tooltip>
             </li>
           ))}
@@ -91,7 +107,8 @@ export function RunStatus({ run }: { run: DiscoveryRun }) {
         {run.warnings.length > 0 && !active && (
           <details className="min-w-0 text-xs break-words text-muted-foreground">
             <summary className="cursor-pointer select-none hover:text-foreground">
-              {run.warnings.length} note{run.warnings.length === 1 ? "" : "s"} from this run
+              {run.warnings.length} note{run.warnings.length === 1 ? "" : "s"}{" "}
+              from this run
             </summary>
             <ul className="mt-1.5 grid list-disc gap-0.5 pl-4">
               {run.warnings.map((w, index) => (

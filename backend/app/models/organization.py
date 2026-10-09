@@ -36,7 +36,13 @@ class Organization(UUIDPk, Timestamps, Base):
     description: Mapped[str | None] = mapped_column(Text)
     industry: Mapped[str | None] = mapped_column(String(120))
     logo_url: Mapped[str | None] = mapped_column(String(2048))
+    # An uploaded logo file (storage key). Preferred over logo_url.
+    logo_storage_key: Mapped[str | None] = mapped_column(String(1024))
     timezone: Mapped[str] = mapped_column(String(64), default="UTC", server_default="UTC")
+
+    @property
+    def has_logo_file(self) -> bool:
+        return self.logo_storage_key is not None
 
 
 class OrganizationSettings(UUIDPk, Timestamps, OrgScoped, Base):
@@ -77,6 +83,11 @@ class BrandProfile(UUIDPk, Timestamps, OrgScoped, Base):
     # Visual identity, surfaced to designers in design briefs.
     brand_colors: Mapped[list[str]] = jsonb_list()
     typography: Mapped[str | None] = mapped_column(Text)
+    # Where the organization's real logo (Profile > Logo URL) is placed on
+    # AI-generated images; "none" leaves it off. Posts can override it.
+    logo_position: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="bottom_right", server_default="bottom_right"
+    )
 
 
 class OrganizationService(UUIDPk, CreatedAt, OrgScoped, Base):

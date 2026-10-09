@@ -49,7 +49,9 @@ export function UserMenu({ me }: { me: Me }) {
   const router = useRouter();
   const logout = useLogout();
   const switchOrganization = useSwitchOrganization();
-  const active = me.memberships.find((m) => m.organization_id === me.organization_id);
+  const active = me.memberships.find(
+    (m) => m.organization_id === me.organization_id,
+  );
   const { theme, setTheme } = useTheme();
 
   return (
@@ -61,7 +63,9 @@ export function UserMenu({ me }: { me: Me }) {
           </AvatarFallback>
         </Avatar>
         <span className="grid min-w-0 flex-1 leading-tight">
-          <span className="truncate text-sm font-medium">{active?.organization_name}</span>
+          <span className="truncate text-sm font-medium">
+            {active?.organization_name}
+          </span>
           <span className="truncate text-xs text-muted-foreground">
             {me.name ?? me.email} · {me.role && roleLabel(me.role)}
           </span>
@@ -82,7 +86,9 @@ export function UserMenu({ me }: { me: Me }) {
               }}
             >
               <span className="flex-1 truncate">{m.organization_name}</span>
-              {m.organization_id === me.organization_id && <CheckIcon className="text-primary" />}
+              {m.organization_id === me.organization_id && (
+                <CheckIcon className="text-primary" />
+              )}
             </DropdownMenuItem>
           ))}
           <DropdownMenuItem onClick={() => router.push("/onboarding")}>

@@ -41,7 +41,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useCreateService,
@@ -65,8 +72,12 @@ export function ServicesManager() {
   const services = useServices();
   const canEdit = useCan()("organization.write");
   // undefined = closed, null = creating, object = editing
-  const [editing, setEditing] = useState<OrganizationService | null | undefined>(undefined);
-  const [deleting, setDeleting] = useState<OrganizationService | undefined>(undefined);
+  const [editing, setEditing] = useState<
+    OrganizationService | null | undefined
+  >(undefined);
+  const [deleting, setDeleting] = useState<OrganizationService | undefined>(
+    undefined,
+  );
 
   return (
     <>
@@ -126,8 +137,8 @@ export function ServicesManager() {
             <div className="grid gap-1">
               <p className="font-medium">No services yet</p>
               <p className="max-w-sm text-sm text-muted-foreground">
-                Add the services, products and areas of expertise you want content to connect
-                trends to.
+                Add the services, products and areas of expertise you want
+                content to connect trends to.
               </p>
             </div>
             {canEdit && (
@@ -141,7 +152,10 @@ export function ServicesManager() {
       )}
 
       <ServiceDialog editing={editing} onClose={() => setEditing(undefined)} />
-      <DeleteServiceDialog service={deleting} onClose={() => setDeleting(undefined)} />
+      <DeleteServiceDialog
+        service={deleting}
+        onClose={() => setDeleting(undefined)}
+      />
     </>
   );
 }
@@ -163,7 +177,9 @@ function ServiceRow({
       <TableCell className="max-w-md pl-4 whitespace-normal">
         <div className="font-medium">{service.name}</div>
         {service.description && (
-          <div className="line-clamp-2 text-xs text-muted-foreground">{service.description}</div>
+          <div className="line-clamp-2 text-xs text-muted-foreground">
+            {service.description}
+          </div>
         )}
       </TableCell>
       <TableCell>
@@ -189,7 +205,13 @@ function ServiceRow({
         <TableCell>
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${service.name}`} />}
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Actions for ${service.name}`}
+                />
+              }
             >
               <MoreHorizontalIcon />
             </DropdownMenuTrigger>
@@ -214,17 +236,30 @@ function ServiceDialog({
   onClose: () => void;
 }) {
   return (
-    <Dialog open={editing !== undefined} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={editing !== undefined}
+      onOpenChange={(open) => !open && onClose()}
+    >
       <DialogContent className="sm:max-w-lg">
         {editing !== undefined && (
-          <ServiceForm key={editing?.id ?? "new"} service={editing} onDone={onClose} />
+          <ServiceForm
+            key={editing?.id ?? "new"}
+            service={editing}
+            onDone={onClose}
+          />
         )}
       </DialogContent>
     </Dialog>
   );
 }
 
-function ServiceForm({ service, onDone }: { service: OrganizationService | null; onDone: () => void }) {
+function ServiceForm({
+  service,
+  onDone,
+}: {
+  service: OrganizationService | null;
+  onDone: () => void;
+}) {
   const create = useCreateService();
   const update = useUpdateService();
   const pending = create.isPending || update.isPending;
@@ -255,9 +290,14 @@ function ServiceForm({ service, onDone }: { service: OrganizationService | null;
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-5">
       <DialogHeader>
-        <DialogTitle>{service ? `Edit ${service.name}` : "Add a service, product or expertise"}</DialogTitle>
+        <DialogTitle>
+          {service
+            ? `Edit ${service.name}`
+            : "Add a service, product or expertise"}
+        </DialogTitle>
         <DialogDescription>
-          Describe it the way you&apos;d explain it to a new hire. Specific beats generic.
+          Describe it the way you&apos;d explain it to a new hire. Specific
+          beats generic.
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 sm:grid-cols-3">
@@ -266,11 +306,21 @@ function ServiceForm({ service, onDone }: { service: OrganizationService | null;
             control={form.control}
             name="kind"
             render={({ field }) => (
-              <SimpleSelect id="kind" value={field.value} onChange={field.onChange} options={OFFERING_KIND_OPTIONS} />
+              <SimpleSelect
+                id="kind"
+                value={field.value}
+                onChange={field.onChange}
+                options={OFFERING_KIND_OPTIONS}
+              />
             )}
           />
         </FormField>
-        <FormField id="svc-name" label="Name" error={errors.name?.message} className="sm:col-span-2">
+        <FormField
+          id="svc-name"
+          label="Name"
+          error={errors.name?.message}
+          className="sm:col-span-2"
+        >
           <Input
             {...fieldAria("svc-name", errors.name?.message)}
             placeholder="e.g. AI Solutions"
@@ -279,10 +329,22 @@ function ServiceForm({ service, onDone }: { service: OrganizationService | null;
           />
         </FormField>
       </div>
-      <FormField id="category" label="Category" hint="Optional grouping, e.g. Engineering." error={errors.category?.message}>
-        <Input {...fieldAria("category", errors.category?.message)} {...form.register("category")} />
+      <FormField
+        id="category"
+        label="Category"
+        hint="Optional grouping, e.g. Engineering."
+        error={errors.category?.message}
+      >
+        <Input
+          {...fieldAria("category", errors.category?.message)}
+          {...form.register("category")}
+        />
       </FormField>
-      <FormField id="svc-description" label="Description" error={errors.description?.message}>
+      <FormField
+        id="svc-description"
+        label="Description"
+        error={errors.description?.message}
+      >
         <Textarea
           {...fieldAria("svc-description", errors.description?.message)}
           rows={4}
@@ -295,7 +357,11 @@ function ServiceForm({ service, onDone }: { service: OrganizationService | null;
         name="active"
         render={({ field }) => (
           <div className="flex items-center gap-3">
-            <Switch id="active" checked={field.value} onCheckedChange={field.onChange} />
+            <Switch
+              id="active"
+              checked={field.value}
+              onCheckedChange={field.onChange}
+            />
             <Label htmlFor="active" className="font-normal">
               Active — consider it when matching trends
             </Label>
@@ -328,8 +394,8 @@ function DeleteServiceDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {service?.name}?</AlertDialogTitle>
           <AlertDialogDescription>
-            Trends will no longer be matched against it. To pause it instead, switch it to
-            inactive.
+            Trends will no longer be matched against it. To pause it instead,
+            switch it to inactive.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

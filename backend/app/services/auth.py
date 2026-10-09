@@ -89,6 +89,29 @@ async def authenticate(db: AsyncSession, email: str, password: str, settings: Se
     return user
 
 
+async def update_profile(db: AsyncSession, user: User, full_name: str) -> User:
+    user.full_name = full_name
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def change_password(
+    db: AsyncSession, user: User, current: str, new: str, settings: Settings
+) -> None:
+    """Local sign-in only: Supabase accounts change passwords with Supabase."""
+    _require_local(settings)
+    if not verify_password(current, user.password_hash):
+        # A form error, not a lost session: the user stays signed in.
+        raise AppError(ErrorCode.VALIDATION_ERROR, "Your current password isn't right.")
+    if verify_password(new, user.password_hash):
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR, "Choose a password different from your current one."
+        )
+    user.password_hash = hash_password(new)
+    await db.commit()
+
+
 async def request_password_reset(db: AsyncSession, email: str, settings: Settings) -> None:
     """Email a reset link if the account exists. Says nothing either way."""
     _require_local(settings)

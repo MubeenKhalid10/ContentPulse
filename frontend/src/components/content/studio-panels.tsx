@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { PostRow } from "@/components/content/content-list";
+import { CollapsibleCard } from "@/components/shared/collapsible-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,18 +107,26 @@ export function SourcesPanel({ post }: { post: PostDetail }) {
   const passages = post.current?.meta.passages ?? [];
   const cited = new Set(post.current?.meta.evidence ?? []);
   if (!post.current) return null;
+  if (!passages.length) {
+    // Nothing to open: say so plainly.
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Grounding</CardTitle>
+          <CardDescription>
+            No knowledge passages matched this topic, so the post should make no specific claims
+            about your organization.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Grounding</CardTitle>
-        <CardDescription>
-          {passages.length
-            ? "Knowledge passages given to the writer. Claims about your organization must come from these."
-            : "No knowledge passages matched this topic, so the post should make no specific claims about your organization."}
-        </CardDescription>
-      </CardHeader>
-      {passages.length > 0 && (
-        <CardContent>
+    <CollapsibleCard
+      title="Grounding"
+      count={passages.length}
+      description={`Knowledge passages given to the writer. Claims about your organization must come from these.${cited.size ? ` ${cited.size} cited.` : ""}`}
+    >
           <ul className="grid gap-2">
             {passages.map((p) => (
               <li key={p.ref} className="grid gap-0.5 rounded-lg border p-2.5 text-xs">
@@ -133,9 +142,7 @@ export function SourcesPanel({ post }: { post: PostDetail }) {
               </li>
             ))}
           </ul>
-        </CardContent>
-      )}
-    </Card>
+    </CollapsibleCard>
   );
 }
 
@@ -159,19 +166,11 @@ export function StrategyPanel({ post }: { post: PostDetail }) {
       : []) as [string, string | null][]),
   ];
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Plan</CardTitle>
-        {post.topic && (
-          <CardDescription>
-            For{" "}
-            <Link href={`/topics/${post.topic.id}`} className="underline underline-offset-4">
-              {post.topic.title}
-            </Link>
-          </CardDescription>
-        )}
-      </CardHeader>
-      <CardContent>
+    <CollapsibleCard
+      title="Plan"
+      description={post.topic ? `For ${post.topic.title}` : undefined}
+      contentClassName="grid gap-3"
+    >
         <dl className="grid gap-2 text-sm">
           {rows
             .filter(([, value]) => value)
@@ -182,8 +181,15 @@ export function StrategyPanel({ post }: { post: PostDetail }) {
               </div>
             ))}
         </dl>
-      </CardContent>
-    </Card>
+        {post.topic && (
+          <Link
+            href={`/topics/${post.topic.id}`}
+            className="text-sm underline-offset-4 hover:underline"
+          >
+            Open the topic
+          </Link>
+        )}
+    </CollapsibleCard>
   );
 }
 

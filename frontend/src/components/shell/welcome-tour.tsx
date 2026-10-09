@@ -55,7 +55,8 @@ export function WelcomeTour({ me }: { me: Me }) {
   const isAdmin = me.permissions.includes("organization.write");
   const steps = WORKFLOW.filter((s) => me.permissions.includes(s.permission));
   // First visit: only on the dashboard, so a deep link into a task isn't interrupted.
-  const open = replaying || (firstVisit && !dismissed && pathname === "/dashboard");
+  const open =
+    replaying || (firstVisit && !dismissed && pathname === "/dashboard");
 
   useEffect(() => {
     const replay = () => {
@@ -105,7 +106,10 @@ export function WelcomeTour({ me }: { me: Me }) {
         <ul className="grid gap-1.5 text-sm text-muted-foreground">
           <li>• Trends unrelated to what you do are marked “Not relevant”.</li>
           <li>• Posts only make claims your website and documents back up.</li>
-          <li>• Nothing is published: every post is reviewed and approved by a person.</li>
+          <li>
+            • Nothing is published: every post is reviewed and approved by a
+            person.
+          </li>
         </ul>
       ),
     },
@@ -115,8 +119,14 @@ export function WelcomeTour({ me }: { me: Me }) {
         "The sidebar lists the steps in order, and the dashboard always shows your next step, so you don't have to guess where to go.",
       body: (
         <ul className="grid gap-1.5 text-sm text-muted-foreground">
-          <li>• Creators shortlist topics, write each post, add its design and send it for approval.</li>
-          <li>• Admins approve posts in Approvals, which makes them ready to publish.</li>
+          <li>
+            • Creators shortlist topics, write each post, add its design and
+            send it for approval.
+          </li>
+          <li>
+            • Admins approve posts in Approvals, which makes them ready to
+            publish.
+          </li>
           <li>• Viewers can see everything and share finished posts.</li>
         </ul>
       ),
@@ -127,20 +137,31 @@ export function WelcomeTour({ me }: { me: Me }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent className="sm:max-w-md" aria-describedby="welcome-description">
+      <DialogContent
+        className="sm:max-w-md"
+        aria-describedby="welcome-description"
+      >
         <DialogHeader>
           <DialogTitle>{screen.title}</DialogTitle>
-          <DialogDescription id="welcome-description">{screen.description}</DialogDescription>
+          <DialogDescription id="welcome-description">
+            {screen.description}
+          </DialogDescription>
         </DialogHeader>
         <div className="min-h-36">{screen.body}</div>
         <DialogFooter className="items-center sm:justify-between">
-          <div className="flex items-center gap-1.5" aria-label={`Step ${step + 1} of ${screens.length}`} role="img">
+          <div
+            className="flex items-center gap-1.5"
+            aria-label={`Step ${step + 1} of ${screens.length}`}
+            role="img"
+          >
             {screens.map((_, i) => (
               <span
                 key={i}
                 className={cn(
                   "h-1.5 rounded-full transition-all duration-200",
-                  i === step ? "w-4 bg-foreground" : "w-1.5 bg-muted-foreground/30",
+                  i === step
+                    ? "w-4 bg-foreground"
+                    : "w-1.5 bg-muted-foreground/30",
                 )}
               />
             ))}

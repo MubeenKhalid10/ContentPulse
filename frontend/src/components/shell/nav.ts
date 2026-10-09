@@ -9,7 +9,9 @@ import {
   LayoutGridIcon,
   type LucideIcon,
   PaletteIcon,
+  RadarIcon,
   SettingsIcon,
+  TargetIcon,
   SparklesIcon,
   TrendingUpIcon,
   UsersIcon,
@@ -34,6 +36,8 @@ export interface NavItem {
   permission?: Permission;
   /** Not built yet: shown disabled so the full workflow is visible. */
   comingIn?: string;
+  /** Sub-pages that fold out under this item. */
+  children?: NavItem[];
 }
 
 export interface NavSection {
@@ -42,7 +46,11 @@ export interface NavSection {
 }
 
 export const NAV: NavSection[] = [
-  { items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon }] },
+  {
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
+    ],
+  },
   {
     label: "Workflow",
     items: WORKFLOW.map((s) => ({
@@ -50,24 +58,61 @@ export const NAV: NavSection[] = [
       label: s.label,
       icon: STEP_ICONS[s.href],
       permission: s.permission,
+      // Sources fold out under Trends.
+      children:
+        s.href === "/trends"
+          ? [
+              {
+                href: "/trends/sources",
+                label: "Trend sources",
+                icon: RadarIcon,
+              },
+            ]
+          : undefined,
     })),
   },
   {
     label: "Organization",
     items: [
       { href: "/organization/profile", label: "Profile", icon: Building2Icon },
-      { href: "/organization/services", label: "Services & products", icon: BriefcaseIcon },
+      {
+        href: "/organization/content-setup",
+        label: "Content setup",
+        icon: TargetIcon,
+      },
+      {
+        href: "/organization/services",
+        label: "Services & products",
+        icon: BriefcaseIcon,
+      },
       { href: "/organization/brand", label: "Brand", icon: FileTextIcon },
-      { href: "/organization/platforms", label: "Platform playbook", icon: LayoutGridIcon },
-      { href: "/organization/knowledge", label: "Knowledge base", icon: BookOpenIcon, permission: "knowledge.read" },
+      {
+        href: "/organization/platforms",
+        label: "Platform playbook",
+        icon: LayoutGridIcon,
+      },
+      {
+        href: "/organization/knowledge",
+        label: "Knowledge base",
+        icon: BookOpenIcon,
+        permission: "knowledge.read",
+      },
     ],
   },
   {
     label: "Admin",
     items: [
       { href: "/team", label: "Team", icon: UsersIcon },
-      { href: "/settings", label: "Settings", icon: SettingsIcon },
-      { href: "/activity", label: "Activity log", icon: ActivityIcon, permission: "organization.write" },
+      {
+        href: "/activity",
+        label: "Activity log",
+        icon: ActivityIcon,
+        permission: "organization.write",
+      },
     ],
+  },
+  {
+    label: "Account",
+    items: [{ href: "/settings", label: "Settings", icon: SettingsIcon }],
   },
 ];

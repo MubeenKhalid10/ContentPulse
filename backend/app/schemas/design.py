@@ -5,9 +5,12 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, StringConstraints
 
 from app.models.enums import DesignBriefStatus, JobStatus, Platform, PostStatus
+from app.schemas.common import LogoPosition
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, max_length=4000)]
 Item = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
+# A colour as written in Brand settings: #0F766E, rgb(...), or a name.
+Color = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
 DesignFormat = Literal["text_only", "single_image", "carousel", "infographic", "video", "reel"]
 
 
@@ -82,6 +85,9 @@ class BrandGuidelines(BaseModel):
     typography: str | None
     content_guidelines: str | None
     forbidden_terms: list[str]
+    # The real logo placed on AI images (Profile > Logo URL) and its default spot.
+    logo_url: str | None = None
+    logo_position: LogoPosition = "bottom_right"
 
 
 class ReviewComment(BaseModel):
@@ -145,6 +151,11 @@ class BriefUpdate(BaseModel):
     visual_elements: Annotated[list[Item], Field(max_length=20)] | None = None
     cta: Text | None = None
     designer_notes: Text | None = None
+    # Colours for this post only; Brand settings stay as they are.
+    # null or [] goes back to the organization's brand colours.
+    colors: Annotated[list[Color], Field(max_length=12)] | None = None
+    # Logo spot for this post's AI images; null goes back to the brand default.
+    logo_position: LogoPosition | None = None
 
 
 class AssignRequest(BaseModel):

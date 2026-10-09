@@ -210,7 +210,7 @@ function GenerateImage({ task }: { task: DesignTaskDetail }) {
       </Button>
       {drawing ? (
         <p className="text-xs text-muted-foreground" role="status">
-          Using the brief, the post and your brand colors. This usually takes under a minute.
+          Using the brief, the post and this post&apos;s colors. This usually takes under a minute.
         </p>
       ) : job?.status === "failed" ? (
         <Alert variant="destructive">

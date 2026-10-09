@@ -22,6 +22,7 @@ dependencies = [
     "anthropic>=1.11.0",
     "boto3>=1.43.107",
     "celery[redis]>=5.5",
+    "pillow>=11",
 ]
 
 [dependency-groups]
@@ -58,3 +59,5 @@ ignore = ["B008"]  # FastAPI Depends() in defaults is idiomatic
 "tests/test_approvals.py" = ["E501", "F811"]
 "tests/test_operations.py" = ["E501", "F811"]
 "tests/test_blog.py" = ["E501", "F811"]
+"tests/test_design_logo.py" = ["E501", "F811"]
+"tests/test_dashboard.py" = ["E501", "F811"]

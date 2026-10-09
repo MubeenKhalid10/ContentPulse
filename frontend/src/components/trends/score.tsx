@@ -18,7 +18,13 @@ function scoreSurface(score: number | null): string {
 }
 
 /** Opportunity score (0-100) as a number on a light teal tile. */
-export function Score({ score, size = "md" }: { score: number | null; size?: keyof typeof SIZES }) {
+export function Score({
+  score,
+  size = "md",
+}: {
+  score: number | null;
+  size?: keyof typeof SIZES;
+}) {
   const value = score == null ? null : Math.round(score);
   return (
     <div
@@ -28,10 +34,15 @@ export function Score({ score, size = "md" }: { score: number | null; size?: key
         SIZES[size],
       )}
       role="img"
-      aria-label={value == null ? "Not scored yet" : `Opportunity score ${value} of 100`}
+      aria-label={
+        value == null ? "Not scored yet" : `Opportunity score ${value} of 100`
+      }
       title="Opportunity score, out of 100"
     >
-      <span aria-hidden className={cn("font-semibold tabular-nums", scoreTone(score))}>
+      <span
+        aria-hidden
+        className={cn("font-semibold tabular-nums", scoreTone(score))}
+      >
         {value ?? "—"}
       </span>
     </div>
@@ -39,19 +50,27 @@ export function Score({ score, size = "md" }: { score: number | null; size?: key
 }
 
 /** Full signal breakdown for the detail page (spec §13: expose the factors). */
-export function SignalBreakdown({ signals }: { signals: Partial<Record<SignalKey, Signal>> }) {
+export function SignalBreakdown({
+  signals,
+}: {
+  signals: Partial<Record<SignalKey, Signal>>;
+}) {
   return (
     <dl className="grid gap-4">
       {SIGNALS.map(({ key, label, help }) => {
         const signal = signals[key];
-        const pendingAi = !signal && (key === "organization_fit" || key === "audience_relevance");
+        const pendingAi =
+          !signal &&
+          (key === "organization_fit" || key === "audience_relevance");
         return (
           <div key={key} className="grid gap-1.5">
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-sm font-medium" title={help}>
                 {label}
               </dt>
-              <dd className="font-mono text-sm tabular-nums">{signal ? signal.score : "—"}</dd>
+              <dd className="font-mono text-sm tabular-nums">
+                {signal ? signal.score : "—"}
+              </dd>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div

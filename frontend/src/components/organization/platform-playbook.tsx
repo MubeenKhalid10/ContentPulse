@@ -24,12 +24,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrgSettings } from "@/hooks/use-organization";
-import { usePlatformRules, useResetPlatformRule, useUpdatePlatformRule } from "@/hooks/use-topics";
+import {
+  usePlatformRules,
+  useResetPlatformRule,
+  useUpdatePlatformRule,
+} from "@/hooks/use-topics";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { PLATFORM_DOT, PLATFORM_TAB_ACTIVE } from "@/lib/tones";
@@ -39,7 +49,14 @@ import type { Platform, PlatformRule } from "@/types/api";
 
 const optionalInt = (max: number) =>
   z
-    .union([z.literal(""), z.coerce.number().int().min(0, "Must be 0 or more.").max(max, `At most ${max}.`)])
+    .union([
+      z.literal(""),
+      z.coerce
+        .number()
+        .int()
+        .min(0, "Must be 0 or more.")
+        .max(max, `At most ${max}.`),
+    ])
     .transform((v) => (v === "" ? null : v));
 
 const schema = z.object({
@@ -70,7 +87,10 @@ export function PlatformPlaybook() {
       />
       {!canEdit && <ReadOnlyNotice />}
       <div className="grid gap-6">
-        <Tabs value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
+        <Tabs
+          value={platform}
+          onValueChange={(v) => setPlatform(v as Platform)}
+        >
           <TabsList>
             {(Object.keys(PLATFORM_LABEL) as Platform[]).map((p) => (
               <TabsTrigger
@@ -81,14 +101,27 @@ export function PlatformPlaybook() {
                   PLATFORM_TAB_ACTIVE[p],
                 )}
               >
-                <span aria-hidden className={cn("size-1.5 rounded-full", PLATFORM_DOT[p], p === "x" && "in-data-active:bg-white dark:in-data-active:bg-zinc-900")} />
+                <span
+                  aria-hidden
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    PLATFORM_DOT[p],
+                    p === "x" &&
+                      "in-data-active:bg-white dark:in-data-active:bg-zinc-900",
+                  )}
+                />
                 {PLATFORM_LABEL[p]}
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
         {rule ? (
-          <RuleForm key={`${rule.platform}:${rule.updated_at}`} rule={rule} canEdit={canEdit} enabled={!enabled.length || enabled.includes(rule.platform)} />
+          <RuleForm
+            key={`${rule.platform}:${rule.updated_at}`}
+            rule={rule}
+            canEdit={canEdit}
+            enabled={!enabled.length || enabled.includes(rule.platform)}
+          />
         ) : (
           <FormSkeleton fields={5} />
         )}
@@ -97,7 +130,15 @@ export function PlatformPlaybook() {
   );
 }
 
-function RuleForm({ rule, canEdit, enabled }: { rule: PlatformRule; canEdit: boolean; enabled: boolean }) {
+function RuleForm({
+  rule,
+  canEdit,
+  enabled,
+}: {
+  rule: PlatformRule;
+  canEdit: boolean;
+  enabled: boolean;
+}) {
   const update = useUpdatePlatformRule();
   const reset = useResetPlatformRule();
   const [confirmReset, setConfirmReset] = useState(false);
@@ -116,13 +157,29 @@ function RuleForm({ rule, canEdit, enabled }: { rule: PlatformRule; canEdit: boo
   });
   const { errors, isDirty } = form.formState;
 
-  const list = (name: "post_types" | "objectives" | "affinity_keywords", title: string, hint: string, placeholder: string) => (
-    <FormField id={`${rule.platform}-${name}`} label={title} hint={hint} error={errors[name]?.message}>
+  const list = (
+    name: "post_types" | "objectives" | "affinity_keywords",
+    title: string,
+    hint: string,
+    placeholder: string,
+  ) => (
+    <FormField
+      id={`${rule.platform}-${name}`}
+      label={title}
+      hint={hint}
+      error={errors[name]?.message}
+    >
       <Controller
         control={form.control}
         name={name}
         render={({ field }) => (
-          <TagInput id={`${rule.platform}-${name}`} value={field.value} onChange={field.onChange} placeholder={placeholder} disabled={!canEdit} />
+          <TagInput
+            id={`${rule.platform}-${name}`}
+            value={field.value}
+            onChange={field.onChange}
+            placeholder={placeholder}
+            disabled={!canEdit}
+          />
         )}
       />
     </FormField>
@@ -134,7 +191,12 @@ function RuleForm({ rule, canEdit, enabled }: { rule: PlatformRule; canEdit: boo
       aria-label={`${label} playbook`}
       onSubmit={form.handleSubmit((values) =>
         update.mutate(
-          { platform: rule.platform, ...values, tone: values.tone || null, guidance: values.guidance || null },
+          {
+            platform: rule.platform,
+            ...values,
+            tone: values.tone || null,
+            guidance: values.guidance || null,
+          },
           {
             onSuccess: () => toast.success(`${label} playbook saved`),
             onError: (e) => toast.error(errorMessage(e)),
@@ -147,16 +209,22 @@ function RuleForm({ rule, canEdit, enabled }: { rule: PlatformRule; canEdit: boo
           <div className="grid flex-1 gap-1">
             <CardTitle className="flex items-center gap-2">
               {label}
-              {!enabled && <Badge variant="outline">Not one of your platforms</Badge>}
+              {!enabled && (
+                <Badge variant="outline">Not one of your platforms</Badge>
+              )}
             </CardTitle>
             <CardDescription>
               {enabled ? (
                 "Used when topics are scored for this platform and post plans are drafted."
               ) : (
                 <>
-                  Topics aren&apos;t recommended for {label} until you enable it in{" "}
-                  <Link href="/settings" className="underline underline-offset-4">
-                    Settings
+                  Topics aren&apos;t recommended for {label} until you enable it
+                  in{" "}
+                  <Link
+                    href="/organization/content-setup#platforms"
+                    className="underline underline-offset-4"
+                  >
+                    Content setup
                   </Link>
                   .
                 </>
@@ -180,7 +248,8 @@ function RuleForm({ rule, canEdit, enabled }: { rule: PlatformRule; canEdit: boo
               <AlertDialogHeader>
                 <AlertDialogTitle>Reset the {label} playbook?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Your post types, tone, limits and guidance for {label} are replaced by the defaults.
+                  Your post types, tone, limits and guidance for {label} are
+                  replaced by the defaults.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -206,8 +275,18 @@ function RuleForm({ rule, canEdit, enabled }: { rule: PlatformRule; canEdit: boo
         </CardHeader>
         <CardContent>
           <fieldset disabled={!canEdit} className="grid gap-5">
-            {list("post_types", "Post types", "Offered when planning a post, most preferred first.", "e.g. Carousel")}
-            {list("objectives", "Objectives", "What posts on this platform are for.", "e.g. Thought leadership")}
+            {list(
+              "post_types",
+              "Post types",
+              "Offered when planning a post, most preferred first.",
+              "e.g. Carousel",
+            )}
+            {list(
+              "objectives",
+              "Objectives",
+              "What posts on this platform are for.",
+              "e.g. Thought leadership",
+            )}
             {list(
               "affinity_keywords",
               "Audience signals",
@@ -215,21 +294,42 @@ function RuleForm({ rule, canEdit, enabled }: { rule: PlatformRule; canEdit: boo
               "e.g. decision makers",
             )}
             <div className="grid gap-5 sm:grid-cols-[1fr_9rem_9rem]">
-              <FormField id={`${rule.platform}-tone`} label="Tone" error={errors.tone?.message}>
-                <Input {...fieldAria(`${rule.platform}-tone`, errors.tone?.message)} {...form.register("tone")} />
-              </FormField>
-              <FormField id={`${rule.platform}-max`} label="Max characters" error={errors.max_length?.message}>
+              <FormField
+                id={`${rule.platform}-tone`}
+                label="Tone"
+                error={errors.tone?.message}
+              >
                 <Input
-                  {...fieldAria(`${rule.platform}-max`, errors.max_length?.message)}
+                  {...fieldAria(`${rule.platform}-tone`, errors.tone?.message)}
+                  {...form.register("tone")}
+                />
+              </FormField>
+              <FormField
+                id={`${rule.platform}-max`}
+                label="Max characters"
+                error={errors.max_length?.message}
+              >
+                <Input
+                  {...fieldAria(
+                    `${rule.platform}-max`,
+                    errors.max_length?.message,
+                  )}
                   type="number"
                   inputMode="numeric"
                   min={1}
                   {...form.register("max_length")}
                 />
               </FormField>
-              <FormField id={`${rule.platform}-hashtags`} label="Max hashtags" error={errors.hashtag_limit?.message}>
+              <FormField
+                id={`${rule.platform}-hashtags`}
+                label="Max hashtags"
+                error={errors.hashtag_limit?.message}
+              >
                 <Input
-                  {...fieldAria(`${rule.platform}-hashtags`, errors.hashtag_limit?.message)}
+                  {...fieldAria(
+                    `${rule.platform}-hashtags`,
+                    errors.hashtag_limit?.message,
+                  )}
                   type="number"
                   inputMode="numeric"
                   min={0}
@@ -237,12 +337,29 @@ function RuleForm({ rule, canEdit, enabled }: { rule: PlatformRule; canEdit: boo
                 />
               </FormField>
             </div>
-            <FormField id={`${rule.platform}-guidance`} label="Guidance" hint="Shared with the AI and your writers." error={errors.guidance?.message}>
-              <Textarea {...fieldAria(`${rule.platform}-guidance`, errors.guidance?.message)} rows={3} {...form.register("guidance")} />
+            <FormField
+              id={`${rule.platform}-guidance`}
+              label="Guidance"
+              hint="Shared with the AI and your writers."
+              error={errors.guidance?.message}
+            >
+              <Textarea
+                {...fieldAria(
+                  `${rule.platform}-guidance`,
+                  errors.guidance?.message,
+                )}
+                rows={3}
+                {...form.register("guidance")}
+              />
             </FormField>
             {canEdit && (
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" disabled={!isDirty} onClick={() => form.reset()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!isDirty}
+                  onClick={() => form.reset()}
+                >
                   Discard changes
                 </Button>
                 <Button type="submit" disabled={!isDirty || update.isPending}>

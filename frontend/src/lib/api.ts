@@ -49,7 +49,10 @@ type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 export async function api<T>(path: string, options: { method?: Method; body?: unknown } = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  // A file (Blob) is sent as the raw body with its own type; anything else as JSON.
+  const raw = typeof Blob !== "undefined" && options.body instanceof Blob;
+  if (raw) headers["Content-Type"] = (options.body as Blob).type || "application/octet-stream";
+  else if (options.body !== undefined) headers["Content-Type"] = "application/json";
   const orgId = typeof window !== "undefined" ? getActiveOrgId() : null;
   if (orgId) headers["X-Organization-Id"] = orgId;
   if (typeof window !== "undefined") {
@@ -64,7 +67,11 @@ export async function api<T>(path: string, options: { method?: Method; body?: un
     response = await fetch(`/api/v1${path}`, {
       method: options.method ?? "GET",
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: raw
+        ? (options.body as Blob)
+        : options.body !== undefined
+          ? JSON.stringify(options.body)
+          : undefined,
       credentials: "same-origin",
     });
   } catch {

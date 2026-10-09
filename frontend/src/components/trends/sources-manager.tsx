@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { SourceListEditor } from "@/components/trends/source-list-editor";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,8 +27,9 @@ const PRICING: Record<SourcePricing, string> = {
   unavailable: "No public API",
 };
 
-function status(source: TrendSourceInfo): { label: string; tone: string } {
-  if (source.pricing === "unavailable") return { label: "Unavailable", tone: "bg-muted-foreground/40" };
+export function sourceStatus(source: TrendSourceInfo): { label: string; tone: string } {
+  if (source.pricing === "unavailable")
+    return { label: "Unavailable", tone: "bg-muted-foreground/40" };
   if (!source.configured) return { label: "Needs setup", tone: "bg-warning" };
   if (!source.enabled) return { label: "Off", tone: "bg-muted-foreground/40" };
   switch (source.health) {
@@ -47,29 +49,47 @@ function status(source: TrendSourceInfo): { label: string; tone: string } {
 export function SourcesManager() {
   const sources = useTrendSources();
   const toggle = useToggleSource();
-  const canManage = useCan()("trends.manage");
+  const can = useCan();
+  const canManage = can("trends.manage");
+  const canEditLists = can("organization.write");
 
   const groups = sources.data
     ? [
-        { title: "Ready to use", items: sources.data.filter((s) => s.configured) },
+        {
+          title: "Ready to use",
+          items: sources.data.filter((s) => s.configured),
+        },
         {
           title: "Needs setup",
           hint: "These need API keys or extra settings. Add keys to the server's .env file and restart the API; ContentPulse picks them up automatically.",
-          items: sources.data.filter((s) => !s.configured && s.pricing !== "unavailable"),
+          items: sources.data.filter(
+            (s) => !s.configured && s.pricing !== "unavailable",
+          ),
         },
-        { title: "Not available", items: sources.data.filter((s) => s.pricing === "unavailable") },
+        {
+          title: "Not available",
+          items: sources.data.filter((s) => s.pricing === "unavailable"),
+        },
       ].filter((g) => g.items.length)
     : [];
 
   return (
     <>
-      <Link href="/trends" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        href="/trends"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeftIcon className="size-4" />
         Trends
       </Link>
       <PageHeader
         title="Trend sources"
-        description="Where ContentPulse looks for trends. Sources that aren't set up are skipped; the others still work."
+        description={
+          <>
+            Where ContentPulse looks for trends. Sources that aren&apos;t set up
+            are skipped; the others still work.
+          </>
+        }
       />
       {!sources.data ? (
         <div className="grid gap-3">
@@ -80,12 +100,23 @@ export function SourcesManager() {
       ) : (
         <div className="grid gap-8">
           {groups.map((group) => (
-            <section key={group.title} aria-labelledby={`group-${slug(group.title)}`} className="grid gap-3">
+            <section
+              key={group.title}
+              aria-labelledby={`group-${slug(group.title)}`}
+              className="grid gap-3"
+            >
               <div className="grid gap-1">
-                <h2 id={`group-${slug(group.title)}`} className="text-base font-medium">
+                <h2
+                  id={`group-${slug(group.title)}`}
+                  className="text-base font-medium"
+                >
                   {group.title}
                 </h2>
-                {group.hint && <p className="max-w-2xl text-sm text-muted-foreground">{group.hint}</p>}
+                {group.hint && (
+                  <p className="max-w-2xl text-sm text-muted-foreground">
+                    {group.hint}
+                  </p>
+                )}
               </div>
               <ul className="grid gap-3 md:grid-cols-2">
                 {group.items.map((source) => (
@@ -93,12 +124,18 @@ export function SourcesManager() {
                     key={source.key}
                     source={source}
                     canManage={canManage}
-                    pending={toggle.isPending && toggle.variables?.key === source.key}
+                    canEditLists={canEditLists}
+                    pending={
+                      toggle.isPending && toggle.variables?.key === source.key
+                    }
                     onToggle={(enabled) =>
                       toggle.mutate(
                         { key: source.key, enabled },
                         {
-                          onSuccess: () => toast.success(`${source.name} ${enabled ? "enabled" : "disabled"}`),
+                          onSuccess: () =>
+                            toast.success(
+                              `${source.name} ${enabled ? "enabled" : "disabled"}`,
+                            ),
                           onError: (e) => toast.error(errorMessage(e)),
                         },
                       )
@@ -117,19 +154,21 @@ export function SourcesManager() {
 function SourceCard({
   source,
   canManage,
+  canEditLists,
   pending,
   onToggle,
 }: {
   source: TrendSourceInfo;
   canManage: boolean;
+  canEditLists: boolean;
   pending: boolean;
   onToggle: (enabled: boolean) => void;
 }) {
-  const s = status(source);
+  const s = sourceStatus(source);
   const unavailable = source.pricing === "unavailable";
   return (
     <li>
-      <Card className={cn("h-full", unavailable && "opacity-80")}>
+      <Card className={cn("h-full", unavailable && "border-dashed bg-muted/40 ring-0 border")}>
         <CardContent className="grid gap-3">
           <div className="flex items-start gap-3">
             <div className="grid flex-1 gap-1">
@@ -138,9 +177,14 @@ function SourceCard({
                 <Badge variant="outline">{PRICING[source.pricing]}</Badge>
               </div>
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className={cn("size-1.5 rounded-full", s.tone)} aria-hidden />
+                <span
+                  className={cn("size-1.5 rounded-full", s.tone)}
+                  aria-hidden
+                />
                 {s.label}
-                {source.mode && source.configured && <span>· {source.mode}</span>}
+                {source.mode && source.configured && (
+                  <span>· {source.mode}</span>
+                )}
               </p>
             </div>
             {!unavailable && (
@@ -153,19 +197,29 @@ function SourceCard({
             )}
           </div>
           <p className="text-sm text-muted-foreground">{source.description}</p>
+          {source.key === "reddit" && (
+            <SourceListEditor field="subreddits" canEdit={canEditLists} />
+          )}
+          {source.key === "rss" && (
+            <SourceListEditor field="rss_feeds" canEdit={canEditLists} />
+          )}
           {source.missing.length > 0 && (
             <div className="grid gap-1.5">
               <p className="text-xs font-medium">Set on the server:</p>
               <ul className="flex flex-wrap gap-1.5">
                 {source.missing.map((v) => (
                   <li key={v}>
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{v}</code>
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      {v}
+                    </code>
                   </li>
                 ))}
               </ul>
             </div>
           )}
-          {source.note && <p className="text-xs text-muted-foreground">{source.note}</p>}
+          {source.note && (
+            <p className="text-xs text-muted-foreground">{source.note}</p>
+          )}
           {source.enabled && !source.configured && !unavailable && (
             <p className="flex items-center gap-1.5 text-xs">
               <span className="size-1.5 rounded-full bg-warning" aria-hidden />
@@ -175,7 +229,8 @@ function SourceCard({
           {source.last_error && source.health !== "healthy" && (
             <p className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive">
               {source.last_error}
-              {source.last_failure_at && ` (${timeAgo(source.last_failure_at)})`}
+              {source.last_failure_at &&
+                ` (${timeAgo(source.last_failure_at)})`}
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -183,7 +238,9 @@ function SourceCard({
               {source.last_success_at ? (
                 <>
                   Last success{" "}
-                  <time title={formatDateTime(source.last_success_at)}>{timeAgo(source.last_success_at)}</time>
+                  <time title={formatDateTime(source.last_success_at)}>
+                    {timeAgo(source.last_success_at)}
+                  </time>
                 </>
               ) : (
                 "No successful runs yet"

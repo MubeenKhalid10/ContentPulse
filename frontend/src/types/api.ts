@@ -1,3 +1,5 @@
+import type { LogoPosition } from "@/lib/logo";
+
 // Mirrors backend Pydantic schemas (backend/app/schemas).
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed";
@@ -68,6 +70,8 @@ export interface Organization {
   description: string | null;
   industry: string | null;
   logo_url: string | null;
+  /** An uploaded logo file exists; it's used before logo_url. */
+  has_logo_file: boolean;
   timezone: string;
   created_at: string;
   updated_at: string;
@@ -99,6 +103,7 @@ export interface BrandProfile {
   hashtag_guidelines: string | null;
   brand_colors: string[];
   typography: string | null;
+  logo_position: LogoPosition;
   updated_at: string;
 }
 
@@ -158,6 +163,49 @@ export interface TopTrend {
   opportunity_score: number | null;
   sources: string[];
   mention_count: number;
+}
+
+export interface DashboardMetric {
+  value: number;
+  previous: number;
+  /** One count per day of the period, oldest first. */
+  series: number[];
+}
+
+export interface DashboardTrendingTopic {
+  id: string;
+  topic: string;
+  source: string | null;
+  category: string | null;
+  relevance_level: RelevanceLevel | null;
+  opportunity_score: number | null;
+  /** The growth signal, 0-100 (not a percent change). */
+  momentum: number | null;
+  why: string | null;
+  shortlisted: boolean;
+}
+
+export interface DashboardPostBrief {
+  id: string;
+  title: string | null;
+  platform: Platform;
+  status: PostStatus;
+  updated_at: string;
+}
+
+export interface DashboardOverview {
+  days: number;
+  start: string;
+  end: string;
+  trends_discovered: DashboardMetric;
+  relevant_trends: DashboardMetric;
+  posts_generated: DashboardMetric;
+  approved_posts: DashboardMetric;
+  pending_approval: number;
+  trending: DashboardTrendingTopic[];
+  platform_breakdown: Partial<Record<Platform, number>>;
+  pipeline: Record<"draft" | "design" | "approval" | "changes" | "ready", number>;
+  recent_posts: DashboardPostBrief[];
 }
 
 export interface DashboardSummary {
@@ -724,6 +772,8 @@ export interface DesignTaskDetail extends DesignTask {
   visual_elements: string[];
   brand_requirements: {
     colors?: string[];
+    /** This post's logo spot, when it differs from the brand default. */
+    logo_position?: LogoPosition;
     typography?: string | null;
     logo?: boolean;
     requirements?: string[];
@@ -746,6 +796,10 @@ export interface DesignTaskDetail extends DesignTask {
     typography: string | null;
     content_guidelines: string | null;
     forbidden_terms: string[];
+    /** Profile > Logo URL, placed on AI images as is. */
+    logo_url: string | null;
+    /** The brand's default spot for the logo. */
+    logo_position: LogoPosition;
   };
   creatives: CreativeVersion[];
   storage: "s3" | "local";

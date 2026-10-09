@@ -60,6 +60,10 @@ class Storage(Protocol):
         """Store bytes produced on the server (e.g. an AI-generated image)."""
         ...
 
+    async def get(self, key: str) -> bytes | None:
+        """Read a small stored file on the server (e.g. the brand logo); None if missing."""
+        ...
+
 
 def safe_filename(name: str) -> str:
     """Keep a readable, path-free version of the uploaded file's name."""

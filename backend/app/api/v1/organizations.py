@@ -2,11 +2,12 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 
 from app.api.deps import DB, AppSettings, CurrentUser, OrgContext, org_permission
-from app.core.errors import Forbidden
+from app.core.errors import AppError, ErrorCode, Forbidden
 from app.core.permissions import Permission, Role
 from app.models.audit import AuditLog
 from app.models.user import User
@@ -29,6 +30,7 @@ from app.schemas.organization import (
 )
 from app.services import auth as auth_service
 from app.services.audit import AuditAction
+from app.services.organization import logo as logo_service
 from app.services.organization import organizations as org_service
 from app.services.organization import team as team_service
 from app.services.topics.sync import FIT_SETTINGS, refresh_platform_fit
@@ -68,6 +70,39 @@ async def update_organization(data: OrganizationUpdate, ctx: CanWrite, db: DB):
         entity_type="organization",
         entity_id=ctx.organization_id,
     )
+
+
+# --- Logo file ------------------------------------------------------------------
+@router.put("/{organization_id}/logo", response_model=OrganizationRead)
+async def upload_logo(request: Request, ctx: CanWrite, db: DB):
+    """Upload the logo as the raw request body (PNG, JPG or WebP, up to 2 MB)."""
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > logo_service.MAX_LOGO_BYTES:
+            raise AppError(
+                ErrorCode.FILE_UPLOAD_FAILED, "The logo is larger than 2 MB. Export a smaller PNG."
+            )
+    return await logo_service.upload_logo(db, ctx.organization, ctx.user.id, bytes(body))
+
+
+@router.delete("/{organization_id}/logo", response_model=OrganizationRead)
+async def remove_logo(ctx: CanWrite, db: DB):
+    return await logo_service.remove_logo(db, ctx.organization, ctx.user.id)
+
+
+@router.get("/{organization_id}/logo/link")
+async def logo_link(ctx: CanRead) -> dict[str, str]:
+    """A short-lived signed link to the uploaded logo, for <img> tags (any sign-in mode)."""
+    return {"url": await logo_service.logo_link(ctx.organization)}
+
+
+@router.get("/{organization_id}/logo", response_class=RedirectResponse)
+async def view_logo(ctx: CanRead):
+    """The uploaded logo, through a fresh signed link (so <img> tags never expire)."""
+    response = RedirectResponse(await logo_service.logo_link(ctx.organization), status_code=307)
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
 
 
 @router.delete("/{organization_id}", status_code=status.HTTP_204_NO_CONTENT)

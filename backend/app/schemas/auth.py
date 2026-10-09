@@ -78,6 +78,17 @@ class PasswordResetRequest(BaseModel):
     email: EmailStr
 
 
+class ProfileUpdate(BaseModel):
+    """The signed-in user's own details (Settings > Your profile)."""
+
+    full_name: Name
+
+
+class PasswordChange(BaseModel):
+    current_password: Annotated[str, StringConstraints(min_length=1, max_length=128)]
+    new_password: Password
+
+
 class PasswordResetConfirm(BaseModel):
     token: Annotated[str, StringConstraints(min_length=20, max_length=2000)]
     password: Password

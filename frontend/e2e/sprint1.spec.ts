@@ -60,11 +60,11 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   await tour.getByRole("button", { name: "Get started" }).click();
   await expect(tour).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Welcome, Ada" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome back, Ada" })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0); // never shown twice
   await expect(page.getByRole("link", { name: "Start setup" })).toBeVisible();
-  await expect(page.getByText("created the organization").first()).toBeVisible();
-  await expect(page.getByText("0 of 6 done.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Content pipeline" })).toBeVisible();
+  await expect(page.getByText("0 of 7 done.")).toBeVisible();
   await shot(page, "03-dashboard");
 
   // Profile.
@@ -91,6 +91,22 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   await expect(page.getByRole("switch", { name: "Workflow Automator active" })).not.toBeChecked();
   await shot(page, "04-services");
 
+  // Logo: upload the real file; it's what AI images will carry.
+  await page.getByRole("link", { name: "Profile" }).first().click();
+  // 1200×1200: the preview must show the whole logo inside its 224×96 box.
+  await page.getByLabel("Logo file").setInputFiles("e2e/fixtures/site/big-logo.png");
+  await expect(page.getByText("Logo uploaded")).toBeVisible();
+  const uploaded = page.getByRole("img", { name: "Your logo" });
+  await expect(uploaded).toBeVisible();
+  const logoBox = (await uploaded.boundingBox())!;
+  const frameBox = (await uploaded.locator("..").boundingBox())!;
+  expect(logoBox.width).toBeLessThanOrEqual(frameBox.width);
+  expect(logoBox.height).toBeLessThanOrEqual(frameBox.height);
+  expect(logoBox.y).toBeGreaterThanOrEqual(frameBox.y);
+  expect(logoBox.y + logoBox.height).toBeLessThanOrEqual(frameBox.y + frameBox.height);
+  await expect(page.getByText("Uploaded file", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Replace logo" })).toBeVisible();
+
   // Brand.
   await page.getByRole("link", { name: "Brand" }).first().click();
   await page.getByLabel("Brand voice").fill("Expert but approachable. We explain, we don't lecture.");
@@ -99,24 +115,44 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   await page.getByLabel("Forbidden terms").fill("disrupt");
   await page.getByLabel("Forbidden terms").press("Enter");
   await expect(page.getByRole("button", { name: "Remove synergy" })).toBeVisible();
+  // Where the real logo goes on AI images (default: bottom right).
+  const logoSpot = page.getByRole("group", { name: "Logo on AI-generated images" });
+  await expect(logoSpot.getByRole("radio", { name: "Bottom right" })).toBeChecked();
+  await logoSpot.getByRole("radio", { name: "Top left" }).check({ force: true });
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Brand profile saved")).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("group", { name: "Logo on AI-generated images" }).getByRole("radio", { name: "Top left" }),
+  ).toBeChecked();
   await shot(page, "05-brand");
 
-  // Settings.
-  await page.getByRole("link", { name: "Settings" }).first().click();
+  // Content setup: audience, platforms and discovery on one page, one save.
+  await page.getByRole("link", { name: "Content setup" }).click();
   await page.getByLabel("Target markets").fill("USA");
   await page.getByLabel("Target markets").press("Enter");
   await page.getByLabel("Target markets").fill("UK");
   await page.getByLabel("Target markets").press("Enter");
   await page.getByRole("button", { name: "LinkedIn" }).click();
   await page.getByRole("button", { name: "X", exact: true }).click();
-  await pick(page, "Check for new trends", "Every 6 hours");
+  await pick(page, "How Often to Check for New Trends", "Every 6 hours");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText("Settings saved")).toBeVisible();
+  await expect(page.getByText("Content setup saved")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("button", { name: "LinkedIn" })).toHaveAttribute("aria-pressed", "true");
   await shot(page, "06-settings");
+
+  // Settings is now about you: name, password, theme, workspaces.
+  await page.getByRole("link", { name: "Settings" }).click();
+  await expect(page.getByLabel("Email")).toHaveValue(ADMIN);
+  await page.getByLabel("Name", { exact: true }).fill("Ada Admin-Lovelace");
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(page.getByText("Your name was saved")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText("Acme Software");
+  await page.getByRole("radio", { name: "Dark" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.getByRole("radio", { name: "Light" }).click();
+  await shot(page, "06b-account");
 
   // Team: invite a creator.
   await page.getByRole("link", { name: "Team" }).first().click();
@@ -153,8 +189,14 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   await page.reload();
   await expect(page.getByText("Dee Designer")).toBeVisible();
   await page.getByRole("link", { name: "Activity log" }).click();
+  // Grouped by day, filterable by area.
+  await expect(page.getByRole("heading", { name: /^Today/ })).toBeVisible();
   await expect(page.getByText("joined the team")).toBeVisible();
   await expect(page.getByText("updated the brand profile")).toBeVisible();
+  await pick(page, "Show changes to", "Team");
+  await expect(page.getByText("joined the team")).toBeVisible();
+  await expect(page.getByText("updated the brand profile")).toHaveCount(0);
+  await pick(page, "Show changes to", "Everything");
   await shot(page, "10-activity");
 
   // Sign out returns to login and protects the app again.

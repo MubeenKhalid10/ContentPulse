@@ -7,6 +7,7 @@ import { meQueryKey, useMe } from "@/lib/auth";
 import type {
   AuditLogEntry,
   BrandProfile,
+  DashboardOverview,
   DashboardSummary,
   InviteResponse,
   Member,
@@ -52,6 +53,12 @@ export const useServices = () =>
   useOrgQuery<OrganizationService[]>(keys.services, (id) => `/organizations/${id}/services`);
 export const useMembers = () => useOrgQuery<Member[]>(keys.members, (id) => `/organizations/${id}/members`);
 export const useDashboard = () => useOrgQuery<DashboardSummary>(keys.dashboard, () => "/dashboard/summary");
+/** The dashboard page: metrics for the last `days` days (7, 30 or 90). */
+export const useDashboardOverview = (days: number) =>
+  useOrgQuery<DashboardOverview>(
+    (id) => [...keys.dashboard(id), "overview", days],
+    () => `/dashboard/overview?days=${days}`,
+  );
 export const useAuditLogs = (enabled = true) =>
   useOrgQuery<AuditLogEntry[]>(keys.audit, (id) => `/organizations/${id}/audit-logs?limit=100`, enabled);
 
@@ -79,6 +86,32 @@ export const useUpdateOrganization = () =>
     (id, body: Partial<Organization>) => api<Organization>(`/organizations/${id}`, { method: "PATCH", body }),
     { refreshMe: true }, // name appears in the org switcher
   );
+
+/** Upload the logo file (PNG, JPG or WebP, up to 2 MB); it replaces any earlier one. */
+export const useUploadLogo = () =>
+  useOrgMutation((id, file: File) =>
+    api<Organization>(`/organizations/${id}/logo`, { method: "PUT", body: file }),
+  );
+
+export const useRemoveLogo = () =>
+  useOrgMutation((id) => api<Organization>(`/organizations/${id}/logo`, { method: "DELETE" }));
+
+/**
+ * The logo to show: a signed link to the uploaded file (refreshed before it
+ * expires), else Profile > Logo URL, else null.
+ */
+export function useLogoSrc(org: Organization | undefined): string | null {
+  const orgId = useOrgId();
+  const link = useQuery({
+    queryKey: [...keys.org(orgId ?? "none"), "logo-link", org?.updated_at],
+    queryFn: () => api<{ url: string }>(`/organizations/${orgId}/logo/link`),
+    enabled: !!orgId && !!org?.has_logo_file,
+    refetchInterval: 10 * 60_000,
+    staleTime: 5 * 60_000,
+  });
+  if (org?.has_logo_file) return link.data?.url ?? null;
+  return org?.logo_url ?? null;
+}
 
 export const useDeleteOrganization = () =>
   useOrgMutation(

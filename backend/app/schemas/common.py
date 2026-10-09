@@ -1,4 +1,4 @@
-from typing import Annotated, Any, ClassVar
+from typing import Annotated, Any, ClassVar, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
@@ -11,6 +11,17 @@ from pydantic import (
     TypeAdapter,
     model_validator,
 )
+
+# Where the logo goes on an AI-generated image.
+LogoPosition = Literal[
+    "top_left",
+    "top_center",
+    "top_right",
+    "bottom_left",
+    "bottom_center",
+    "bottom_right",
+    "none",
+]
 
 
 class ORMModel(BaseModel):

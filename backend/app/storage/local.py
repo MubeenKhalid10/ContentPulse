@@ -92,6 +92,10 @@ class LocalStorage:
         for path in (self.path(key), self._meta_path(key)):
             path.unlink(missing_ok=True)
 
+    async def get(self, key: str) -> bytes | None:
+        path = self.path(key)
+        return path.read_bytes() if path.is_file() else None
+
     async def put(self, key: str, data: bytes, content_type: str) -> None:
         target = self.path(key)
         target.parent.mkdir(parents=True, exist_ok=True)

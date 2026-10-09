@@ -17,6 +17,8 @@ const APP_PAGES = [
   "/design",
   "/approvals",
   "/organization/profile",
+  "/organization/content-setup",
+  "/trends/sources",
   "/organization/services",
   "/organization/brand",
   "/organization/platforms",

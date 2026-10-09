@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { useOrgId } from "@/hooks/use-organization";
 import { api, ApiError } from "@/lib/api";
+import type { LogoPosition } from "@/lib/logo";
 import type { DesignTaskDetail, DesignTaskFilter, DesignTaskPage, Platform, UploadTicket } from "@/types/api";
 import { pollOrRefresh, signedLinkQuery } from "@/lib/signed-links";
 
@@ -83,7 +84,12 @@ export type BriefEdit = Partial<
     DesignTaskDetail,
     "format" | "dimensions" | "visual_concept" | "headline" | "supporting_text" | "slide_structure" | "visual_elements" | "cta" | "designer_notes"
   >
->;
+> & {
+  /** This post's colours; null goes back to the brand's. */
+  colors?: string[] | null;
+  /** This post's logo spot; null goes back to the brand default. */
+  logo_position?: LogoPosition | null;
+};
 
 export const useUpdateBrief = () =>
   useTaskMutation(({ id, ...body }: BriefEdit & { id: string }) =>

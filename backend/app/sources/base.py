@@ -184,10 +184,15 @@ class TrendSource(ABC):
         return self._merge_partial(ctx, results)
 
     async def sequential_partial(
-        self, ctx: SourceContext, jobs: list[Awaitable[list[RawTrendItem]]], delay: float
+        self,
+        ctx: SourceContext,
+        jobs: list[Awaitable[list[RawTrendItem]]],
+        delay: float,
+        *,
+        stop_on: frozenset[SourceErrorKind] = frozenset(),
     ) -> list[RawTrendItem]:
         """Like gather_partial, but one request at a time with a gap."""
-        return self._merge_partial(ctx, await run_sequentially(jobs, delay))
+        return self._merge_partial(ctx, await run_sequentially(jobs, delay, stop_on=stop_on))
 
     def _merge_partial(self, ctx: SourceContext, results: list) -> list[RawTrendItem]:
         items: list[RawTrendItem] = []
@@ -273,17 +278,31 @@ request_cache = RequestCache()
 
 
 async def run_sequentially(
-    jobs: list[Awaitable[list["RawTrendItem"]]], delay: float
+    jobs: list[Awaitable[list["RawTrendItem"]]],
+    delay: float,
+    *,
+    stop_on: frozenset["SourceErrorKind"] = frozenset(),
 ) -> list[list["RawTrendItem"] | BaseException]:
-    """Await sub-requests one at a time (providers with per-second limits)."""
+    """Await sub-requests one at a time (providers with per-second limits).
+
+    An error whose kind is in `stop_on` (e.g. rate limited, bad key) ends the
+    run: the remaining requests would fail the same way and only spend quota.
+    """
     results: list[list[RawTrendItem] | BaseException] = []
-    for index, job in enumerate(jobs):
+    pending = list(jobs)
+    for index, job in enumerate(pending):
         if index:
             await asyncio.sleep(delay)
         try:
             results.append(await job)
         except SourceError as exc:
             results.append(exc)
+            if exc.kind in stop_on:
+                for skipped in pending[index + 1 :]:
+                    close = getattr(skipped, "close", None)
+                    if close:
+                        close()  # never awaited: release the coroutine quietly
+                break
     return results
 
 

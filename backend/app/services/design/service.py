@@ -19,7 +19,7 @@ from app.core.permissions import Permission, has_permission
 from app.models.ai import AIGenerationJob
 from app.models.design import CreativeAsset, DesignBrief
 from app.models.enums import DesignBriefStatus, JobStatus, MemberStatus, PostStatus
-from app.models.organization import BrandProfile, OrganizationMember
+from app.models.organization import BrandProfile, Organization, OrganizationMember
 from app.models.post import Post, PostVersion
 from app.models.topic import TopicCandidate
 from app.models.user import User
@@ -339,6 +339,7 @@ async def task_detail(
     brand = await db.scalar(
         select(BrandProfile).where(BrandProfile.organization_id == organization_id)
     )
+    organization = await db.get(Organization, organization_id)
     pending = await db.scalar(
         select(func.count()).where(
             AIGenerationJob.entity_id == brief.id,
@@ -373,6 +374,8 @@ async def task_detail(
             typography=brand.typography if brand else None,
             content_guidelines=brand.content_guidelines if brand else None,
             forbidden_terms=brand.forbidden_terms if brand else [],
+            logo_url=await _logo_preview_url(organization),
+            logo_position=brand.logo_position if brand else "bottom_right",
         ),
         creatives=await creative_versions(db, post.id),
         storage=storage_provider(settings),
@@ -435,6 +438,18 @@ async def update_brief(
     for key in ("slide_structure", "visual_elements"):
         if key in changes and changes[key] is None:
             changes[key] = []
+    if "colors" in changes:
+        changes["brand_requirements"] = _with_colors(
+            changes.get("brand_requirements", brief.brand_requirements), changes.pop("colors")
+        )
+    if "logo_position" in changes:
+        requirements = dict(changes.get("brand_requirements", brief.brand_requirements) or {})
+        position = changes.pop("logo_position")
+        if position:
+            requirements["logo_position"] = position
+        else:
+            requirements.pop("logo_position", None)
+        changes["brand_requirements"] = requirements
     old, new = audit.diff(brief, changes)
     if new:
         for field, value in changes.items():
@@ -443,6 +458,29 @@ async def update_brief(
         _record(db, brief, user_id, AuditAction.DESIGN_BRIEF_UPDATED, new, old)
     await db.commit()
     return await task_detail(db, organization_id, brief.id)
+
+
+async def _logo_preview_url(organization: Organization | None) -> str | None:
+    """What the design page shows: a signed link to the uploaded logo (works in
+    any <img>, refreshed with the task), else Profile > Logo URL."""
+    if organization is None:
+        return None
+    if organization.logo_storage_key:
+        from app.services.organization.logo import logo_link
+
+        return await logo_link(organization)
+    return organization.logo_url
+
+
+def _with_colors(requirements: dict | None, colors: list[str] | None) -> dict:
+    """The brief's brand rules with this post's colours (none: the brand's own)."""
+    updated = dict(requirements or {})  # a new dict, so the JSON column is saved
+    unique = list(dict.fromkeys(c for c in colors or [] if c))
+    if unique:
+        updated["colors"] = unique
+    else:
+        updated.pop("colors", None)
+    return updated
 
 
 def _can_manage(role) -> bool:
