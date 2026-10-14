@@ -26,6 +26,7 @@ class Platform(StrEnum):
 class TrendFrequency(StrEnum):
     MANUAL = "manual"
     HOURLY = "hourly"
+    EVERY_3_HOURS = "every_3_hours"
     EVERY_6_HOURS = "every_6_hours"
     DAILY = "daily"
 

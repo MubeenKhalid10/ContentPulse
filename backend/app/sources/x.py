@@ -11,10 +11,12 @@ from app.sources.base import (
     SourceInputs,
     TrendSource,
     compact_number,
+    token_cache,
 )
 from app.sources.feeds import parse_date
 
 API = "https://api.x.com"
+TOKEN_REUSE_SECONDS = 3600.0
 
 
 class XSource(TrendSource):
@@ -50,6 +52,13 @@ class XSource(TrendSource):
             return ctx.settings.x_bearer_token
         if not (ctx.settings.x_api_key and ctx.settings.x_api_secret):
             raise SourceError(SourceErrorKind.NOT_CONFIGURED, "X credentials are not set.")
+        # App-only bearer tokens don't expire until revoked: reuse one (in
+        # memory) for a while instead of exchanging the key on every run.
+        fingerprint = token_cache.fingerprint(
+            "x", ctx.settings.x_api_key, ctx.settings.x_api_secret
+        )
+        if cached := token_cache.get(fingerprint):
+            return cached
         resp = await self.request(
             ctx,
             "POST",
@@ -60,6 +69,7 @@ class XSource(TrendSource):
         token = resp.json().get("access_token")
         if not token:
             raise SourceError(SourceErrorKind.AUTH, "X did not return a bearer token.")
+        token_cache.put(fingerprint, token, TOKEN_REUSE_SECONDS)
         return token
 
     async def collect(self, ctx: SourceContext) -> list[RawTrendItem]:

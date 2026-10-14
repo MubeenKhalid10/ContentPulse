@@ -191,6 +191,9 @@ def align_with_rules(
     if keyword_score >= 100:
         fit = max(fit, 60)
         reasons.append("It matches one of your tracked keywords.")
+    elif (trend.signals.get("keyword_match") or {}).get("match") == "industry":
+        fit = max(fit, 45)
+        reasons.append("It relates to your industry.")
     elif keyword_score >= 35:
         fit = max(fit, 25)
     if not reasons:

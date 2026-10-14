@@ -36,10 +36,20 @@ function authFailure(message: string, status = 401): ApiError {
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (body: { email: string; password: string }): Promise<{ user: Me }> => {
+    mutationFn: async (body: {
+      email: string;
+      password: string;
+      captchaToken?: string;
+    }): Promise<{ user: Me }> => {
       const supabase = await getSupabase();
       if (!supabase) return api<Session>("/auth/login", { method: "POST", body });
-      const { error } = await supabase.auth.signInWithPassword(body);
+      if (!body.captchaToken) throw authFailure("Complete the CAPTCHA challenge.", 400);
+      const { email, password, captchaToken } = body;
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: { captchaToken },
+      });
       if (error) throw authFailure(error.message);
       // First request provisions/links the ContentPulse user for this identity.
       return { user: await api<Me>("/auth/me") };
@@ -60,18 +70,25 @@ export interface RegisterResult {
 export function useRegister() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (body: { email: string; password: string; full_name: string }): Promise<RegisterResult> => {
+    mutationFn: async (body: {
+      email: string;
+      password: string;
+      full_name: string;
+      captchaToken?: string;
+    }): Promise<RegisterResult> => {
       const supabase = await getSupabase();
       if (!supabase) {
         const session = await api<Session>("/auth/register", { method: "POST", body });
         return { user: session.user, needsConfirmation: false };
       }
+      if (!body.captchaToken) throw authFailure("Complete the CAPTCHA challenge.", 400);
       const { data, error } = await supabase.auth.signUp({
         email: body.email,
         password: body.password,
         options: {
           data: { full_name: body.full_name },
           emailRedirectTo: authRedirect("/auth/callback", "/onboarding"),
+          captchaToken: body.captchaToken,
         },
       });
       if (error) throw authFailure(error.message, 400);

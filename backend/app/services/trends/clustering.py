@@ -16,11 +16,18 @@ from app.services.trends.text import (
 from app.sources.base import RawTrendItem
 
 # Sources whose items carry real engagement: a single strong item can be a trend.
-ENGAGEMENT_SOURCES = {"google_trends", "hacker_news", "reddit", "x", "instagram"}
+ENGAGEMENT_SOURCES = {
+    "google_trends",
+    "google_trends_tech",
+    "hacker_news",
+    "reddit",
+    "x",
+    "instagram",
+}
 STANDALONE_MIN_ENGAGEMENT = {"hacker_news": 100, "reddit": 500, "x": 50, "instagram": 500}
 # These providers return searched news articles without an engagement metric.
 # A tracked keyword is enough signal to retain an otherwise unique article.
-KEYWORD_STANDALONE_SOURCES = {"world_news", "newsdata"}
+KEYWORD_STANDALONE_SOURCES = {"world_news", "newsdata", "the_news_api", "exa"}
 BIGRAM_WEIGHT = 0.6
 
 

@@ -8,7 +8,7 @@ filled in by AI alignment (Sprint 4) and are left empty until then.
 
 import math
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.services.trends.text import keyword_matches, normalize_terms
@@ -18,20 +18,34 @@ from app.sources.locations import name_for
 # Engagement that counts as "very high" (score 100) per source.
 ENGAGEMENT_REFERENCE = {
     "google_trends": 1_000_000,  # searches
+    "google_trends_tech": 1_000_000,  # searches
     "hacker_news": 1_000,  # points
     "reddit": 50_000,  # upvotes
     "x": 100_000,  # interactions
     "instagram": 200_000,  # likes + comments
 }
-ARTICLE_SOURCES = {"google_news", "newsapi", "gnews", "world_news", "newsdata", "rss"}
+ARTICLE_SOURCES = {
+    "google_news",
+    "newsapi",
+    "gnews",
+    "world_news",
+    "newsdata",
+    "the_news_api",
+    "exa",
+    "rss",
+}
+SEARCH_SOURCES = {"google_trends", "google_trends_tech"}
 SOURCE_LABELS = {
     "google_trends": "Google Trends",
+    "google_trends_tech": "Google Trends (Technology)",
     "google_news": "Google News",
     "hacker_news": "Hacker News",
     "reddit": "Reddit",
     "rss": "RSS feeds",
     "newsapi": "NewsAPI",
     "gnews": "GNews",
+    "the_news_api": "TheNewsAPI",
+    "exa": "Exa",
     "x": "X",
     "instagram": "Instagram",
 }
@@ -64,6 +78,16 @@ class OrgProfile:
     markets: set[str]  # ISO codes; {"GLOBAL"} or empty means worldwide
     tracked_keywords: list[str]
     service_names: list[str]
+    # Seed searches from the organization's industry (services/trends/industry.py).
+    industry_terms: list[str] = field(default_factory=list)
+
+    @property
+    def search_keywords(self) -> list[str]:
+        """Keywords the organization's searches used: tracked ones, or the
+        industry seeds when it hasn't listed any keywords or services."""
+        if self.tracked_keywords or self.service_names:
+            return self.tracked_keywords
+        return self.industry_terms
 
 
 def _clamp(value: float) -> int:
@@ -94,7 +118,7 @@ def popularity(mentions: list[MentionView]) -> dict:
         if source in ENGAGEMENT_REFERENCE:
             peak = max((m.engagement or 0) for m in items)
             if peak:
-                unit = "searches" if source == "google_trends" else "engagement"
+                unit = "searches" if source in SEARCH_SOURCES else "engagement"
                 parts.append(
                     (
                         _log_score(peak, ENGAGEMENT_REFERENCE[source]),
@@ -117,7 +141,7 @@ def popularity(mentions: list[MentionView]) -> dict:
 
 def growth(mentions: list[MentionView], now: datetime) -> dict:
     candidates: list[tuple[int, str]] = []
-    if any(m.source == "google_trends" for m in mentions):
+    if any(m.source in SEARCH_SOURCES for m in mentions):
         candidates.append((70, "Rising search on Google Trends right now"))
     for m in mentions:
         reference = ENGAGEMENT_REFERENCE.get(m.source)
@@ -196,8 +220,17 @@ def keyword_match(text: str, profile: OrgProfile) -> dict:
     services = keyword_matches(text, profile.service_names)
     if services:
         return {"score": 90, "detail": f"Mentions your offering “{services[0]}”"}
+    industry = keyword_matches(text, profile.industry_terms)
+    if industry:
+        return {
+            "score": 70,
+            "detail": f"Relates to your industry: “{industry[0]}”",
+            "match": "industry",
+        }
     org_terms = {
-        t for k in [*profile.tracked_keywords, *profile.service_names] for t in normalize_terms(k)
+        t
+        for k in [*profile.tracked_keywords, *profile.service_names, *profile.industry_terms]
+        for t in normalize_terms(k)
     }
     overlap = sorted(org_terms & set(normalize_terms(text)))
     if len(overlap) >= 2:
@@ -205,7 +238,10 @@ def keyword_match(text: str, profile: OrgProfile) -> dict:
     if overlap:
         return {"score": 35, "detail": f"Shares the term “{overlap[0]}” with your focus"}
     if not org_terms:
-        return {"score": 0, "detail": "Add tracked keywords and services to measure fit"}
+        return {
+            "score": 0,
+            "detail": "Add tracked keywords, services or an industry to measure fit",
+        }
     return {"score": 0, "detail": "No overlap with your keywords or services"}
 
 

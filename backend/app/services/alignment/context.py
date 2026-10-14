@@ -13,6 +13,7 @@ from app.models.organization import (
     OrganizationService,
     OrganizationSettings,
 )
+from app.services.trends.industry import industry_terms
 from app.services.trends.scoring import OrgProfile
 from app.sources.locations import resolve_markets
 
@@ -96,5 +97,6 @@ async def load_context(db: AsyncSession, organization_id: uuid.UUID) -> Alignmen
             markets={loc.code for loc in locations},
             tracked_keywords=settings.tracked_keywords if settings else [],
             service_names=[s.name for s in services],
+            industry_terms=industry_terms(org.industry),
         ),
     )

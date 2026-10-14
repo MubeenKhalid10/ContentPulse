@@ -22,6 +22,7 @@ class RssSource(TrendSource):
     name = "RSS feeds"
     description = "Industry blogs, trade publications and newsletters you choose (RSS or Atom)."
     pricing = "free"
+    org_private = True  # feeds are each organization's own URLs
 
     def configuration(self, settings: Settings, inputs: SourceInputs) -> Configuration:
         if not inputs.rss_feeds:

@@ -62,8 +62,10 @@ class OrganizationSettings(UUIDPk, Timestamps, OrgScoped, Base):
     rss_feeds: Mapped[list[str]] = jsonb_list()
     trend_frequency: Mapped[TrendFrequency] = mapped_column(
         str_enum(TrendFrequency, "trend_frequency"),
-        default=TrendFrequency.DAILY,
-        server_default=TrendFrequency.DAILY.value,
+        # New organizations get TREND_DEFAULT_FREQUENCY (every 3 hours) when
+        # created; existing organizations keep what they chose.
+        default=TrendFrequency.EVERY_3_HOURS,
+        server_default=TrendFrequency.EVERY_3_HOURS.value,
         nullable=False,
     )
 

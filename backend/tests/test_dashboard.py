@@ -50,7 +50,11 @@ async def test_overview_counts_the_real_journey(client, internet, design_ai):
     assert body["posts_generated"]["value"] >= 1
     assert body["platform_breakdown"][post["platform"]] >= 1
     assert body["pipeline"]["design"] >= 1 and set(body["pipeline"]) == {
-        "draft", "design", "approval", "changes", "ready"
+        "draft",
+        "design",
+        "approval",
+        "changes",
+        "ready",
     }
     assert body["recent_posts"][0]["id"] == post["id"]
     trending = body["trending"]

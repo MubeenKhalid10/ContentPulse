@@ -64,6 +64,7 @@ class AuthConfig(BaseModel):
     # The anon/publishable key is designed to be public (row-level security
     # protects data); never the service-role key.
     supabase_anon_key: str | None = None
+    turnstile_site_key: str | None = None
 
 
 class InvitePreview(BaseModel):

@@ -2,12 +2,17 @@ import type { SignalKey } from "@/types/api";
 
 export const SOURCE_NAMES: Record<string, string> = {
   google_trends: "Google Trends",
+  google_trends_tech: "Google Trends (Technology)",
   google_news: "Google News",
   hacker_news: "Hacker News",
   reddit: "Reddit",
   rss: "RSS feeds",
   newsapi: "NewsAPI",
   gnews: "GNews",
+  world_news: "World News API",
+  newsdata: "NewsData.io",
+  the_news_api: "TheNewsAPI",
+  exa: "Exa",
   x: "X",
   instagram: "Instagram",
   linkedin: "LinkedIn",

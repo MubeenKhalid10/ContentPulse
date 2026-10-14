@@ -1,9 +1,11 @@
 """Trend operations used by the API (spec §38)."""
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import Text, cast, func, nulls_last, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -33,21 +35,80 @@ from app.services.topics import sync as topic_sync
 from app.services.trends.inputs import load_org_inputs
 from app.services.workflow import TREND_MACHINE
 from app.sources import SOURCES
+from app.sources.base import is_public_error
 from app.workers import trend_tasks
 from app.workers.tasks import enqueue
 
 ACTIVE_RUN = (DiscoveryRunStatus.QUEUED, DiscoveryRunStatus.RUNNING)
 
 
+@dataclass
+class _Health:
+    health: SourceHealth = SourceHealth.UNKNOWN
+    last_success_at: datetime | None = None
+    last_failure_at: datetime | None = None
+    last_error: str | None = None
+
+
+def _platform_health(row: TrendSource | None) -> _Health:
+    """Provider health shared by all organizations. Only sanitized wording is
+    shown: rows written before sanitizing could hold one organization's feed
+    URL or query in `last_error`."""
+    if row is None:
+        return _Health()
+    error = row.last_error if is_public_error(row.last_error) else None
+    if row.last_error and error is None and row.health != SourceHealth.HEALTHY:
+        error = "The last request failed."
+    return _Health(row.health, row.last_success_at, row.last_failure_at, error)
+
+
+async def _organization_health(
+    db: AsyncSession, organization_id: uuid.UUID, keys: list[str]
+) -> dict[str, _Health]:
+    """Status of organization-private sources (RSS) from this organization's
+    own recent runs only."""
+    out = {key: _Health() for key in keys}
+    if not keys:
+        return out
+    runs = await db.scalars(
+        select(TrendDiscoveryRun)
+        .where(
+            TrendDiscoveryRun.organization_id == organization_id,
+            TrendDiscoveryRun.status.in_([DiscoveryRunStatus.SUCCEEDED, DiscoveryRunStatus.FAILED]),
+        )
+        .order_by(TrendDiscoveryRun.created_at.desc())
+        .limit(20)
+    )
+    for run in runs:
+        for key in keys:
+            result = (run.results or {}).get(key) or {}
+            state = out[key]
+            if result.get("status") not in ("ok", "failed") or state.health != SourceHealth.UNKNOWN:
+                continue
+            at = run.finished_at or run.created_at
+            if result["status"] == "ok":
+                out[key] = _Health(SourceHealth.HEALTHY, last_success_at=at)
+            else:
+                out[key] = _Health(
+                    trend_tasks.source_health(result.get("error_kind")),
+                    last_failure_at=at,
+                    last_error=result.get("error"),
+                )
+    return out
+
+
 async def list_sources(
     db: AsyncSession, organization_id: uuid.UUID, settings: Settings
 ) -> list[SourceInfo]:
     org = await load_org_inputs(db, organization_id)
-    health = {row.key: row for row in await db.scalars(select(TrendSource))}
+    rows = {row.key: row for row in await db.scalars(select(TrendSource))}
+    private = await _organization_health(
+        db, organization_id, [s.key for s in SOURCES.values() if s.org_private]
+    )
     out = []
     for source in SOURCES.values():
         config = source.configuration(settings, org.inputs)
-        row = health.get(source.key)
+        row = private[source.key] if source.org_private else _platform_health(rows.get(source.key))
         out.append(
             SourceInfo(
                 key=source.key,
@@ -61,10 +122,10 @@ async def list_sources(
                 missing=list(config.missing),
                 note=config.note,
                 enabled=source.key in org.enabled_sources,
-                health=row.health if row else SourceHealth.UNKNOWN,
-                last_success_at=row.last_success_at if row else None,
-                last_failure_at=row.last_failure_at if row else None,
-                last_error=row.last_error if row else None,
+                health=row.health,
+                last_success_at=row.last_success_at,
+                last_failure_at=row.last_failure_at,
+                last_error=row.last_error,
             )
         )
     return out
@@ -149,6 +210,7 @@ async def start_discovery(
         active.status = DiscoveryRunStatus.FAILED
         active.error = "Interrupted: the worker stopped responding."
         active.finished_at = datetime.now(UTC)
+        await db.flush()  # free the one-active-run slot before inserting
 
     run = TrendDiscoveryRun(
         organization_id=organization_id,
@@ -158,7 +220,13 @@ async def start_discovery(
         requested_by=user_id,
     )
     db.add(run)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # A scheduled (or another manual) run was created at the same moment:
+        # the unique index on active runs keeps one.
+        await db.rollback()
+        raise AppError(ErrorCode.CONFLICT, "Trend discovery is already running.") from None
     enqueue("trends.discover", run.id)
     return run
 

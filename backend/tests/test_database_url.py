@@ -29,7 +29,9 @@ def test_transaction_pooler_disables_statement_cache():
 
 
 def test_sslmode_disable_and_other_params_kept():
-    url, args = async_database_url("postgres://u:p@db.example.com/app?sslmode=disable&application_name=cp")
+    url, args = async_database_url(
+        "postgres://u:p@db.example.com/app?sslmode=disable&application_name=cp"
+    )
     assert args["ssl"] is False
     assert url.endswith("/app?application_name=cp")
 

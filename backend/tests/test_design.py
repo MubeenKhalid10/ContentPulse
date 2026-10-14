@@ -672,9 +672,7 @@ def test_kie_is_preferred_when_its_key_is_set():
     assert get_image_provider(explicit) is None  # Cloudflare chosen but not set up
 
 
-async def test_daily_image_cap_is_explained(
-    client, internet, design_ai, fake_images, monkeypatch
-):
+async def test_daily_image_cap_is_explained(client, internet, design_ai, fake_images, monkeypatch):
     from app.ai.limits import quota_limiter
     from app.core.config import get_settings
 

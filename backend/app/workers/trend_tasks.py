@@ -68,18 +68,33 @@ async def sync_source_registry() -> None:
         await db.commit()
 
 
+def source_health(error_kind: str | None) -> SourceHealth:
+    if error_kind is None:
+        return SourceHealth.HEALTHY
+    try:
+        return _HEALTH.get(SourceErrorKind(error_kind), SourceHealth.DEGRADED)
+    except ValueError:
+        return SourceHealth.DEGRADED
+
+
 async def _record_health(key: str, error: SourceError | None) -> None:
+    """Platform-wide provider health, shown to every organization: only fixed,
+    sanitized wording is stored. Sources fed by organization-owned inputs
+    (RSS feed URLs) are skipped; their status lives in each organization's runs."""
+    adapter = SOURCES.get(key)
+    if adapter is not None and adapter.org_private:
+        return
     async with SessionLocal() as db:
         values = (
             {"health": SourceHealth.HEALTHY, "last_success_at": _now(), "last_error": None}
             if error is None
             else {
-                "health": _HEALTH.get(error.kind, SourceHealth.DEGRADED),
+                "health": source_health(error.kind),
                 "last_failure_at": _now(),
-                "last_error": error.message[:1000],
+                "last_error": error.public_message,
             }
         )
-        name = SOURCES[key].name if key in SOURCES else key
+        name = adapter.name if adapter is not None else key
         await db.execute(
             insert(TrendSource)
             .values(id=uuid.uuid4(), key=key, name=name, **values)
@@ -149,6 +164,14 @@ async def _discover(run_id: uuid.UUID) -> None:
         runnable.append(adapter)
 
     warnings = [f"Unrecognized market “{m}” was ignored." for m in org_inputs.unknown_markets]
+    if org_inputs.keyword_origin == "industry":
+        warnings.append(
+            "No tracked keywords or services yet: searches used your industry ("
+            + ", ".join(inputs.keywords)
+            + "). Add keywords in Settings for more precise results."
+        )
+    elif org_inputs.keyword_origin == "none":
+        warnings.append("No tracked keywords, services or industry: keyword searches were skipped.")
     if not runnable:
         async with SessionLocal() as db:
             run = await db.get(TrendDiscoveryRun, run_id)
@@ -167,7 +190,9 @@ async def _discover(run_id: uuid.UUID) -> None:
             client=client,
             settings=settings,
             inputs=inputs,
-            since=_now() - LOOKBACK,
+            # Whole hours: every run in the same hour asks providers the same
+            # question, so their responses can be shared (provider cache).
+            since=_now().replace(minute=0, second=0, microsecond=0) - LOOKBACK,
             resolver=resolver,
         )
         outcomes = await asyncio.gather(

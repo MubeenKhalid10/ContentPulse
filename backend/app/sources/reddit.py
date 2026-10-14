@@ -10,11 +10,14 @@ from app.sources.base import (
     SourceErrorKind,
     SourceInputs,
     TrendSource,
+    token_cache,
 )
 from app.sources.feeds import parse_feed
 
 TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
 OAUTH_API = "https://oauth.reddit.com"
+# Reuse an app-only token at most this long (Reddit issues them for 24 hours).
+TOKEN_REUSE_SECONDS = 3600.0
 PUBLIC = "https://www.reddit.com"
 # Unauthenticated access is heavily rate limited: keep requests few and spaced.
 PUBLIC_MAX_REQUESTS = 4
@@ -54,6 +57,12 @@ class RedditSource(TrendSource):
 
     # -- OAuth API -------------------------------------------------------------
     async def _token(self, ctx: SourceContext) -> str:
+        """App-only OAuth token, reused (in memory) until shortly before it
+        expires instead of being fetched for every run."""
+        s = ctx.settings
+        fingerprint = token_cache.fingerprint("reddit", s.reddit_client_id, s.reddit_client_secret)
+        if cached := token_cache.get(fingerprint):
+            return cached
         resp = await self.request(
             ctx,
             "POST",
@@ -62,9 +71,13 @@ class RedditSource(TrendSource):
             auth=(ctx.settings.reddit_client_id or "", ctx.settings.reddit_client_secret or ""),
             headers={"User-Agent": ctx.settings.trend_user_agent},
         )
-        token = resp.json().get("access_token")
+        data = resp.json()
+        token = data.get("access_token")
         if not token:
             raise SourceError(SourceErrorKind.AUTH, "Reddit did not return an access token.")
+        expires_in = data.get("expires_in")
+        lifetime = float(expires_in) if isinstance(expires_in, int | float) else 3600.0
+        token_cache.put(fingerprint, token, min(lifetime - 120, TOKEN_REUSE_SECONDS))
         return token
 
     async def _collect_oauth(

@@ -7,7 +7,12 @@ export type JobStatus = "queued" | "running" | "succeeded" | "failed";
 export type Role = "admin" | "creator" | "viewer";
 export type MemberStatus = "active" | "invited" | "disabled";
 export type Platform = "linkedin" | "x" | "instagram" | "facebook" | "blog";
-export type TrendFrequency = "manual" | "hourly" | "every_6_hours" | "daily";
+export type TrendFrequency =
+  | "manual"
+  | "hourly"
+  | "every_3_hours"
+  | "every_6_hours"
+  | "daily";
 export type OfferingKind = "service" | "product" | "expertise";
 
 export type Permission =

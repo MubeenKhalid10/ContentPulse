@@ -3,7 +3,7 @@ import os
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _INSECURE_DEV_SECRET = "dev-insecure-secret-change-me-0123456789abcdef"
@@ -86,6 +86,7 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
     supabase_jwt_secret: str | None = None
+    turnstile_site_key: str | None = None
 
     # AI (used from Sprint 4 onward)
     # LLM for AI alignment and content generation. Unset = rule-based analysis
@@ -212,6 +213,51 @@ class Settings(BaseSettings):
     # source "not configured"; discovery runs with whatever is available.
     trend_source_timeout_seconds: float = 45.0
     trend_scheduler_enabled: bool = True
+    # Discovery frequency given to NEW organizations (each organization can
+    # change its own; existing organizations keep theirs).
+    trend_default_frequency: Literal[
+        "manual", "hourly", "every_3_hours", "every_6_hours", "daily"
+    ] = "every_3_hours"
+    # How often the scheduler checks which organizations are due. A tick only
+    # starts runs for organizations whose frequency says they are due; it
+    # never refreshes providers by itself.
+    trend_scheduler_tick_seconds: int = Field(default=60, ge=10)
+    # A run counts as due this much early, so a scheduler tick (or an external
+    # trigger every 30 minutes) that lands just before the interval is up
+    # doesn't push the run back a whole tick.
+    trend_schedule_grace_seconds: int = Field(default=600, ge=0)
+    # After a failed or interrupted run (e.g. the server slept), retry after
+    # this many minutes, at most this many times in a row; then the normal
+    # frequency applies again (no endless retries).
+    trend_failure_retry_minutes: int = Field(default=30, ge=1)
+    trend_failure_max_retries: int = Field(default=2, ge=0)
+
+    # Shared provider-response cache (app/sources/cache_policy.py). Identical
+    # public requests from different organizations reuse one response.
+    #   "memory"   -> this process only (lost on restart or Render sleep); default
+    #   "postgres" -> also kept in the provider_cache table, shared by every
+    #                 process and surviving restarts, for the providers listed
+    #                 in PROVIDER_CACHE_PERSIST_SOURCES only
+    provider_cache_backend: Literal["memory", "postgres"] = "memory"
+    # Providers whose responses may be stored in Postgres. Empty by default:
+    # add a provider only after checking its terms allow storing responses
+    # and serving them to several customers. Reddit, X and Instagram are never
+    # stored (deletion obligations), whatever this says.
+    provider_cache_persist_sources: Annotated[list[str], NoDecode] = []
+    # Per-policy TTL overrides in seconds, e.g. {"exa": 86400, "google_news": 1800}.
+    provider_cache_ttls: dict[str, int] = {}
+    # A worker fetching a missing response holds a lease this long; others
+    # wait up to provider_cache_wait_seconds for it, then fetch themselves.
+    provider_cache_lease_seconds: int = Field(default=60, ge=5)
+    provider_cache_wait_seconds: float = Field(default=10.0, ge=0)
+    # Expired responses are kept this long (served only while a provider is
+    # cooling down) and then deleted.
+    provider_cache_stale_seconds: int = Field(default=6 * 3600, ge=0)
+    # Responses larger than this are not stored in Postgres.
+    provider_cache_max_bytes: int = Field(default=2_000_000, ge=1_000)
+    # When the cache database fails: "fetch" calls the provider directly (the
+    # run still works, quota is spent); "skip" skips that request instead.
+    provider_cache_on_db_error: Literal["fetch", "skip"] = "fetch"
     trend_user_agent: str = "ContentPulse/0.1 (trend discovery)"
     reddit_client_id: str | None = None
     reddit_client_secret: str | None = None
@@ -219,6 +265,10 @@ class Settings(BaseSettings):
     gnews_api_key: str | None = None
     world_news_api_key: str | None = None
     newsdata_api_key: str | None = None
+    the_news_api_key: str | None = None
+    exa_api_key: str | None = None
+    # Articles per TheNewsAPI request: 3 on the free plan, higher on paid plans.
+    the_news_api_limit: int = Field(default=3, ge=1, le=100)
     serp_api_key: str | None = None
     apitube_news_api_key: str | None = None
     x_bearer_token: str | None = None
@@ -263,7 +313,9 @@ class Settings(BaseSettings):
             return None
         return name or None
 
-    @field_validator("llm_fallbacks", "cors_origins", mode="before")
+    @field_validator(
+        "llm_fallbacks", "cors_origins", "provider_cache_persist_sources", mode="before"
+    )
     @classmethod
     def _split_models(cls, value: object) -> object:
         """Accept `a/b, c/d` as well as a JSON list, so .env stays readable."""

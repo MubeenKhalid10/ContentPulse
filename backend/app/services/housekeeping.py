@@ -22,3 +22,22 @@ async def prune_llm_requests(now: datetime | None = None) -> int:
     if deleted:
         logger.info("Deleted %d model request record(s) older than %d days", deleted, days)
     return deleted
+
+
+async def prune_provider_cache() -> int:
+    """Delete shared provider responses past their stale window, and dead
+    leases (bounded batches)."""
+    from app.sources.provider_cache import store
+
+    deleted = await store.prune(get_settings().provider_cache_stale_seconds)
+    if deleted:
+        logger.info("Deleted %d expired provider cache entr(ies)", deleted)
+    return deleted
+
+
+async def run_housekeeping(now: datetime | None = None) -> dict[str, int]:
+    """Every clean-up task (hourly from the in-process scheduler and Celery beat)."""
+    return {
+        "llm_requests": await prune_llm_requests(now),
+        "provider_cache": await prune_provider_cache(),
+    }

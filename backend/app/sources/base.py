@@ -9,6 +9,7 @@ its health and never stops other sources or the application.
 
 import asyncio
 import json
+import re
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Iterable
@@ -57,10 +58,36 @@ class SourceErrorKind(StrEnum):
 
 
 class SourceError(Exception):
-    def __init__(self, kind: SourceErrorKind, message: str) -> None:
+    def __init__(self, kind: SourceErrorKind, message: str, *, status: int | None = None) -> None:
         super().__init__(message)
         self.kind = kind
         self.message = message
+        self.status = status
+
+    @property
+    def public_message(self) -> str:
+        """Fixed wording safe for platform-wide health, which every organization
+        sees. `message` can hold one organization's feed URL or query (via the
+        provider's error body), so it only goes into that organization's run."""
+        text = PUBLIC_ERRORS.get(self.kind, PUBLIC_ERRORS[SourceErrorKind.UNAVAILABLE])
+        return f"{text} (HTTP {self.status})" if self.status else text
+
+
+PUBLIC_ERRORS = {
+    SourceErrorKind.NOT_CONFIGURED: "Not configured.",
+    SourceErrorKind.AUTH: "Access denied by the provider. Check the API key or credentials.",
+    SourceErrorKind.RATE_LIMITED: "Rate limited or usage limit reached at the provider.",
+    SourceErrorKind.UNAVAILABLE: "The provider was unavailable or did not respond in time.",
+    SourceErrorKind.BAD_RESPONSE: "The provider rejected a request or sent an unexpected response.",
+}
+_PUBLIC_ERROR = re.compile(
+    "^(" + "|".join(re.escape(t) for t in PUBLIC_ERRORS.values()) + r")( \(HTTP \d{3}\))?$"
+)
+
+
+def is_public_error(text: str | None) -> bool:
+    """True for health text produced by `SourceError.public_message`."""
+    return bool(text) and _PUBLIC_ERROR.match(text) is not None
 
 
 @dataclass(frozen=True)
@@ -80,6 +107,8 @@ class SourceInputs:
     keywords: list[str]
     subreddits: list[str] = field(default_factory=list)
     rss_feeds: list[str] = field(default_factory=list)
+    # The organization's content language: used where a market doesn't set one.
+    language: str = "en"
 
 
 @dataclass
@@ -104,6 +133,9 @@ class TrendSource(ABC):
     docs_url: ClassVar[str | None] = None
     # Settings (env vars) this source can use, shown in the UI.
     env_vars: ClassVar[tuple[str, ...]] = ()
+    # Collects from organization-owned inputs (e.g. its own feed URLs): its
+    # health says nothing about the provider and is never recorded platform-wide.
+    org_private: ClassVar[bool] = False
 
     @abstractmethod
     def configuration(self, settings: Settings, inputs: SourceInputs) -> Configuration:
@@ -119,20 +151,58 @@ class TrendSource(ABC):
         ctx: SourceContext,
         method: str,
         url: str,
+        *,
+        cache: str | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
         """HTTP call with errors mapped to SourceError kinds.
 
-        GET requests are shared through `request_cache`, so organizations that
-        collect at the same time (e.g. the 08:00 scheduled runs) reuse one
-        response instead of each hitting the provider.
+        Requests covered by a cache policy (`cache`, default: this source's
+        key) are shared between organizations through the provider cache, keyed
+        by what was asked and never by credentials (app/sources/cache_policy.py).
+        Credential exchanges (`auth=`) are never cached.
         """
-        if method.upper() == "GET" and "auth" not in kwargs:
-            key = request_cache.key(url, kwargs)
-            return await request_cache.get_or_fetch(
-                key, lambda: self._send(ctx, method, url, **kwargs)
+        if "auth" not in kwargs:
+            from app.sources import provider_cache
+
+            prepared = provider_cache.prepare(
+                cache or self.key, method, url, kwargs.get("params"), kwargs.get("json")
             )
+            if prepared is not None:
+                return await provider_cache.get_or_fetch(
+                    prepared, lambda: self._send(ctx, method, url, **kwargs)
+                )
+            if method.upper() == "GET":
+                # No policy covers it: share within this process only.
+                key = request_cache.key(url, kwargs)
+                return await request_cache.get_or_fetch(
+                    key, lambda: self._send(ctx, method, url, **kwargs)
+                )
         return await self._send(ctx, method, url, **kwargs)
+
+    async def cached_json(
+        self,
+        ctx: SourceContext,
+        name: str,
+        params: dict[str, Any],
+        produce: Callable[[], Awaitable[Any]],
+    ) -> Any:
+        """Share a non-HTTP fetch (a client library, a helper that calls the
+        API itself) through the provider cache. `params` must describe
+        everything that changes the result; `produce` returns JSON data."""
+        from app.sources import provider_cache
+
+        url = f"https://provider-cache.invalid/{name}"
+        prepared = provider_cache.prepare(name, "GET", url, params)
+        if prepared is None:
+            return await produce()
+
+        async def fetch() -> httpx.Response:
+            return httpx.Response(
+                200, json=await produce(), request=httpx.Request("GET", prepared.url)
+            )
+
+        return (await provider_cache.get_or_fetch(prepared, fetch)).json()
 
     async def _send(
         self,
@@ -149,21 +219,33 @@ class TrendSource(ABC):
             raise SourceError(
                 SourceErrorKind.UNAVAILABLE, f"Connection failed ({type(exc).__name__})."
             ) from exc
-        if resp.status_code in (401, 403):
+        status = resp.status_code
+        if status in (401, 403):
             raise SourceError(
                 SourceErrorKind.AUTH,
-                f"Access denied (HTTP {resp.status_code}). Check the API key or credentials.",
+                f"Access denied (HTTP {status}). Check the API key or credentials.",
+                status=status,
             )
-        if resp.status_code == 429:
-            raise SourceError(SourceErrorKind.RATE_LIMITED, "Rate limited by the provider.")
-        if resp.status_code >= 500:
+        if status == 429:
             raise SourceError(
-                SourceErrorKind.UNAVAILABLE, f"Provider error (HTTP {resp.status_code})."
+                SourceErrorKind.RATE_LIMITED, "Rate limited by the provider.", status=status
             )
-        if resp.status_code >= 400:
+        if status == 402:
+            # Used by several news APIs for "daily/plan usage limit reached".
+            raise SourceError(
+                SourceErrorKind.RATE_LIMITED,
+                "Usage limit reached for this plan (HTTP 402).",
+                status=status,
+            )
+        if status >= 500:
+            raise SourceError(
+                SourceErrorKind.UNAVAILABLE, f"Provider error (HTTP {status}).", status=status
+            )
+        if status >= 400:
             raise SourceError(
                 SourceErrorKind.BAD_RESPONSE,
-                f"Request rejected (HTTP {resp.status_code}): {resp.text[:200]}",
+                f"Request rejected (HTTP {status}): {resp.text[:200]}",
+                status=status,
             )
         return resp
 
@@ -224,7 +306,7 @@ class RequestCache:
 
     SUCCESS_TTL = 600.0
     FAILURE_TTL = 120.0
-    MAX_ENTRIES = 1000
+    MAX_ENTRIES = 2000
 
     def __init__(self) -> None:
         self._entries: dict[str, tuple[float, asyncio.Future]] = {}
@@ -241,14 +323,23 @@ class RequestCache:
         self._entries.clear()
 
     async def get_or_fetch(
-        self, key: str, fetch: Callable[[], Awaitable[httpx.Response]]
+        self,
+        key: str,
+        fetch: Callable[[], Awaitable[httpx.Response]],
+        *,
+        ttl: float | None = None,
+        label: str | None = None,
     ) -> httpx.Response:
         now = time.monotonic()
         entry = self._entries.get(key)
         if entry and entry[0] > now:
+            if label:
+                from app.sources.provider_cache import cache_stats
+
+                cache_stats.record(label, "memory_hit")
             return await asyncio.shield(entry[1])
         future: asyncio.Future = asyncio.get_running_loop().create_future()
-        self._entries[key] = (now + self.SUCCESS_TTL, future)
+        self._entries[key] = (now + (ttl or self.SUCCESS_TTL), future)
         self._evict(now)
         try:
             response = await fetch()
@@ -275,6 +366,37 @@ class RequestCache:
 
 
 request_cache = RequestCache()
+
+
+class TokenCache:
+    """Access tokens from credential exchanges (Reddit, X), reused until shortly
+    before they expire. Process memory only: never logged, never persisted."""
+
+    def __init__(self) -> None:
+        self._tokens: dict[str, tuple[float, str]] = {}
+
+    @staticmethod
+    def fingerprint(*credentials: str | None) -> str:
+        import hashlib
+
+        return hashlib.sha256("|".join(c or "" for c in credentials).encode()).hexdigest()
+
+    def get(self, fingerprint: str) -> str | None:
+        entry = self._tokens.get(fingerprint)
+        if entry and entry[0] > time.monotonic():
+            return entry[1]
+        self._tokens.pop(fingerprint, None)
+        return None
+
+    def put(self, fingerprint: str, token: str, ttl: float) -> None:
+        if ttl > 0:
+            self._tokens[fingerprint] = (time.monotonic() + ttl, token)
+
+    def clear(self) -> None:
+        self._tokens.clear()
+
+
+token_cache = TokenCache()
 
 
 async def run_sequentially(
@@ -304,6 +426,14 @@ async def run_sequentially(
                         close()  # never awaited: release the coroutine quietly
                 break
     return results
+
+
+def search_language(inputs: SourceInputs) -> str:
+    """The primary market's language, else the organization's own language."""
+    for loc in inputs.locations:
+        if loc.code != GLOBAL:
+            return loc.language
+    return inputs.language or "en"
 
 
 def missing_settings(settings: Settings, *names: str) -> tuple[str, ...]:

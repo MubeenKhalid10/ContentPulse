@@ -13,6 +13,7 @@ export interface AuthConfig {
   supabase_anon_key: string | null;
   /** Local mode: the server can email reset links (SMTP is set up). */
   password_reset?: boolean;
+  turnstile_site_key?: string | null;
 }
 
 let configPromise: Promise<AuthConfig> | null = null;

@@ -109,11 +109,18 @@ SOURCE_AFFINITY: dict[str, dict[Platform, int]] = {
     "google_news": {Platform.LINKEDIN: 6, Platform.FACEBOOK: 4, Platform.BLOG: 3},
     "newsapi": {Platform.LINKEDIN: 6, Platform.FACEBOOK: 4, Platform.BLOG: 3},
     "gnews": {Platform.LINKEDIN: 6, Platform.FACEBOOK: 4, Platform.BLOG: 3},
+    "the_news_api": {Platform.LINKEDIN: 6, Platform.FACEBOOK: 4, Platform.BLOG: 3},
+    "exa": {Platform.LINKEDIN: 6, Platform.BLOG: 5},
     "rss": {Platform.LINKEDIN: 4, Platform.BLOG: 4},
     # Search interest is what long-form articles rank for.
     "google_trends": {
         Platform.INSTAGRAM: 3,
         Platform.FACEBOOK: 3,
+        Platform.X: 3,
+        Platform.BLOG: 6,
+    },
+    "google_trends_tech": {
+        Platform.LINKEDIN: 3,
         Platform.X: 3,
         Platform.BLOG: 6,
     },

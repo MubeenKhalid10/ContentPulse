@@ -12,6 +12,7 @@ from app.sources.base import (
     SourceInputs,
     TrendSource,
     missing_settings,
+    search_language,
 )
 from app.sources.feeds import parse_date
 from app.sources.locations import country_codes
@@ -21,7 +22,11 @@ QUERY_JOINER = " OR "
 MAX_QUERY_KEYWORDS = 6
 # Most requests one source makes per run: each costs free-tier quota.
 MAX_QUERIES_PER_RUN = 3
-FALLBACK_QUERY = "technology"
+# Search-only sources need something to search for; they never fall back to a
+# generic topic (an organization without keywords searches by its industry).
+NEEDS_KEYWORDS = (
+    "Add tracked keywords, services or an industry in Settings: this source only searches."
+)
 
 # Provider limits on the search text (characters, including " OR ").
 NEWSDATA_QUERY_LIMIT = 100  # newsdata.io: HTTP 422 "Query cannot exceed 100 characters"
@@ -29,12 +34,32 @@ WORLD_NEWS_TEXT_LIMIT = 100  # worldnewsapi.com: HTTP 400 on a longer `text`
 # Gap between one source's consecutive requests (per-second provider limits).
 NEWSDATA_REQUEST_GAP = 1.0
 WORLD_NEWS_REQUEST_GAP = 1.0
+# thenewsapi.com: no documented cap; kept short so a URL never gets unwieldy.
+THE_NEWS_API_SEARCH_LIMIT = 200
+THE_NEWS_API_REQUEST_GAP = 1.0
 # Errors that end a source's run early: further requests would fail the same way.
 STOP_ON = frozenset({SourceErrorKind.AUTH, SourceErrorKind.RATE_LIMITED})
 
 
 def _query(inputs: SourceInputs) -> str:
-    return " OR ".join(inputs.keywords[:6]) or "technology"
+    return " OR ".join(inputs.keywords[:6])
+
+
+def search_configuration(settings: Settings, inputs: SourceInputs, setting: str) -> Configuration:
+    """Configuration of a keyed source that only runs keyword searches."""
+    missing = missing_settings(settings, setting)
+    if missing:
+        return Configuration(False, None, missing)
+    if not inputs.keywords:
+        return Configuration(False, None, (), note=NEEDS_KEYWORDS)
+    return Configuration(True, "REST API")
+
+
+def _require_keywords(queries: list[str]) -> list[str]:
+    queries = [q for q in queries if q]
+    if not queries:
+        raise SourceError(SourceErrorKind.NOT_CONFIGURED, NEEDS_KEYWORDS)
+    return queries
 
 
 @dataclass
@@ -75,34 +100,40 @@ def plan_queries(
     *,
     max_keywords: int = MAX_QUERY_KEYWORDS,
     max_queries: int = MAX_QUERIES_PER_RUN,
+    joiner: str = QUERY_JOINER,
+    quote_phrases: bool = False,
 ) -> QueryPlan:
     """Pack keywords into as few `a OR b OR c` searches as fit within `max_chars`.
 
     Keywords are never split mid-word, and earlier (higher-priority) keywords
     land in earlier searches; a single keyword longer than the limit is searched
-    by its leading whole words.
+    by its leading whole words. With `quote_phrases`, multi-word keywords are
+    wrapped in double quotes (counted in the limit) so they match as phrases.
     """
     plan = QueryPlan(queries=[])
     batches: list[list[str]] = []
     for term in _clean_keywords(keywords)[:max_keywords]:
-        if len(term) > max_chars:
-            short = _whole_words(term, max_chars)
+        room = max_chars - 2 if quote_phrases and " " in term else max_chars
+        if len(term) > room:
+            short = _whole_words(term, room)
             if not short:
                 plan.dropped.append(term)
                 continue
             plan.shortened.append(term)
             term = short
+        if quote_phrases and " " in term:
+            term = f'"{term}"'
         # First fit: the earliest search with room, so fewer requests are needed
         # and higher-priority keywords stay in the earlier searches.
         for batch in batches:
-            if len(QUERY_JOINER.join([*batch, term])) <= max_chars:
+            if len(joiner.join([*batch, term])) <= max_chars:
                 batch.append(term)
                 break
         else:
             batches.append([term])
     for batch in batches[max_queries:]:
-        plan.dropped.extend(batch)
-    plan.queries = [QUERY_JOINER.join(batch) for batch in batches[:max_queries]]
+        plan.dropped.extend(t.strip('"') for t in batch)
+    plan.queries = [joiner.join(batch) for batch in batches[:max_queries]]
     return plan
 
 
@@ -190,7 +221,7 @@ class WorldNewsSource(TrendSource):
 
     async def _search(self, ctx: SourceContext, key: str, text: str | None) -> list[RawTrendItem]:
         params = {
-            "language": "en",
+            "language": search_language(ctx.inputs),
             "earliest-publish-date": ctx.since.strftime("%Y-%m-%d %H:%M:%S"),
             "number": "50",
         }
@@ -214,8 +245,7 @@ class NewsDataSource(TrendSource):
     env_vars = ("NEWSDATA_API_KEY",)
 
     def configuration(self, settings: Settings, inputs: SourceInputs) -> Configuration:
-        missing = missing_settings(settings, "newsdata_api_key")
-        return Configuration(not missing, "REST API" if not missing else None, missing)
+        return search_configuration(settings, inputs, "newsdata_api_key")
 
     async def collect(self, ctx: SourceContext) -> list[RawTrendItem]:
         key = ctx.settings.newsdata_api_key
@@ -225,7 +255,7 @@ class NewsDataSource(TrendSource):
         _report(ctx, self.name, plan, NEWSDATA_QUERY_LIMIT)
         countries = country_codes(ctx.inputs.locations)
         country = ",".join(c.lower() for c in countries[:5]) if countries else None
-        queries = plan.queries or [FALLBACK_QUERY]
+        queries = _require_keywords(plan.queries)
         jobs = [self._search(ctx, key, query, country) for query in queries]
         items = await self.sequential_partial(
             ctx, jobs, delay=NEWSDATA_REQUEST_GAP, stop_on=STOP_ON
@@ -235,7 +265,7 @@ class NewsDataSource(TrendSource):
     async def _search(
         self, ctx: SourceContext, key: str, query: str, country: str | None
     ) -> list[RawTrendItem]:
-        params = {"apikey": key, "q": query, "language": "en"}
+        params = {"apikey": key, "q": query, "language": search_language(ctx.inputs)}
         if country:
             params["country"] = country
         data = await self.get_json(ctx, "https://newsdata.io/api/1/latest", params=params)
@@ -255,6 +285,71 @@ class NewsDataSource(TrendSource):
         ]
 
 
+class TheNewsApiSource(TrendSource):
+    key = "the_news_api"
+    name = "TheNewsAPI"
+    description = "Worldwide news from 40,000+ publishers, searched for your tracked keywords."
+    pricing = "free_tier"
+    docs_url = "https://www.thenewsapi.com/documentation"
+    env_vars = ("THE_NEWS_API_KEY",)
+
+    def configuration(self, settings: Settings, inputs: SourceInputs) -> Configuration:
+        return search_configuration(settings, inputs, "the_news_api_key")
+
+    async def collect(self, ctx: SourceContext) -> list[RawTrendItem]:
+        key = ctx.settings.the_news_api_key
+        if not key:
+            raise SourceError(SourceErrorKind.NOT_CONFIGURED, "THE_NEWS_API_KEY is not set.")
+        plan = plan_queries(
+            ctx.inputs.keywords,
+            THE_NEWS_API_SEARCH_LIMIT,
+            joiner=" | ",
+            quote_phrases=True,
+        )
+        _report(ctx, self.name, plan, THE_NEWS_API_SEARCH_LIMIT)
+        countries = country_codes(ctx.inputs.locations)
+        locale = ",".join(c.lower() for c in countries[:5]) if countries else None
+        queries = _require_keywords(plan.queries)
+        jobs = [self._search(ctx, key, query, locale) for query in queries]
+        items = await self.sequential_partial(
+            ctx, jobs, delay=THE_NEWS_API_REQUEST_GAP, stop_on=STOP_ON
+        )
+        return _dedupe(items)
+
+    async def _search(
+        self, ctx: SourceContext, key: str, search: str, locale: str | None
+    ) -> list[RawTrendItem]:
+        params = {
+            "api_token": key,
+            "search": search,
+            "language": search_language(ctx.inputs),
+            "published_after": ctx.since.strftime("%Y-%m-%dT%H:%M:%S"),
+            "sort": "relevance_score",
+            "limit": str(ctx.settings.the_news_api_limit),
+        }
+        if locale:
+            params["locale"] = locale
+        data = await self.get_json(ctx, "https://api.thenewsapi.com/v1/news/all", params=params)
+        items = []
+        for article in data.get("data") or []:
+            item = _news_item(
+                self.key,
+                {**article, "id": article.get("uuid")},
+                description_key="description",
+                published_key="published_at",
+                author_key="source",
+            )
+            if item:
+                categories = article.get("categories") or []
+                item.category = str(categories[0]).title() if categories else None
+                keywords = article.get("keywords") or ""
+                item.keywords = [k.strip().lower() for k in keywords.split(",") if k.strip()][:10]
+                if article.get("locale"):
+                    item.location = str(article["locale"]).upper()
+                items.append(item)
+        return items
+
+
 class SerpApiNewsSource(TrendSource):
     key = "serpapi_news"
     name = "SerpApi Google News"
@@ -264,8 +359,7 @@ class SerpApiNewsSource(TrendSource):
     env_vars = ("SERP_API_KEY",)
 
     def configuration(self, settings: Settings, inputs: SourceInputs) -> Configuration:
-        missing = missing_settings(settings, "serp_api_key")
-        return Configuration(not missing, "REST API" if not missing else None, missing)
+        return search_configuration(settings, inputs, "serp_api_key")
 
     async def collect(self, ctx: SourceContext) -> list[RawTrendItem]:
         key = ctx.settings.serp_api_key
@@ -274,7 +368,12 @@ class SerpApiNewsSource(TrendSource):
         data = await self.get_json(
             ctx,
             "https://serpapi.com/search.json",
-            params={"engine": "google_news", "q": _query(ctx.inputs), "api_key": key, "hl": "en"},
+            params={
+                "engine": "google_news",
+                "q": _require_keywords([_query(ctx.inputs)])[0],
+                "api_key": key,
+                "hl": search_language(ctx.inputs),
+            },
         )
         return [
             item
@@ -301,8 +400,7 @@ class ApiTubeNewsSource(TrendSource):
     env_vars = ("APITUBE_NEWS_API_KEY",)
 
     def configuration(self, settings: Settings, inputs: SourceInputs) -> Configuration:
-        missing = missing_settings(settings, "apitube_news_api_key")
-        return Configuration(not missing, "REST API" if not missing else None, missing)
+        return search_configuration(settings, inputs, "apitube_news_api_key")
 
     async def collect(self, ctx: SourceContext) -> list[RawTrendItem]:
         key = ctx.settings.apitube_news_api_key
@@ -311,7 +409,11 @@ class ApiTubeNewsSource(TrendSource):
         data = await self.get_json(
             ctx,
             "https://api.apitube.io/v1/news/everything",
-            params={"query": _query(ctx.inputs), "language": "en", "limit": "50"},
+            params={
+                "query": _require_keywords([_query(ctx.inputs)])[0],
+                "language": search_language(ctx.inputs),
+                "limit": "50",
+            },
             headers={"x-api-key": key},
         )
         articles = data.get("articles") or data.get("data") or data.get("results") or []

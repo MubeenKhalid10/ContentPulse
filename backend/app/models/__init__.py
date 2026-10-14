@@ -14,6 +14,7 @@ from app.models.organization import (
     OrganizationSettings,
 )
 from app.models.post import Post, PostVersion
+from app.models.provider import InstagramHashtagUse, ProviderCache, ProviderUsage
 from app.models.topic import ContentStrategy, PlatformRule, TopicCandidate
 from app.models.trend import Trend, TrendDiscoveryRun, TrendMention, TrendSource
 from app.models.user import User
@@ -45,5 +46,8 @@ __all__ = [
     "TrendDiscoveryRun",
     "TrendMention",
     "TrendSource",
+    "ProviderCache",
+    "ProviderUsage",
+    "InstagramHashtagUse",
     "User",
 ]

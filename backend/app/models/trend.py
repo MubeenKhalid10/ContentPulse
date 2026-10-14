@@ -11,6 +11,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -52,6 +53,12 @@ class TrendSource(UUIDPk, Timestamps, Base):
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(Text)
+    # Provider-wide pause after rate limits or exhausted quota: no request is
+    # sent before `cooldown_until` (for any organization).
+    cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cooldown_reason: Mapped[str | None] = mapped_column(String(200))
+    # Consecutive rate-limit failures, for exponential backoff.
+    failure_streak: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     rate_limit: Mapped[dict] = jsonb_dict()
     config: Mapped[dict] = jsonb_dict()
 
@@ -134,6 +141,14 @@ class TrendDiscoveryRun(UUIDPk, CreatedAt, OrgScoped, Base):
     __tablename__ = "trend_discovery_runs"
     __table_args__ = (
         Index("ix_trend_discovery_runs_org_created", "organization_id", "created_at"),
+        # At most one queued/running run per organization, even when manual and
+        # scheduled triggers race.
+        Index(
+            "uq_trend_discovery_runs_one_active",
+            "organization_id",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+        ),
     )
 
     status: Mapped[DiscoveryRunStatus] = mapped_column(

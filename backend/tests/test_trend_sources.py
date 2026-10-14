@@ -47,11 +47,14 @@ def test_every_source_reports_configuration_without_keys():
     states = {k: s.configuration(NO_KEYS, inputs) for k, s in SOURCES.items()}
     assert {k for k, c in states.items() if c.configured} == {
         "google_trends",
+        "google_trends_tech",
         "google_news",
         "hacker_news",
         "reddit",
     }
     assert states["newsapi"].missing == ("NEWS_API_KEY",)
+    assert states["the_news_api"].missing == ("THE_NEWS_API_KEY",)
+    assert states["exa"].missing == ("EXA_API_KEY",)
     assert states["instagram"].missing == (
         "INSTAGRAM_ACCESS_TOKEN",
         "INSTAGRAM_BUSINESS_ACCOUNT_ID",

@@ -29,6 +29,7 @@ export const SOURCE_OPTIONS: Option[] = Object.entries(SOURCE_NAMES).map(([value
 
 export const FREQUENCY_OPTIONS: Option<TrendFrequency>[] = [
   { value: "hourly", label: "Every hour" },
+  { value: "every_3_hours", label: "Every 3 hours" },
   { value: "every_6_hours", label: "Every 6 hours" },
   { value: "daily", label: "Once a day" },
   { value: "manual", label: "Only when I ask" },

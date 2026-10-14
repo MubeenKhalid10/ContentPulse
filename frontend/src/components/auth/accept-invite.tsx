@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { CheckEmail } from "@/components/auth/check-email";
+import { AuthCaptcha } from "@/components/auth/captcha";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -239,6 +240,7 @@ function SupabaseIdentityForm({
 }) {
   const [hasAccount, setHasAccount] = useState(invite.has_account);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const accept = useAcceptInvite(token);
   const schema = acceptInviteSchema(hasAccount);
   const form = useForm<z.infer<typeof schema>>({
@@ -251,10 +253,12 @@ function SupabaseIdentityForm({
     mutationFn: async ({ full_name, password }: z.infer<typeof schema>) => {
       const supabase = await getSupabase();
       if (!supabase) throw new Error("Sign-in is unavailable.");
+      if (!captchaToken) throw new Error("Complete the CAPTCHA challenge.");
       if (hasAccount) {
         const { error } = await supabase.auth.signInWithPassword({
           email: invite.email,
           password,
+          options: { captchaToken },
         });
         if (error) throw new Error(supabaseErrorMessage(error.message));
         return { full_name, signedIn: true };
@@ -268,6 +272,7 @@ function SupabaseIdentityForm({
             "/auth/callback",
             `/invite/${encodeURIComponent(token)}`,
           ),
+          captchaToken,
         },
       });
       if (error) throw new Error(supabaseErrorMessage(error.message));
@@ -335,6 +340,7 @@ function SupabaseIdentityForm({
               {...form.register("password")}
             />
           </FormField>
+          <AuthCaptcha onToken={setCaptchaToken} />
           <Button type="submit" size="lg" disabled={pending}>
             {pending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>

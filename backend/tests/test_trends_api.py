@@ -188,7 +188,7 @@ async def discover(actor, **body) -> dict:
 async def test_sources_listing_without_any_keys(client):
     admin, _ = await setup(client)
     sources = {s["key"]: s for s in (await admin.get(f"{API}/sources")).json()}
-    assert len(sources) == 14
+    assert len(sources) == 17
     assert sources["google_trends"]["configured"] and sources["google_trends"]["enabled"]
     assert sources["newsapi"]["configured"] is False
     assert sources["newsapi"]["missing"] == ["NEWS_API_KEY"]
@@ -243,9 +243,14 @@ async def test_rediscovery_deduplicates_and_tracks_growth(client, internet):
     assert second["items"][0]["mention_count"] == first["items"][0]["mention_count"]
 
 
-async def test_discovery_with_all_sources_down_fails_cleanly(client, internet):
+async def test_discovery_with_all_sources_down_fails_cleanly(client, internet, monkeypatch):
     for host in ("trends.google.com", "news.google.com", "hn.algolia.com"):
         internet.fail(host, 503)
+
+    def trendspy_down(geo, hours=24):
+        raise ConnectionError("Google Trends unreachable")
+
+    monkeypatch.setattr("app.sources.google_trends_tech.fetch_tech_trends", trendspy_down)
     admin, _ = await setup(client)
     run = await discover(admin)
     assert run["status"] == "failed"

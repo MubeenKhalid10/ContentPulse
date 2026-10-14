@@ -252,6 +252,10 @@ below mention content managers and designers: both are now the Creator role (mig
   secret is also accepted. The first request provisions or links the ContentPulse user (by
   Supabase user id, then email), and the API's password endpoints return 403. To accept an
   invitation, you need a Supabase session for the invited email address.
+- If CAPTCHA protection is enabled in Supabase Auth, set `TURNSTILE_SITE_KEY` to the
+  Cloudflare Turnstile site key from the same Auth settings. The frontend renders the
+  challenge on sign-in, registration, and invitation forms and sends the resulting token
+  to Supabase. Restart the backend after changing this setting.
 - Email links land on `/auth/callback`, which completes the PKCE exchange and continues to
   `/onboarding`, `/auth/reset` or the invitation.
 

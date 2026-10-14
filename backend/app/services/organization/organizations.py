@@ -8,10 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings as app_settings
 from app.core.errors import Conflict, NotFound
 from app.core.permissions import Role
 from app.models.design import CreativeAsset
-from app.models.enums import MemberStatus
+from app.models.enums import MemberStatus, TrendFrequency
 from app.models.organization import (
     BrandProfile,
     Organization,
@@ -23,7 +24,7 @@ from app.models.user import User
 from app.schemas.organization import OrganizationCreate, ServiceCreate
 from app.services import audit
 from app.services.audit import AuditAction
-from app.sources import DEFAULT_ENABLED_SOURCES
+from app.sources import default_sources
 from app.storage import get_storage
 
 
@@ -58,7 +59,8 @@ async def create_organization(
         OrganizationSettings(
             organization_id=org.id,
             default_timezone=data.timezone,
-            enabled_sources=list(DEFAULT_ENABLED_SOURCES),
+            enabled_sources=default_sources(data.industry),
+            trend_frequency=TrendFrequency(app_settings().trend_default_frequency),
         )
     )
     db.add(BrandProfile(organization_id=org.id))

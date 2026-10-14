@@ -169,10 +169,14 @@ async def test_newsdata_short_keywords_make_one_request_as_before():
     assert len(items) == 2
 
 
-async def test_newsdata_without_keywords_keeps_the_fallback_query():
+async def test_newsdata_without_keywords_searches_nothing():
+    """No generic "technology" fallback: an organization without keywords or
+    services searches by its industry (see test_personalization.py)."""
     net = FakeNewsApis()
-    await collect("newsdata", [], net)
-    assert [r.url.params["q"] for r in net.requests] == ["technology"]
+    with pytest.raises(SourceError) as exc:
+        await collect("newsdata", [], net)
+    assert exc.value.kind == SourceErrorKind.NOT_CONFIGURED
+    assert net.requests == []
 
 
 async def test_newsdata_rate_limit_stops_further_requests():

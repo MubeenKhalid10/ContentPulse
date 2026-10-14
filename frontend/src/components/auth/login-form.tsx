@@ -4,8 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { useState } from "react";
 
 import { fieldAria, FormField } from "@/components/shared/form-field";
+import { AuthCaptcha } from "@/components/auth/captcha";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +27,7 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const login = useLogin();
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   // Supabase sends its own reset emails; local mode needs SMTP on the server.
   const canReset = useAuthConfig().data?.password_reset === true;
   const form = useForm<LoginValues>({
@@ -34,7 +37,7 @@ export function LoginForm() {
   const { errors } = form.formState;
 
   const onSubmit = form.handleSubmit((values) =>
-    login.mutate(values, {
+    login.mutate({ ...values, captchaToken: captchaToken ?? undefined }, {
       onSuccess: ({ user }) => {
         router.replace(
           user.organization_id
@@ -93,6 +96,7 @@ export function LoginForm() {
               {...form.register("password")}
             />
           </FormField>
+          <AuthCaptcha onToken={setCaptchaToken} />
           <Button type="submit" size="lg" disabled={login.isPending}>
             {login.isPending ? "Signing in…" : "Sign in"}
           </Button>

@@ -46,7 +46,7 @@ celery_app.conf.update(
         },
         "prune-request-history": {
             "task": CELERY_PREFIX + "prune_request_history",
-            "schedule": 86400.0,
+            "schedule": 3600.0,
         },
     },
 )
@@ -122,6 +122,6 @@ def recover_stale_jobs() -> int:
 
 @celery_app.task(name=CELERY_PREFIX + "prune_request_history")
 def prune_request_history() -> int:
-    from app.services.housekeeping import prune_llm_requests
+    from app.services.housekeeping import run_housekeeping
 
-    return run_async(prune_llm_requests())
+    return sum(run_async(run_housekeeping()).values())

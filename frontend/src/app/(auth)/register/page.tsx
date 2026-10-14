@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { CheckEmail } from "@/components/auth/check-email";
+import { AuthCaptcha } from "@/components/auth/captcha";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { type RegisterValues, registerSchema } from "@/schemas/auth";
 export default function RegisterPage() {
   const router = useRouter();
   const register = useRegister();
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -33,7 +35,7 @@ export default function RegisterPage() {
   const { errors } = form.formState;
 
   const onSubmit = form.handleSubmit((values) =>
-    register.mutate(values, {
+    register.mutate({ ...values, captchaToken: captchaToken ?? undefined }, {
       onSuccess: ({ needsConfirmation }) => {
         if (needsConfirmation) setSentTo(values.email);
         else router.replace("/onboarding");
@@ -119,6 +121,7 @@ export default function RegisterPage() {
               {...form.register("password")}
             />
           </FormField>
+          <AuthCaptcha onToken={setCaptchaToken} />
           <Button type="submit" size="lg" disabled={register.isPending}>
             {register.isPending ? "Creating account…" : "Create account"}
           </Button>

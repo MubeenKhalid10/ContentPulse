@@ -5,7 +5,7 @@ import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import prompts
@@ -175,10 +175,19 @@ async def run_job(job_id: uuid.UUID) -> None:
         await db.commit()
 
 
+def ai_priority():
+    """Order for the limited AI batch: opportunity plus keyword fit (both
+    0-100), so a viral trend unrelated to the organization doesn't outrank a
+    smaller one that matches its keywords, services or industry. Missing
+    scores count as 0; nothing is excluded, only ordered."""
+    fit = func.coalesce(Trend.signals["keyword_match"]["score"].as_float(), 0.0)
+    return func.coalesce(Trend.opportunity_score, 0.0) + fit
+
+
 async def analyze_organization(organization_id: uuid.UUID) -> int:
     """Analyze recent trends that need it (after each discovery run).
 
-    AI analysis covers the top trends by opportunity (a cost guard); the free
+    AI analysis covers the top trends by opportunity and fit (a cost guard); the free
     rule-based engine covers all of them when no LLM is configured.
     """
     settings = get_settings()
@@ -199,7 +208,7 @@ async def analyze_organization(organization_id: uuid.UUID) -> int:
                     Trend.last_seen_at >= _now() - timedelta(days=7),
                     or_(*needs),
                 )
-                .order_by(Trend.opportunity_score.desc().nulls_last())
+                .order_by(ai_priority().desc(), Trend.last_seen_at.desc())
                 .limit(limit)
             )
         )

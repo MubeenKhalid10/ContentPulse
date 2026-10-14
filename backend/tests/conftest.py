@@ -40,7 +40,8 @@ from app.ai.metrics import metrics  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
-from app.sources.base import request_cache  # noqa: E402
+from app.sources.base import request_cache, token_cache  # noqa: E402
+from app.sources.provider_cache import cache_stats  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PASSWORD = "correct-horse-battery"
@@ -56,8 +57,18 @@ def migrated_database() -> None:
 
 
 @pytest.fixture(autouse=True)
+def offline_trendspy(monkeypatch) -> None:
+    """trendspy uses `requests`, not httpx: keep the suite off the real Google."""
+    monkeypatch.setattr(
+        "app.sources.google_trends_tech.fetch_tech_trends", lambda geo, hours=24: []
+    )
+
+
+@pytest.fixture(autouse=True)
 async def clean_tables() -> AsyncIterator[None]:
     request_cache.clear()  # trend source responses are cached across runs
+    token_cache.clear()
+    cache_stats.reset()
     quota_limiter.reset()
     llm_cache.clear()
     metrics.reset()

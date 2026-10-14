@@ -70,6 +70,7 @@ async def auth_config(settings: AppSettings) -> AuthConfig:
             password_reset=True,  # Supabase sends its own reset emails
             supabase_url=settings.supabase_url,
             supabase_anon_key=settings.supabase_anon_key,
+            turnstile_site_key=settings.turnstile_site_key,
         )
     return AuthConfig(provider="local", password_reset=settings.email_enabled)
 
@@ -158,9 +159,7 @@ async def change_password(
 ) -> None:
     # Same limits as sign-in: the current password can't be guessed from here.
     await limiter.check(LOGIN_PER_ACCOUNT, user.email.lower())
-    await auth_service.change_password(
-        db, user, data.current_password, data.new_password, settings
-    )
+    await auth_service.change_password(db, user, data.current_password, data.new_password, settings)
 
 
 @router.get("/invites/{token}", response_model=InvitePreview)

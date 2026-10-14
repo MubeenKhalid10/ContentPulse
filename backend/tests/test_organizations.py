@@ -17,7 +17,7 @@ async def test_create_organization_makes_creator_admin(client):
     # Defaults are provisioned alongside the organization.
     settings = (await admin.get(f"{API}/{org['id']}/settings")).json()
     assert settings["default_timezone"] == "Europe/London"
-    assert settings["trend_frequency"] == "daily"
+    assert settings["trend_frequency"] == "every_3_hours"  # TREND_DEFAULT_FREQUENCY
     brand = (await admin.get(f"{API}/{org['id']}/brand")).json()
     assert brand["forbidden_terms"] == []
 

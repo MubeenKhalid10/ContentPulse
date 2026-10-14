@@ -96,7 +96,7 @@ async def ingest(
 ) -> IngestStats:
     now = datetime.now(UTC)
     stats = IngestStats()
-    clusters, stats.unclustered = cluster_items(items, profile.tracked_keywords)
+    clusters, stats.unclustered = cluster_items(items, profile.search_keywords)
 
     known = list(
         (

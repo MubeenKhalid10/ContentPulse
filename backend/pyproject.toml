@@ -23,6 +23,7 @@ dependencies = [
     "boto3>=1.43.107",
     "celery[redis]>=5.5",
     "pillow>=11",
+    "trendspy>=0.1.6",
 ]
 
 [dependency-groups]

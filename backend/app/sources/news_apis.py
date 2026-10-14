@@ -11,6 +11,7 @@ from app.sources.base import (
     SourceInputs,
     TrendSource,
     missing_settings,
+    search_language,
 )
 from app.sources.feeds import parse_date
 from app.sources.locations import country_codes
@@ -54,7 +55,7 @@ class NewsApiSource(TrendSource):
                 "q": _keyword_query(ctx.inputs.keywords[:6]),
                 "from": ctx.since.isoformat(timespec="seconds"),
                 "sortBy": "popularity",
-                "language": "en",
+                "language": search_language(ctx.inputs),
                 "pageSize": "30",
             }
             jobs.append(self._fetch(ctx, "everything", params, headers, None))
@@ -129,7 +130,7 @@ class GNewsSource(TrendSource):
         if ctx.inputs.keywords:
             params = {
                 "q": " OR ".join(ctx.inputs.keywords[:5]),
-                "lang": "en",
+                "lang": search_language(ctx.inputs),
                 "max": "10",
                 "from": ctx.since.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "apikey": key,

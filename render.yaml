@@ -104,6 +104,16 @@ services:
         sync: false
       - key: CLOUDFLARE_API_TOKEN
         sync: false
+      # Trend sources (optional). Google Trends Technology needs no key.
+      - key: THE_NEWS_API_KEY
+        sync: false
+      - key: EXA_API_KEY
+        sync: false
+      # Instagram hashtag search: Facebook Login token (EAA...) + linked IG account ID.
+      - key: INSTAGRAM_ACCESS_TOKEN
+        sync: false
+      - key: INSTAGRAM_BUSINESS_ACCOUNT_ID
+        sync: false
 
       # Email (optional): invitations and password reset in local sign-in mode.
       - key: SMTP_HOST
