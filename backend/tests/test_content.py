@@ -461,3 +461,23 @@ async def test_withdrawing_copy_review_clears_the_request(client, internet, cont
     await admin.post(f"{url}/submit-for-review")
     assert (await admin.post(f"{url}/back-to-draft")).json()["status"] == "draft"
     assert (await admin.get("/api/v1/approvals")).json()["items"] == []
+
+
+async def test_approval_queue_splits_copy_and_design(client, internet, content_ai):
+    admin, org = await setup_org(client)
+    post = await generated(admin, await approved_strategy(admin, org))
+    await admin.post(f"{API}/{post['id']}/submit-for-review")
+
+    page = (await admin.get("/api/v1/approvals", params={"stage": "copy"})).json()
+    assert [i["stage"] for i in page["items"]] == ["copy"]
+    assert page["stage_pending"] == {"copy": 1, "design": 0}
+    assert (await admin.get("/api/v1/approvals", params={"stage": "design"})).json()["items"] == []
+
+    # Once the copy is approved it moves to the copy list's "approved" tab, not the design list.
+    request = page["items"][0]
+    await admin.post(f"/api/v1/approvals/{request['id']}/approve", json={})
+    done = (
+        await admin.get("/api/v1/approvals", params={"stage": "copy", "status": "approved"})
+    ).json()
+    assert [i["id"] for i in done["items"]] == [request["id"]]
+    assert (await admin.get("/api/v1/approvals", params={"stage": "design"})).json()["total"] == 0

@@ -134,6 +134,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
 
   await page.getByRole("link", { name: /^5. Approve$/ }).click();
+  await page.getByRole("tab", { name: /Design approval/ }).click();
   const queue = page.getByRole("list", { name: "Approvals" });
   await expect(queue.getByRole("link")).toHaveCount(1);
   await queue.getByRole("link").click();

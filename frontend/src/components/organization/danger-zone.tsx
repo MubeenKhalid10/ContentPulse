@@ -24,7 +24,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useDeleteOrganization } from "@/hooks/use-organization";
-import { errorMessage, setActiveOrgId } from "@/lib/api";
+import { api, errorMessage, setActiveOrgId } from "@/lib/api";
+import { meQueryKey } from "@/lib/auth";
+import type { Me } from "@/types/api";
 
 /** Delete the whole workspace (admins only), behind a confirmation. */
 export function DangerZone() {
@@ -72,10 +74,23 @@ export function DangerZone() {
               disabled={remove.isPending}
               onClick={() =>
                 remove.mutate(undefined, {
-                  onSuccess: () => {
+                  onSuccess: async () => {
                     setActiveOrgId(null);
                     queryClient.removeQueries({ queryKey: ["org"] });
                     toast.success("Workspace deleted");
+                    // Land in another organization if there is one; only a user
+                    // with none left needs to set a new one up.
+                    try {
+                      const me = await api<Me>("/auth/me");
+                      queryClient.setQueryData(meQueryKey, me);
+                      if (me.organization_id) {
+                        setActiveOrgId(me.organization_id);
+                        router.replace("/dashboard");
+                        return;
+                      }
+                    } catch {
+                      // Fall through to onboarding.
+                    }
                     router.replace("/onboarding");
                   },
                   onError: (error) => toast.error(errorMessage(error)),

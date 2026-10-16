@@ -26,10 +26,7 @@ import { SharePostButton } from "@/components/content/share-post-button";
 import {
   ChecksPanel,
   PreviewPanel,
-  SourcesPanel,
-  StrategyPanel,
   VariantsPanel,
-  VersionsPanel,
 } from "@/components/content/studio-panels";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -161,10 +158,7 @@ export function ContentStudio({ id }: { id: string }) {
           <div className="grid content-start gap-6">
             <ChecksPanel post={p} />
             <PreviewPanel post={p} />
-            <VersionsPanel post={p} canEdit={canEdit} />
             <VariantsPanel post={p} />
-            <SourcesPanel post={p} />
-            <StrategyPanel post={p} />
           </div>
         </div>
       ) : (

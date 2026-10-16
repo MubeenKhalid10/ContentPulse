@@ -882,7 +882,11 @@ export interface ApprovalPage {
   items: Approval[];
   total: number;
   counts: Record<ApprovalFilter, number>;
+  /** Posts waiting for a decision, per stage. */
+  stage_pending: Record<ApprovalStage, number>;
 }
+
+export type ApprovalStage = "copy" | "design";
 
 export interface ApprovalComment extends ReviewComment {
   id: string;

@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { fieldAria, FormField } from "@/components/shared/form-field";
-import { SimpleSelect } from "@/components/shared/simple-select";
 import { TagInput } from "@/components/shared/tag-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +15,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUpdatePost } from "@/hooks/use-content";
 import { ApiError, errorMessage } from "@/lib/api";
 import {
-  DESIGN_FORMAT_OPTIONS,
   fullText,
   META_DESCRIPTION_MAX,
   META_TITLE_MAX,
@@ -242,37 +240,6 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
             </CardContent>
           </Card>
         )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Design direction</CardTitle>
-            <CardDescription>
-              {isBlog ? "The featured image, also used when the article is shared." : "The visual to create for this post."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-5 sm:grid-cols-[12rem_1fr]">
-            <FormField id="post-format" label="Format">
-              <Controller
-                control={form.control}
-                name="design_format"
-                render={({ field }) => (
-                  <SimpleSelect
-                    id="post-format"
-                    aria-label="Format"
-                    value={field.value || undefined}
-                    onChange={field.onChange}
-                    options={DESIGN_FORMAT_OPTIONS}
-                    placeholder="Choose a format"
-                    disabled={locked}
-                  />
-                )}
-              />
-            </FormField>
-            <FormField id="post-visual" label={isBlog ? "Featured image" : "Visual concept"} error={errors.visual_concept?.message}>
-              <Textarea {...fieldAria("post-visual", errors.visual_concept?.message)} rows={3} {...form.register("visual_concept")} />
-            </FormField>
-          </CardContent>
-        </Card>
       </fieldset>
 
       {!locked && (

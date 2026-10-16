@@ -35,6 +35,7 @@ async def list_approvals(
         Query(alias="status"),
     ] = "pending",
     platform: Platform | None = None,
+    stage: Literal["copy", "design"] | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -43,6 +44,7 @@ async def list_approvals(
         ctx.organization_id,
         status=status_filter,
         platform=platform.value if platform else None,
+        stage=stage,
         limit=limit,
         offset=offset,
     )

@@ -7,9 +7,11 @@ import {
   PencilIcon,
   PlusIcon,
   ShieldAlertIcon,
+  SparklesIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { TOPIC_STATUS_TONE } from "@/lib/tones";
 import { Tag } from "@/components/shared/tag";
@@ -33,7 +35,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePosts } from "@/hooks/use-content";
+import { usePosts, useWriteAll } from "@/hooks/use-content";
 import { useTopic } from "@/hooks/use-topics";
 import { useMarkets } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -390,6 +392,13 @@ function StrategiesCard({
     { status: "all", platform: "", topicId: topic.id, q: "" },
     50,
   );
+  const canGenerate = useCan()("content.generate");
+  const writeAll = useWriteAll();
+  const toWrite = strategies.filter(
+    (s) =>
+      s.status !== "archived" &&
+      !(posts.data?.items ?? []).some((p) => p.content_strategy_id === s.id),
+  );
   const postFor = (strategyId: string) => {
     const written = (posts.data?.items ?? []).filter(
       (p) => p.content_strategy_id === strategyId,
@@ -407,8 +416,38 @@ function StrategiesCard({
               : "Shortlist this topic to plan posts for it."}
           </CardDescription>
         </div>
+        {canManage && shortlisted && canGenerate && toWrite.length > 1 && (
+          <Button
+            size="sm"
+            disabled={writeAll.isPending}
+            onClick={() =>
+              writeAll.mutate(
+                toWrite.map((s) => s.id),
+                {
+                  onSuccess: (r) =>
+                    r.failed
+                      ? toast.error(
+                          `Started ${r.ok}, but ${r.failed} failed: ${errorMessage(r.error)}`,
+                        )
+                      : toast.success(
+                          `Writing ${r.ok} posts, one per platform. They stay together in Write posts.`,
+                        ),
+                },
+              )
+            }
+          >
+            <SparklesIcon />
+            {writeAll.isPending
+              ? "Starting…"
+              : `Write all ${toWrite.length} posts`}
+          </Button>
+        )}
         {canManage && shortlisted && (
-          <Button size="sm" onClick={() => onPlan(null)}>
+          <Button
+            size="sm"
+            variant={toWrite.length > 1 && canGenerate ? "outline" : "default"}
+            onClick={() => onPlan(null)}
+          >
             <PlusIcon />
             New plan
           </Button>
@@ -475,8 +514,8 @@ function PlatformFitCard({
       <CardHeader>
         <CardTitle>Recommended platforms</CardTitle>
         <CardDescription>
-          Scored against your audience, goals, the suggested post ideas and where
-          it&apos;s trending.
+          Scored against your audience, goals, the suggested post ideas and
+          where it&apos;s trending.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">

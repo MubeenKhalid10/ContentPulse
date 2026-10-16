@@ -204,7 +204,7 @@ export function AlignmentPanel({
           <>
             {a.reason && (
               <div className="grid gap-1.5">
-                <p className="text-xs font-medium text-muted-foreground">
+                <p className="text-sm font-semibold text-foreground">
                   How this connects to your website and services
                 </p>
                 <p className="text-sm leading-relaxed">
@@ -215,7 +215,7 @@ export function AlignmentPanel({
 
             {!!a.matched_services?.length && (
               <div className="grid gap-1.5">
-                <p className="text-xs font-medium text-muted-foreground">
+                <p className="text-sm font-semibold text-foreground">
                   Your services it matches
                 </p>
                 <ul className="flex flex-wrap gap-1.5">
@@ -230,7 +230,7 @@ export function AlignmentPanel({
 
             {!!a.possible_angles?.length && (
               <div className="grid gap-2">
-                <p className="text-xs font-medium text-muted-foreground">
+                <p className="text-sm font-semibold text-foreground">
                   Post ideas
                 </p>
                 <ol className="grid gap-2">
@@ -272,8 +272,8 @@ export function AlignmentPanel({
 
             {!!a.unsupported_claims?.length && (
               <div className="grid gap-1.5 rounded-lg bg-destructive/5 p-3">
-                <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
-                  <ShieldAlertIcon className="size-3.5" />
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-destructive">
+                  <ShieldAlertIcon className="size-4" />
                   Avoid saying this (your website and documents don&apos;t back it
                   up)
                 </p>

@@ -161,6 +161,7 @@ async def list_approvals(
     platform: str | None,
     limit: int,
     offset: int,
+    stage: str | None = None,
 ) -> ApprovalPage:
     # One row per post: its latest round. Earlier rounds are history, shown on the
     # review page, so a resubmitted post never appears twice.
@@ -169,6 +170,9 @@ async def list_approvals(
         select(newer.id)
         .where(
             newer.post_id == ApprovalRequest.post_id,
+            # Copy and design reviews are separate lists: a design submission
+            # doesn't hide the copy approval that came before it.
+            newer.creative_version.is_(None) == ApprovalRequest.creative_version.is_(None),
             newer.created_at > ApprovalRequest.created_at,
         )
         .exists()
@@ -182,6 +186,22 @@ async def list_approvals(
                 )
             )
         )
+    # Waiting-for-review counts per stage, for the two tabs.
+    stage_rows = (
+        await db.execute(
+            select(ApprovalRequest.creative_version.is_(None), func.count())
+            .where(*filters, ApprovalRequest.status == A.PENDING)
+            .group_by(ApprovalRequest.creative_version.is_(None))
+        )
+    ).all()
+    stage_pending = {
+        "copy": sum(n for is_copy, n in stage_rows if is_copy),
+        "design": sum(n for is_copy, n in stage_rows if not is_copy),
+    }
+    if stage == "copy":
+        filters.append(ApprovalRequest.creative_version.is_(None))
+    elif stage == "design":
+        filters.append(ApprovalRequest.creative_version.is_not(None))
     by_status = dict(
         (
             await db.execute(
@@ -213,7 +233,12 @@ async def list_approvals(
             .offset(offset)
         )
     )
-    return ApprovalPage(items=await _items(db, rows), total=total or 0, counts=counts)
+    return ApprovalPage(
+        items=await _items(db, rows),
+        total=total or 0,
+        counts=counts,
+        stage_pending=stage_pending,
+    )
 
 
 async def _comments(db: AsyncSession, post_id: uuid.UUID) -> list[CommentRead]:

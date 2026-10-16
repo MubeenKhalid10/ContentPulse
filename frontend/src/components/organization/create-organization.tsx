@@ -21,7 +21,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errorMessage, setActiveOrgId } from "@/lib/api";
-import { meQueryKey, useLogout } from "@/lib/auth";
+import {
+  meQueryKey,
+  useLogout,
+  useMe,
+  useSwitchOrganization,
+} from "@/lib/auth";
 import { browserTimezone, timezoneOptions } from "@/lib/options";
 import { organizationSchema } from "@/schemas/organization";
 import type { Me, Organization } from "@/types/api";
@@ -33,6 +38,9 @@ export function CreateOrganization() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const logout = useLogout();
+  const me = useMe();
+  const switchOrganization = useSwitchOrganization();
+  const existing = me.data?.memberships ?? [];
   const form = useForm<Input, unknown, Output>({
     resolver: zodResolver(organizationSchema),
     defaultValues: {
@@ -64,101 +72,137 @@ export function CreateOrganization() {
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle role="heading" aria-level={1} className="text-xl">
-          Set up your organization
-        </CardTitle>
-        <CardDescription>
-          ContentPulse uses this to judge which trends matter to you. You can
-          refine everything later.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          onSubmit={form.handleSubmit((v) => create.mutate(v))}
-          noValidate
-          className="grid gap-4"
-        >
-          {create.isError && (
-            <Alert variant="destructive">
-              <AlertDescription>{errorMessage(create.error)}</AlertDescription>
-            </Alert>
-          )}
-          <FormField
-            id="name"
-            label="Organization name"
-            error={errors.name?.message}
+    <div className="grid gap-4">
+      {existing.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Already have an organization?
+            </CardTitle>
+            <CardDescription>
+              Go back to one of yours instead of creating a new one.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {existing.map((m) => (
+              <Button
+                key={m.organization_id}
+                type="button"
+                variant="outline"
+                className="justify-start"
+                onClick={() => {
+                  switchOrganization(m.organization_id);
+                  router.replace("/dashboard");
+                }}
+              >
+                {m.organization_name}
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={1} className="text-xl">
+            Set up your organization
+          </CardTitle>
+          <CardDescription>
+            ContentPulse uses this to judge which trends matter to you. You can
+            refine everything later.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={form.handleSubmit((v) => create.mutate(v))}
+            noValidate
+            className="grid gap-4"
           >
-            <Input
-              {...fieldAria("name", errors.name?.message)}
-              autoFocus
-              {...form.register("name")}
-            />
-          </FormField>
-          <FormField
-            id="website_url"
-            label="Website"
-            hint="We'll build your knowledge base from it."
-            error={errors.website_url?.message}
-          >
-            <Input
-              {...fieldAria("website_url", errors.website_url?.message)}
-              type="url"
-              placeholder="https://example.com"
-              {...form.register("website_url")}
-            />
-          </FormField>
-          <FormField
-            id="industry"
-            label="Industry"
-            error={errors.industry?.message}
-          >
-            <Input
-              {...fieldAria("industry", errors.industry?.message)}
-              placeholder="e.g. Software development"
-              {...form.register("industry")}
-            />
-          </FormField>
-          <FormField
-            id="description"
-            label="What you do"
-            hint="One or two sentences. Used to judge which trends fit you."
-            error={errors.description?.message}
-          >
-            <Textarea
-              {...fieldAria("description", errors.description?.message)}
-              rows={3}
-              placeholder="e.g. We build custom software and AI agents for finance teams."
-              {...form.register("description")}
-            />
-          </FormField>
-          <FormField
-            id="timezone"
-            label="Timezone"
-            error={errors.timezone?.message}
-          >
-            <Controller
-              control={form.control}
-              name="timezone"
-              render={({ field }) => (
-                <SimpleSelect
-                  id="timezone"
-                  value={field.value}
-                  onChange={field.onChange}
-                  options={timezoneOptions()}
-                />
-              )}
-            />
-          </FormField>
-          <Button type="submit" size="lg" disabled={create.isPending}>
-            {create.isPending ? "Creating…" : "Create organization"}
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => logout.mutate()}>
-            Sign out
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+            {create.isError && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {errorMessage(create.error)}
+                </AlertDescription>
+              </Alert>
+            )}
+            <FormField
+              id="name"
+              label="Organization name"
+              error={errors.name?.message}
+            >
+              <Input
+                {...fieldAria("name", errors.name?.message)}
+                autoFocus
+                {...form.register("name")}
+              />
+            </FormField>
+            <FormField
+              id="website_url"
+              label="Website"
+              hint="We'll build your knowledge base from it."
+              error={errors.website_url?.message}
+            >
+              <Input
+                {...fieldAria("website_url", errors.website_url?.message)}
+                type="url"
+                placeholder="https://example.com"
+                {...form.register("website_url")}
+              />
+            </FormField>
+            <FormField
+              id="industry"
+              label="Industry"
+              error={errors.industry?.message}
+            >
+              <Input
+                {...fieldAria("industry", errors.industry?.message)}
+                placeholder="e.g. Software development"
+                {...form.register("industry")}
+              />
+            </FormField>
+            <FormField
+              id="description"
+              label="What you do"
+              hint="One or two sentences. Used to judge which trends fit you."
+              error={errors.description?.message}
+            >
+              <Textarea
+                {...fieldAria("description", errors.description?.message)}
+                rows={3}
+                placeholder="e.g. We build custom software and AI agents for finance teams."
+                {...form.register("description")}
+              />
+            </FormField>
+            <FormField
+              id="timezone"
+              label="Timezone"
+              error={errors.timezone?.message}
+            >
+              <Controller
+                control={form.control}
+                name="timezone"
+                render={({ field }) => (
+                  <SimpleSelect
+                    id="timezone"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={timezoneOptions()}
+                  />
+                )}
+              />
+            </FormField>
+            <Button type="submit" size="lg" disabled={create.isPending}>
+              {create.isPending ? "Creating…" : "Create organization"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => logout.mutate()}
+            >
+              Sign out
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

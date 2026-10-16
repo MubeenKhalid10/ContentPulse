@@ -43,6 +43,8 @@ class ApprovalPage(BaseModel):
     items: list[ApprovalListItem]
     total: int
     counts: dict[str, int]
+    # Posts waiting for a decision, per stage: {"copy": n, "design": n}.
+    stage_pending: dict[str, int]
 
 
 class CommentRead(BaseModel):
