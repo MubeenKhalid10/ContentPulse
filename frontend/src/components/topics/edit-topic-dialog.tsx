@@ -68,7 +68,7 @@ function EditForm({ topic, onClose }: { topic: TopicDetail; onClose: () => void 
       <DialogHeader>
         <DialogTitle>Edit topic</DialogTitle>
         <DialogDescription>
-          Your wording is kept when the trend is re-analyzed. The analysis only updates relevance, angles and
+          Your wording is kept when the trend is re-analyzed. The analysis only updates relevance, post ideas and
           platform recommendations.
         </DialogDescription>
       </DialogHeader>

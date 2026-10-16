@@ -15,11 +15,11 @@ export interface WorkflowStep {
 }
 
 export const WORKFLOW: WorkflowStep[] = [
-  { n: 1, href: "/trends", label: "Trends", summary: "Spot what's rising and shortlist what fits", permission: "trends.read" },
-  { n: 2, href: "/topics", label: "Topics", summary: "Shortlist topics and plan a post per platform", permission: "topics.read" },
-  { n: 3, href: "/content", label: "Content studio", summary: "Write and edit the posts", permission: "content.read" },
-  { n: 4, href: "/design", label: "Design", summary: "Add the visual and submit for approval", permission: "design.read" },
-  { n: 5, href: "/approvals", label: "Approvals", summary: "Admins approve: the post is ready to publish", permission: "approval.read" },
+  { n: 1, href: "/trends", label: "Find trends", summary: "See what's rising in your market and shortlist what fits", permission: "trends.read" },
+  { n: 2, href: "/topics", label: "Pick topics", summary: "Decide what to post about and plan one post per platform", permission: "topics.read" },
+  { n: 3, href: "/content", label: "Write posts", summary: "Write the copy, then send it to an admin to approve", permission: "content.read" },
+  { n: 4, href: "/design", label: "Add designs", summary: "Once the copy is approved: export the design brief for your designer, then add the design", permission: "design.read" },
+  { n: 5, href: "/approvals", label: "Approve", summary: "An admin approves the copy first, then the finished design", permission: "approval.read" },
 ];
 
 export interface StepCount {
@@ -63,7 +63,7 @@ export function nextAction(s: DashboardSummary, can: (p: Permission) => boolean)
   if (s.pending_approval > 0 && can("approval.manage")) {
     return {
       title: `${s.pending_approval} ${plural(s.pending_approval, "post is", "posts are")} waiting for your approval`,
-      detail: "Check the copy and the design, then approve or ask for changes.",
+      detail: "Approve the copy to open its design brief, or approve a finished design. You can also ask for changes.",
       href: "/approvals",
       cta: "Review posts",
     };
@@ -71,7 +71,7 @@ export function nextAction(s: DashboardSummary, can: (p: Permission) => boolean)
   if (s.design_pending > 0 && can("design.upload")) {
     return {
       title: `${s.design_pending} ${plural(s.design_pending, "post needs", "posts need")} a design`,
-      detail: "Each task has a brief, the post copy and your brand rules. Upload the design and submit it for approval.",
+      detail: "The copy is approved. Each task has a brief and your brand rules: export it for a designer, or upload the design and submit it for approval.",
       href: "/design",
       cta: "Open design tasks",
     };
@@ -87,7 +87,7 @@ export function nextAction(s: DashboardSummary, can: (p: Permission) => boolean)
   if (s.drafts > 0 && can("content.edit")) {
     return {
       title: `${s.drafts} ${plural(s.drafts, "draft is", "drafts are")} in progress`,
-      detail: "Finish the copy, then send each post to design.",
+      detail: "Finish the copy, then submit each post to an admin for approval.",
       href: "/content",
       cta: "Open drafts",
     };

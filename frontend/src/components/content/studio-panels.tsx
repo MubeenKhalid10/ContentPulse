@@ -152,7 +152,7 @@ export function StrategyPanel({ post }: { post: PostDetail }) {
   const rows: [string, string | null][] = [
     ["Post type", s.post_type],
     ["Objective", s.objective],
-    ["Angle", s.content_angle],
+    ["Post idea", s.content_angle],
     ["Audience", s.target_audience],
     [s.platform === "blog" ? "Introduction" : "Hook", s.hook_direction],
     ["Call to action", s.cta_direction],

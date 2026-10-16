@@ -52,7 +52,7 @@ celerybeat-schedule*
 .impeccable/review/
 .impeccable
 
-
+.claudeignore
 AUDIT_REPORT.md
 DESIGN.md
 PRODUCT.md

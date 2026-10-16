@@ -110,7 +110,7 @@ export const useRestoreVersion = () =>
     api<PostDetail>(`/content/${id}/versions/${number}/restore`, { method: "POST", body: { base_version: base } }),
   );
 
-export type PostAction = "back-to-draft" | "send-to-design" | "archive";
+export type PostAction = "back-to-draft" | "submit-for-review" | "archive";
 
 export const usePostAction = () =>
   useContentMutation(({ id, action }: { id: string; action: PostAction }) =>

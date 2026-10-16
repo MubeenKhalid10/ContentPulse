@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 
+from app.ai.metrics import metrics
 from app.core.config import get_settings
 from app.core.logging import logger
 from app.db.session import SessionLocal
@@ -189,6 +190,8 @@ async def tick(now: datetime | None = None) -> dict[str, int]:
 
     recovered = await trend_tasks.recover_stale_runs()
     scheduled = await schedule_due_runs(now)
+    metrics.inc("trend_scheduler_stale_runs_total", recovered)
+    metrics.inc("trend_scheduler_runs_started_total", scheduled)
     return {"recovered": recovered, "scheduled": scheduled}
 
 

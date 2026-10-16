@@ -17,7 +17,7 @@ import asyncio
 import time
 import uuid
 from collections import Counter
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -90,6 +90,21 @@ class Prepared:
 def effective_ttl(name: str, policy: CachePolicy) -> int:
     overrides = get_settings().provider_cache_ttls
     return int(overrides.get(name, overrides.get(source_of(name), policy.ttl)))
+
+
+def persisted_sources() -> list[str]:
+    """Sources whose responses may currently be kept in Postgres."""
+    settings = get_settings()
+    if settings.provider_cache_backend != "postgres":
+        return []
+    return [
+        source
+        for source in settings.provider_cache_persist_sources
+        if any(
+            source_of(name) == source and policy.persist == "opt_in"
+            for name, policy in POLICIES.items()
+        )
+    ]
 
 
 def persists(name: str, policy: CachePolicy) -> bool:
@@ -257,6 +272,17 @@ class store:
         return deleted
 
     @staticmethod
+    async def purge_except(allowed: Sequence[str]) -> int:
+        """Remove every stored response of a provider that may no longer be
+        stored (taken off PROVIDER_CACHE_PERSIST_SOURCES, or the backend
+        switched back to memory)."""
+        result = await store._execute(
+            "DELETE FROM provider_cache WHERE NOT (source = ANY(:allowed))",
+            allowed=list(allowed),
+        )
+        return result.rowcount or 0
+
+    @staticmethod
     async def purge(source: str | None = None) -> int:
         """Remove stored responses (one provider, or all), e.g. to honor a
         provider's deletion request or after taking it off the persist list."""
@@ -269,13 +295,14 @@ class store:
         return result.rowcount or 0
 
 
-def _response(prepared: Prepared, row: Row) -> httpx.Response:
+def _response(prepared: Prepared, row: Row, *, stale: bool = False) -> httpx.Response:
     headers = {"content-type": row.content_type} if row.content_type else {}
     return httpx.Response(
         row.status_code or 200,
         content=row.body or b"",
         headers=headers,
         request=httpx.Request(prepared.method, prepared.url),
+        extensions={"provider_cache": "stale" if stale else "hit"},
     )
 
 
@@ -293,6 +320,8 @@ async def _db_failed(prepared: Prepared, fetch: Callable[[], Awaitable[httpx.Res
 
 async def _store_quietly(prepared: Prepared, response: httpx.Response) -> bool:
     settings = get_settings()
+    if response.extensions.get("provider_cache") == "stale":
+        return False  # an expired copy served during a cooldown stays expired
     if not 200 <= response.status_code < 300:
         return False
     if len(response.content) > settings.provider_cache_max_bytes:
@@ -390,5 +419,5 @@ async def stale_response(prepared: Prepared) -> httpx.Response | None:
         return None
     if row and row.usable and row.stale_ok:
         cache_stats.record(prepared.name, "stale_served")
-        return _response(prepared, row)
+        return _response(prepared, row, stale=True)
     return None

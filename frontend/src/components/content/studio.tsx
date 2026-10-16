@@ -4,6 +4,7 @@ import {
   AlertTriangleIcon,
   ArchiveIcon,
   ArrowLeftIcon,
+  CheckCircle2Icon,
   CopyPlusIcon,
   EllipsisIcon,
   LoaderCircleIcon,
@@ -75,7 +76,7 @@ export function ContentStudio({ id }: { id: string }) {
   const back = (
     <Link href="/content" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
       <ArrowLeftIcon className="size-4" />
-      Content studio
+      Write posts
     </Link>
   );
 
@@ -272,7 +273,7 @@ function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail;
 
 const ACTION_COPY: Record<PostAction, string> = {
   "back-to-draft": "Moved back to draft",
-  "send-to-design": "Sent to design",
+  "submit-for-review": "Sent to an admin for approval",
   archive: "Post archived",
 };
 // The post's design task is where the creative is uploaded and submitted.
@@ -292,6 +293,7 @@ function StudioActions({
   generating: boolean;
 }) {
   const router = useRouter();
+  const canReview = useCan()("approval.manage");
   const action = usePostAction();
   const variant = useCreateVariant();
   const [regenOpen, setRegenOpen] = useState(false);
@@ -304,8 +306,8 @@ function StudioActions({
   const s = post.status;
   const canVariant = canGenerate && post.editable && !!post.content_strategy_id;
   // A post waiting for a decision can't be archived; withdraw nothing mid-review.
-  const canArchive = canEdit && s !== "archived" && s !== "pending_approval";
-  const canBackToDraft = canEdit && s === "design_pending";
+  const canArchive = canEdit && s !== "archived" && s !== "pending_approval" && s !== "content_review";
+  const canBackToDraft = canEdit && (s === "design_pending" || s === "content_review");
   const hasMore = canVariant || canArchive || canBackToDraft;
 
   return (
@@ -328,27 +330,24 @@ function StudioActions({
           Rewrite with AI
         </Button>
       )}
-      {canEdit && (s === "draft" || s === "content_review") && (
-        <Button
-          size="sm"
-          disabled={busy || !hasCopy}
-          onClick={() =>
-            action.mutate(
-              { id: post.id, action: "send-to-design" },
-              {
-                // Straight to the design task: upload the creative there and submit.
-                onSuccess: (sent) => {
-                  toast.success("Sent to design. Add the creative next.");
-                  if (sent.design_task) router.push(`/design/${sent.design_task.id}`);
-                },
-                onError,
-              },
-            )
-          }
-        >
-          <PaletteIcon />
-          Send to design
+      {canEdit && s === "draft" && (
+        <Button size="sm" disabled={busy || !hasCopy} onClick={() => run("submit-for-review")}>
+          <SendIcon />
+          Submit for approval
         </Button>
+      )}
+      {s === "content_review" && (
+        <>
+          <Tag tone="sky" dot>
+            Waiting for an admin to approve the copy
+          </Tag>
+          {canReview && post.review && (
+            <Link href={`/approvals/${post.review.request_id}`} className={buttonVariants({ size: "sm" })}>
+              <CheckCircle2Icon />
+              Review &amp; approve
+            </Link>
+          )}
+        </>
       )}
       {DESIGN_STEP.includes(s) && post.design_task && (
         <Link href={`/design/${post.design_task.id}`} className={buttonVariants({ size: "sm" })}>
@@ -385,7 +384,7 @@ function StudioActions({
             {canBackToDraft && (
               <DropdownMenuItem onClick={() => run("back-to-draft")}>
                 <Undo2Icon />
-                Take back from design
+                {s === "content_review" ? "Withdraw from review" : "Take back from design"}
               </DropdownMenuItem>
             )}
             {canArchive && (

@@ -155,9 +155,18 @@ class Settings(BaseSettings):
     llm_budget_timezone: str = "UTC"
     # Serve Prometheus-format LLM metrics at /health/metrics.
     metrics_enabled: bool = False
+    # Optional bearer token scrapers must send to /health/metrics.
+    metrics_token: str | None = None
+    # Shared secret for POST /api/v1/internal/ingest/tick (an external
+    # scheduler such as Supabase Cron). Unset = the endpoint doesn't exist.
+    # Generate: python -c "import secrets; print(secrets.token_urlsafe(48))"
+    ingest_trigger_secret: str | None = Field(default=None, min_length=32)
     # Trends analyzed by AI per discovery run (cost guard). Rule-based analysis
     # covers all recent trends because it is free.
     alignment_ai_batch_size: int = 15
+    # Drop collected items that share nothing with the organization's keywords,
+    # services or industry before they become trends.
+    trend_relevance_prefilter: bool = True
     alignment_auto_analyze: bool = True
     # Embeddings for semantic knowledge search. Unset = keyword-only search.
     #   "openai" -> OpenAI or any OpenAI-compatible API (EMBEDDING_BASE_URL)
@@ -258,6 +267,30 @@ class Settings(BaseSettings):
     # When the cache database fails: "fetch" calls the provider directly (the
     # run still works, quota is spent); "skip" skips that request instead.
     provider_cache_on_db_error: Literal["fetch", "skip"] = "fetch"
+
+    # Provider request controls (app/sources/quota.py). One platform key per
+    # provider serves every organization, so outbound requests (never cache
+    # hits) are counted per provider and UTC day before they are sent.
+    #   "off"     -> no counting, no limits
+    #   "monitor" -> count everything and log what *would* be refused (default)
+    #   "enforce" -> refuse requests over a budget, or during a cooldown
+    # Cooldowns after rate limits apply in monitor and enforce modes.
+    provider_budget_mode: Literal["off", "monitor", "enforce"] = "monitor"
+    # Requests per UTC day per provider, e.g. {"gnews": 90, "the_news_api": 90}.
+    # Empty = no budget. Set from your real plans: nothing is assumed.
+    provider_daily_budgets: dict[str, int] = {}
+    # Requests per UTC day one organization may use per provider (fair share).
+    provider_org_daily_budgets: dict[str, int] = {}
+    # Minutes before the same organization may collect a source again (e.g.
+    # repeated manual runs), e.g. {"exa": 360}. Empty = no minimum.
+    provider_min_refresh_minutes: dict[str, int] = {}
+    # Backoff after a rate limit without Retry-After: base x 2^(streak-1),
+    # capped, plus up to 10% jitter. Retry-After is honored up to a day.
+    provider_cooldown_base_seconds: int = Field(default=60, ge=1)
+    provider_cooldown_max_seconds: int = Field(default=3600, ge=1)
+    # Unique hashtags searched per 7 days per Instagram account (Instagram's
+    # documented limit is 30; kept below it so manual checks still fit).
+    instagram_hashtag_weekly_cap: int = Field(default=27, ge=0, le=30)
     trend_user_agent: str = "ContentPulse/0.1 (trend discovery)"
     reddit_client_id: str | None = None
     reddit_client_secret: str | None = None

@@ -46,8 +46,8 @@ export function ApprovalList() {
   return (
     <>
       <PageHeader
-        title="Approvals"
-        description="Finished posts waiting for your decision. Approve them, or ask for changes."
+        title="Approve posts"
+        description="Posts waiting for your decision. First approve the written copy, which opens the design brief. Later, approve the finished design."
       />
       {counts?.all === 0 && !platform ? (
         <Card>
@@ -176,6 +176,9 @@ function ApprovalRow({ approval: a }: { approval: Approval }) {
           </Link>
           <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>
             {APPROVAL_STATUS_LABEL[a.status]}
+          </Tag>
+          <Tag tone={a.stage === "copy" ? "sky" : "violet"}>
+            {a.stage === "copy" ? "Copy" : "Design"}
           </Tag>
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
         </div>

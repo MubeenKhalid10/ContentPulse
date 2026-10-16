@@ -23,7 +23,17 @@ class DiscoverRequest(BaseModel):
 
 
 class SourceResult(BaseModel):
-    status: Literal["ok", "failed", "not_configured", "running", "unknown"]
+    status: Literal[
+        "ok",
+        "failed",
+        "not_configured",
+        "running",
+        "unknown",
+        # Not failures: skipped on purpose (app/sources/quota.py, trend_tasks).
+        "budget_exhausted",
+        "cooling_down",
+        "skipped_recent",
+    ]
     items: int = 0
     error: str | None = None
     error_kind: str | None = None
@@ -71,6 +81,8 @@ class SourceInfo(BaseModel):
     last_success_at: datetime | None
     last_failure_at: datetime | None
     last_error: str | None
+    # Provider-wide pause after a rate limit (no request is sent until then).
+    cooldown_until: datetime | None = None
 
 
 class SourceToggle(BaseModel):

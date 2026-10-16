@@ -94,12 +94,31 @@ def bearer(token: str) -> dict:
 
 
 async def test_config_exposes_public_supabase_settings(client, supabase):
+    # Exactly the public values: no JWT secret or other server-side setting.
+    # Without TURNSTILE_SITE_KEY the field is null (the web app then explains
+    # that the key is missing when Supabase requires a CAPTCHA).
     assert (await client.get("/api/v1/auth/config")).json() == {
         "provider": "supabase",
         "password_reset": True,
         "supabase_url": SUPABASE_URL,
         "supabase_anon_key": "sb_publishable_test",
+        "turnstile_site_key": None,
     }
+
+
+async def test_config_exposes_the_public_turnstile_site_key(client, supabase, monkeypatch):
+    settings = app.dependency_overrides[get_settings]()
+    monkeypatch.setattr(settings, "turnstile_site_key", "0x4AAAAAAATestSiteKey")
+    body = (await client.get("/api/v1/auth/config")).json()
+    assert body["turnstile_site_key"] == "0x4AAAAAAATestSiteKey"
+    assert "legacy-shared-secret" not in str(body)
+
+
+async def test_local_mode_publishes_no_turnstile_key(client, monkeypatch):
+    # The CAPTCHA belongs to Supabase Auth; local sign-in never shows one.
+    monkeypatch.setattr(get_settings(), "turnstile_site_key", "0x4AAAAAAATestSiteKey")
+    body = (await client.get("/api/v1/auth/config")).json()
+    assert body["provider"] == "local" and body["turnstile_site_key"] is None
 
 
 async def test_es256_token_provisions_and_links_user(client, supabase):

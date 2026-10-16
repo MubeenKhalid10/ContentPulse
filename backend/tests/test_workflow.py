@@ -11,6 +11,7 @@ P = PostStatus
 
 HAPPY_PATH = [
     P.DRAFT,
+    P.CONTENT_REVIEW,
     P.DESIGN_PENDING,
     P.DESIGN_IN_PROGRESS,
     P.DESIGN_UPLOADED,
@@ -36,6 +37,7 @@ def test_revision_loop_is_valid():
     [
         (P.DRAFT, P.APPROVED),  # spec rule 5
         (P.DRAFT, P.PENDING_APPROVAL),
+        (P.DRAFT, P.DESIGN_PENDING),  # the copy needs an admin's approval first
         (P.DESIGN_PENDING, P.APPROVED),
         (P.REJECTED, P.APPROVED),
         (P.FINAL, P.DRAFT),

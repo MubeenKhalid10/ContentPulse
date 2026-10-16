@@ -123,3 +123,35 @@ async def test_other_organization_cannot_reach_private_data(client, internet):  
     assert trend["id"] not in summary
     b_settings = (await admin_b.get(f"/api/v1/organizations/{org_b['id']}/settings")).text
     assert "alpha-secret-keyword" not in b_settings and "private-feed" not in b_settings
+
+
+async def test_other_organization_cannot_change_or_delete_private_data(client, internet):  # noqa: F811
+    admin_a, org_a, admin_b, _ = await two_orgs(client)
+    await discover(admin_a)
+    trend = (await admin_a.get(API)).json()["items"][0]
+    org_url = f"/api/v1/organizations/{org_a['id']}"
+    as_a = {"X-Organization-Id": org_a["id"]}
+
+    attempts = [
+        ("PATCH", org_url, {"name": "Taken over"}),
+        ("DELETE", org_url, None),
+        ("PATCH", f"{org_url}/settings", {"rss_feeds": ["https://evil.example.com/rss"]}),
+        ("PATCH", f"{org_url}/brand", {"tone_of_voice": "hijacked"}),
+        ("POST", f"{org_url}/services", {"name": "Injected"}),
+        ("POST", f"{org_url}/invitations", {"email": "mallory@b.example.com", "role": "admin"}),
+        ("POST", f"{org_url}/knowledge/documents", {"title": "x", "content": "x"}),
+        ("POST", f"{API}/{trend['id']}/shortlist", {}),
+        ("DELETE", f"{API}/{trend['id']}", None),
+    ]
+    for method, url, body in attempts:
+        for headers in ({}, as_a):
+            resp = await admin_b.request(method, url, json=body, headers=headers)
+            assert resp.status_code == 404, (method, url, headers, resp.status_code)
+
+    # A's data is exactly as it was.
+    assert (await admin_a.get(org_url)).json()["name"] == "Alpha"
+    settings = (await admin_a.get(f"{org_url}/settings")).json()
+    assert settings["rss_feeds"] == [SECRET_FEED]
+    assert (await admin_a.get(f"{API}/{trend['id']}")).json()["status"] == trend["status"]
+    members = (await admin_a.get(f"{org_url}/members")).json()
+    assert len(members) == 1

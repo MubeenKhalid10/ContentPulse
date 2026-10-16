@@ -174,7 +174,10 @@ export function TopicDetailView({ id }: { id: string }) {
             t.relevance_reason && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Relevance to your organization</CardTitle>
+                  <CardTitle>Does this fit your business?</CardTitle>
+                  <CardDescription>
+                    How this connects to your website and services.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="text-sm">
                   {stripCitations(t.relevance_reason)}
@@ -397,7 +400,7 @@ function StrategiesCard({
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start gap-2">
         <div className="grid flex-1 gap-1">
-          <CardTitle>Post plans</CardTitle>
+          <CardTitle>Your post plans</CardTitle>
           <CardDescription>
             {shortlisted
               ? "One plan per platform: what to say, to whom and how. Write the post straight from the plan."
@@ -472,7 +475,7 @@ function PlatformFitCard({
       <CardHeader>
         <CardTitle>Recommended platforms</CardTitle>
         <CardDescription>
-          Scored against your audience, goals, the suggested angles and where
+          Scored against your audience, goals, the suggested post ideas and where
           it&apos;s trending.
         </CardDescription>
       </CardHeader>

@@ -42,7 +42,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await expect(page.getByText("Content setup saved")).toBeVisible();
 
   // Sources: one click from Trends; free ones ready, keyed ones explain what's missing.
-  await page.getByRole("link", { name: "Trends", exact: true }).click();
+  await page.getByRole("link", { name: /Find trends/ }).first().click();
   const strip = page.getByRole("region", { name: "Trend sources" });
   await expect(strip).toContainText(/Watching \d+ sources/);
   await strip.getByRole("link", { name: "Manage sources" }).click();
@@ -62,7 +62,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await shot(page, "trends-01-sources");
 
   // Discover against the live internet.
-  await page.getByRole("link", { name: "Trends", exact: true }).first().click();
+  await page.getByRole("link", { name: /Find trends/ }).first().click();
   // New organizations get a scheduled first run within a minute, so discovery
   // may already be under way; otherwise start it.
   const startFirst = page.getByRole("button", { name: "Discover New Trends now" }).first();
@@ -89,7 +89,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await expect(page.getByText("Why it's trending", { exact: true })).toBeVisible();
   // Relevance analysis (Sprint 4). Without an AI model configured, discovery
   // runs the rule-based estimate automatically; trigger it if it hasn't yet.
-  await expect(page.getByText("Relevance to your organization", { exact: true })).toBeVisible();
+  await expect(page.getByText("Does this fit your business?", { exact: true })).toBeVisible();
   const analyzeNow = page.getByRole("button", { name: "Analyze now" });
   if (await analyzeNow.isVisible()) await analyzeNow.click();
   await expect(page.getByText(/^Rule-based estimate/).first()).toBeVisible({ timeout: 30_000 });
@@ -108,7 +108,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
 
   await page.getByRole("button", { name: `Shortlist ${topic}`, exact: true }).click();
   await expect(page.getByText(`Shortlisted “${topic}”`)).toBeVisible();
-  await page.getByRole("link", { name: "Trends", exact: true }).first().click();
+  await page.getByRole("link", { name: /Find trends/ }).first().click();
   await page.getByRole("tab", { name: "Shortlisted" }).click();
   const shortlisted = page.getByRole("list", { name: "Trends" });
   await expect(shortlisted).toHaveAttribute("aria-busy", "false");
@@ -116,7 +116,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await expect(shortlisted.getByRole("listitem")).toHaveCount(1);
 
   // Sprint 5: shortlisting the trend shortlisted its topic candidate.
-  await page.getByRole("link", { name: "Topics", exact: true }).click();
+  await page.getByRole("link", { name: /Pick topics/ }).first().click();
   await page.getByRole("tab", { name: /^Shortlisted/ }).click();
   const topics = page.getByRole("list", { name: "Topics" });
   await expect(topics).toHaveAttribute("aria-busy", "false");
@@ -124,14 +124,14 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await topics.getByRole("link", { name: topic, exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: topic })).toBeVisible();
   await expect(page.getByText("Recommended platforms", { exact: true })).toBeVisible();
-  await expect(page.getByText("Relevance to your organization", { exact: true })).toBeVisible();
+  await expect(page.getByText("Does this fit your business?", { exact: true })).toBeVisible();
 
   // Plan a post and write it in one step: draft the plan from the playbook (no
   // AI model in E2E), then "Save & write post" opens the studio.
   await page.getByRole("button", { name: "New plan" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Draft from playbook" }).click();
-  await expect(dialog.getByLabel("Content angle")).not.toHaveValue("");
+  await expect(dialog.getByLabel("Post idea")).not.toHaveValue("");
   await shot(page, "topics-01-detail");
   await dialog.getByRole("button", { name: "Save & write post" }).click();
   await expect(page).toHaveURL(/\/content\//);
@@ -155,9 +155,12 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   }).toPass();
   await shot(page, "content-01-studio");
   const studioUrl = page.url();
-  await page.getByRole("button", { name: "Send to design" }).click();
+  // The copy needs an admin's approval before design: approving it opens the design task.
+  await page.getByRole("button", { name: "Submit for approval" }).click();
+  await page.getByRole("link", { name: "Review & approve" }).click();
+  await page.getByRole("button", { name: "Approve copy" }).click();
 
-  // "Send to design" lands on the design task: brief, copy and brand rules,
+  // Approving the copy lands on the design task: brief, copy and brand rules,
   // then the creative goes up through a signed URL.
   await expect(page).toHaveURL(/\/design\//);
   await expect(page.getByText("Design brief", { exact: true })).toBeVisible();
@@ -225,16 +228,16 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await page.getByRole("button", { name: "Submit current design for approval" }).click();
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
   await expect(page.getByText("Waiting for approval", { exact: true }).first()).toBeVisible();
-  await page.getByRole("link", { name: "Design", exact: true }).first().click();
+  await page.getByRole("link", { name: /Add designs/ }).first().click();
   await page.getByRole("tab", { name: /^Waiting for approval/ }).click();
   await expect(page.getByRole("list", { name: "Design tasks" }).getByRole("link")).toHaveCount(1);
-  await page.getByRole("link", { name: "Content studio", exact: true }).first().click();
+  await page.getByRole("link", { name: /Write posts/ }).first().click();
   await page.getByRole("tab", { name: /^Waiting for approval/ }).click();
   await expect(page.getByRole("list", { name: "Posts" }).getByRole("link")).toHaveCount(1);
 
   // Review: ask for changes, the creator uploads a new design and resubmits
   // in one click, then one "Approve" makes the post ready to publish.
-  await page.getByRole("link", { name: "Approvals", exact: true }).click();
+  await page.getByRole("link", { name: /^5. Approve$/ }).click();
   const queue = page.getByRole("list", { name: "Approvals" });
   await expect(queue.getByRole("link")).toHaveCount(1);
   await queue.getByRole("link").click();
@@ -249,7 +252,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await changes.getByRole("button", { name: "Request changes" }).click();
   await expect(page.getByRole("list", { name: "Comments" })).toContainText("Use a stronger headline on the image.");
   await shot(page, "approvals-01-review");
-  // The creator goes back to the post in Content studio.
+  // The creator goes back to the post in Write posts.
   await page.goto(studioUrl);
   await expect(page.getByText(/^Changes requested \(round 1\)/)).toBeVisible();
   await page.getByRole("link", { name: "Update design & resubmit" }).click();
@@ -257,7 +260,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await page.getByLabel("Choose creative files").setInputFiles("e2e/fixtures/creative-slide-1.png");
   await page.getByRole("button", { name: "Upload & submit for approval" }).click();
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
-  await page.getByRole("link", { name: "Approvals", exact: true }).click();
+  await page.getByRole("link", { name: /^5. Approve$/ }).click();
   await expect(queue.getByText("Round 2")).toBeVisible();
   await queue.getByRole("link").click();
   await page.getByRole("button", { name: "Approve" }).click();

@@ -10,7 +10,7 @@ Fields:
 - supporting_text: one short line that supports the headline, or an empty string.
 - slide_structure: for carousels, one entry per slide ("Slide 1: hook ..."); for videos and reels, one entry per shot; otherwise an empty list.
 - visual_elements: concrete things to show, such as icons, a chart, a product UI or people.
-- designer_notes: anything else the designer needs, such as what to avoid.
+- designer_notes: what a designer working alone needs to understand the post. In a few short sentences cover: the single message the viewer should take away and the feeling it should leave; who the audience is and what they care about; the visual hierarchy (what is seen first, second, third); the mood and style to aim for; and what to avoid (clichés, stock-photo looks, anything that would overclaim).
 
 Brand rules (colors, typography, logo) are attached to the brief separately, so don't repeat them. Mention them only when a rule changes the composition.
 

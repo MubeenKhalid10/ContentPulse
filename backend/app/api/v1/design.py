@@ -11,13 +11,14 @@ from app.schemas.approval import ResubmitRequest
 from app.schemas.design import (
     AssignRequest,
     BriefUpdate,
+    HandoffDocument,
     RegisterAssets,
     TaskDetail,
     TaskPage,
     UploadRequest,
     UploadTicket,
 )
-from app.services.design import images, service
+from app.services.design import handoff, images, service
 
 router = APIRouter(prefix="/design/tasks", tags=["design"])
 
@@ -65,6 +66,13 @@ async def list_tasks(
 @router.get("/{task_id}", response_model=TaskDetail)
 async def get_task(task_id: uuid.UUID, ctx: CanRead, db: DB):
     return await service.task_detail(db, ctx.organization_id, task_id)
+
+
+@router.get("/{task_id}/handoff", response_model=HandoffDocument)
+async def get_handoff(task_id: uuid.UUID, ctx: CanRead, db: DB):
+    """The brief as one Markdown document a designer can take anywhere."""
+    file_name, markdown = await handoff.render(db, ctx.organization_id, task_id)
+    return HandoffDocument(file_name=file_name, markdown=markdown)
 
 
 @router.patch("/{task_id}", response_model=TaskDetail)

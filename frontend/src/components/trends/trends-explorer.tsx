@@ -40,8 +40,8 @@ import { cn } from "@/lib/utils";
 
 const PAGE = 30;
 const RELEVANCE_FILTERS = [
-  { value: "all", label: "Any relevance" },
   { value: "relevant", label: "Relevant to us" },
+  { value: "all", label: "Any relevance" },
   { value: "highly_relevant", label: "Highly relevant" },
   { value: "weakly_relevant", label: "Weakly relevant" },
   { value: "not_relevant", label: "Not relevant" },
@@ -60,7 +60,8 @@ export function TrendsExplorer() {
   const canReview = can("trends.manage") || can("topics.manage");
   const [filters, setFilters] = usePersistedState<TrendFilters>("trends", {
     status: "active",
-    relevance: "",
+    // Only trends tied to the organization's website by default.
+    relevance: "relevant",
     sort: "score",
     source: "",
     location: "",
@@ -110,11 +111,12 @@ export function TrendsExplorer() {
   return (
     <>
       <PageHeader
-        title="Trends"
+        title="Find trends"
         description={
           <>
-            What&apos;s rising in your markets, scored for your organization.
-            Shortlist the trends worth posting about.{" "}
+            Everything that
+            is rising in your markets right now, scored for how well it fits
+            your business. Shortlist the trends worth posting about.{" "}
             {ai.data && (
               <span className="sm:whitespace-nowrap">
                 {ai.data.engine === "ai"

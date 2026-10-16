@@ -15,7 +15,7 @@ from app.services.topics.platform_defaults import DEFAULT_RULES
 from app.workers.runner import runner
 from tests.conftest import add_member, create_org, register
 from tests.test_alignment import discover, internet, setup_org  # noqa: F401  (fixtures)
-from tests.test_content import approved_strategy, generated
+from tests.test_content import approved_strategy, generated, send_to_design
 from tests.test_design import DesignAI, upload
 from tests.test_topics import gpt6_topic
 
@@ -473,7 +473,7 @@ async def test_seo_fields_are_rejected_for_social_posts(client, internet, blog_a
 async def test_blog_design_approval_and_final(client, internet, blog_ai):
     admin, org = await setup_org(client)
     post = await generated(admin, await blog_strategy(admin, org))
-    sent = (await admin.post(f"{CONTENT}/{post['id']}/send-to-design")).json()
+    sent = await send_to_design(admin, post["id"])
     assert sent["status"] == "design_pending"
     await runner.wait_idle()
     brief_prompt = blog_ai.calls[-1]["prompt"]
@@ -503,7 +503,7 @@ async def test_blog_design_approval_and_final(client, internet, blog_ai):
 async def test_rules_brief_for_blog_uses_featured_image_and_seo(client, internet):
     admin, org = await setup_org(client)
     post = await generated(admin, await blog_strategy(admin, org))
-    sent = (await admin.post(f"{CONTENT}/{post['id']}/send-to-design")).json()
+    sent = await send_to_design(admin, post["id"])
     task = (await admin.get(f"/api/v1/design/tasks/{sent['design_task']['id']}")).json()
     assert task["format"] == "single_image" and task["dimensions"] == "1200×630 (1.91:1)"
     seo = post["current"]["meta"]["blog"]

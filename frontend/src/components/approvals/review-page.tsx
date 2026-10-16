@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeftIcon, CheckIcon, DownloadIcon, FlagIcon, MessageSquarePlusIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckIcon, DownloadIcon, FlagIcon, MessageSquarePlusIcon, PaletteIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -10,6 +11,7 @@ import { PlatformTag, Tag } from "@/components/shared/tag";
 import { ArticlePreview } from "@/components/content/article-preview";
 import { SocialPostPreview } from "@/components/content/social-preview";
 import { SharePostButton } from "@/components/content/share-post-button";
+import { HandoffButtons } from "@/components/design/handoff-buttons";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -21,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -75,6 +77,7 @@ export function ReviewPage({ id }: { id: string }) {
           <h1 className="text-2xl font-semibold tracking-tight">{a.post.title ?? "Untitled post"}</h1>
           <PlatformTag platform={a.post.platform} />
           <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>{APPROVAL_STATUS_LABEL[a.status]}</Tag>
+          <Tag tone={a.stage === "copy" ? "sky" : "violet"}>{a.stage === "copy" ? "Copy review" : "Design review"}</Tag>
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
           {a.post.status === "final" && (
             <div className="ml-auto">
@@ -175,6 +178,7 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
   const [changeNote, setChangeNote] = useState("");
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectNote, setRejectNote] = useState("");
+  const router = useRouter();
   const busy = approve.isPending || changes.isPending || reject.isPending;
   const onError = (e: unknown) => toast.error(errorMessage(e));
 
@@ -182,12 +186,34 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{a.post.status === "final" && a.status === "approved" ? "Ready to publish" : APPROVAL_STATUS_LABEL[a.status]}</CardTitle>
+          <CardTitle>
+            {a.stage === "copy" && a.status === "approved"
+              ? "Copy approved: ready for design"
+              : a.post.status === "final" && a.status === "approved"
+                ? "Ready to publish"
+                : APPROVAL_STATUS_LABEL[a.status]}
+          </CardTitle>
           <CardDescription>
             {a.reviewer && `${a.status === "approved" ? "Approved" : "Decided"} by ${a.reviewer.name ?? a.reviewer.email}`}
             {a.reviewed_at && <> · <time title={formatDateTime(a.reviewed_at)}>{timeAgo(a.reviewed_at)}</time></>}
           </CardDescription>
         </CardHeader>
+        {/* Copy approved: the design brief is open, ready to hand to a designer. */}
+        {a.stage === "copy" && a.status === "approved" && a.brief && (
+          <CardContent className="grid gap-3">
+            <p className="text-sm text-muted-foreground">
+              The design brief and brand guidelines for this post are ready. Open it to check them, or export the brief and send it
+              to your designer.
+            </p>
+            <Link href={`/design/${a.brief.id}`} className={buttonVariants()}>
+              <PaletteIcon />
+              Open design brief
+            </Link>
+            <div className="flex flex-wrap gap-2">
+              <HandoffButtons id={a.brief.id} />
+            </div>
+          </CardContent>
+        )}
         {/* Posts approved before approval and finalizing became one step. */}
         {can && a.status === "approved" && a.post.status === "approved" && (
           <CardContent>
@@ -212,7 +238,11 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
       <Card>
         <CardHeader>
           <CardTitle>Waiting for approval</CardTitle>
-          <CardDescription>An admin will approve this post or ask for changes.</CardDescription>
+          <CardDescription>
+            {a.stage === "copy"
+              ? "An admin will approve the copy, which opens the design brief, or ask for changes."
+              : "An admin will approve this post or ask for changes."}
+          </CardDescription>
         </CardHeader>
       </Card>
     );
@@ -222,17 +252,35 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
       <CardHeader>
         <CardTitle>Your decision</CardTitle>
         <CardDescription>
-          Approving makes the post ready to publish. Checking copy v{a.post_version}
+          {a.stage === "copy"
+            ? "Approving the copy opens the design brief and guidelines, which you can export for a designer. "
+            : "Approving makes the post ready to publish. "}
+          Checking copy v{a.post_version}
           {a.creative_version != null && ` and design v${a.creative_version}`}.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-2">
         <Button
           disabled={busy}
-          onClick={() => approve.mutate({ id: a.id, comment: "" }, { onSuccess: () => toast.success("Approved: ready to publish"), onError })}
+          onClick={() =>
+            approve.mutate(
+              { id: a.id, comment: "" },
+              {
+                onSuccess: (done) => {
+                  if (a.stage === "copy" && done.brief) {
+                    toast.success("Copy approved. The design brief is ready to export.");
+                    router.push(`/design/${done.brief.id}`);
+                  } else {
+                    toast.success("Approved: ready to publish");
+                  }
+                },
+                onError,
+              },
+            )
+          }
         >
           <CheckIcon />
-          Approve
+          {a.stage === "copy" ? "Approve copy" : "Approve"}
         </Button>
         <Button variant="outline" disabled={busy} onClick={() => setChangesOpen(true)}>
           <RotateCcwIcon />
@@ -249,7 +297,9 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
           <AlertDialogHeader>
             <AlertDialogTitle>What should change?</AlertDialogTitle>
             <AlertDialogDescription>
-              The post goes back to its creator, who can fix the copy, the design or both, then resubmit it.
+              {a.stage === "copy"
+                ? "The post goes back to its writer to revise the copy, then they submit it again."
+                : "The post goes back to its creator, who can fix the copy, the design or both, then resubmit it."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Textarea

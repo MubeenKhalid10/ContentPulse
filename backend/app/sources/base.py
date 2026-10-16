@@ -55,14 +55,30 @@ class SourceErrorKind(StrEnum):
     RATE_LIMITED = "rate_limited"
     UNAVAILABLE = "unavailable"
     BAD_RESPONSE = "bad_response"
+    # Not failures: the request was deliberately not sent (app/sources/quota.py).
+    BUDGET_EXHAUSTED = "budget_exhausted"
+    COOLING_DOWN = "cooling_down"
+
+
+# Kinds that mean "skipped on purpose", reported as such rather than as errors.
+SKIPPED_KINDS = frozenset({SourceErrorKind.BUDGET_EXHAUSTED, SourceErrorKind.COOLING_DOWN})
 
 
 class SourceError(Exception):
-    def __init__(self, kind: SourceErrorKind, message: str, *, status: int | None = None) -> None:
+    def __init__(
+        self,
+        kind: SourceErrorKind,
+        message: str,
+        *,
+        status: int | None = None,
+        retry_after: float | None = None,
+    ) -> None:
         super().__init__(message)
         self.kind = kind
         self.message = message
         self.status = status
+        # Seconds the provider asked us to wait (Retry-After), if it said.
+        self.retry_after = retry_after
 
     @property
     def public_message(self) -> str:
@@ -79,6 +95,8 @@ PUBLIC_ERRORS = {
     SourceErrorKind.RATE_LIMITED: "Rate limited or usage limit reached at the provider.",
     SourceErrorKind.UNAVAILABLE: "The provider was unavailable or did not respond in time.",
     SourceErrorKind.BAD_RESPONSE: "The provider rejected a request or sent an unexpected response.",
+    SourceErrorKind.BUDGET_EXHAUSTED: "Skipped: the daily request budget is used up.",
+    SourceErrorKind.COOLING_DOWN: "Skipped: paused after the provider's rate limit.",
 }
 _PUBLIC_ERROR = re.compile(
     "^(" + "|".join(re.escape(t) for t in PUBLIC_ERRORS.values()) + r")( \(HTTP \d{3}\))?$"
@@ -120,6 +138,8 @@ class SourceContext:
     warnings: list[str] = field(default_factory=list)
     # DNS resolver for the SSRF guard on user-supplied URLs (tests inject one).
     resolver: Resolver = system_resolver
+    # Whose run this is: only for per-organization request budgets.
+    organization_id: str | None = None
 
     def warn(self, source: str, message: str) -> None:
         self.warnings.append(f"{source}: {message}")
@@ -165,20 +185,38 @@ class TrendSource(ABC):
         if "auth" not in kwargs:
             from app.sources import provider_cache
 
+            name = cache or self.key
             prepared = provider_cache.prepare(
-                cache or self.key, method, url, kwargs.get("params"), kwargs.get("json")
+                name, method, url, kwargs.get("params"), kwargs.get("json")
+            )
+            send = self._guarded(
+                ctx, name, lambda: self._send(ctx, method, url, **kwargs), prepared
             )
             if prepared is not None:
-                return await provider_cache.get_or_fetch(
-                    prepared, lambda: self._send(ctx, method, url, **kwargs)
-                )
+                return await provider_cache.get_or_fetch(prepared, send)
             if method.upper() == "GET":
                 # No policy covers it: share within this process only.
-                key = request_cache.key(url, kwargs)
-                return await request_cache.get_or_fetch(
-                    key, lambda: self._send(ctx, method, url, **kwargs)
-                )
-        return await self._send(ctx, method, url, **kwargs)
+                return await request_cache.get_or_fetch(request_cache.key(url, kwargs), send)
+            return await send()
+        return await self._guarded(
+            ctx, cache or self.key, lambda: self._send(ctx, method, url, **kwargs), None
+        )()
+
+    def _guarded(
+        self,
+        ctx: SourceContext,
+        name: str,
+        call: Callable[[], Awaitable[httpx.Response]],
+        prepared: Any,
+    ) -> Callable[[], Awaitable[httpx.Response]]:
+        """An outbound request under the provider's cooldown and budget
+        (app/sources/quota.py). Runs only on a cache miss."""
+        from app.sources import provider_cache, quota
+
+        async def stale() -> httpx.Response | None:
+            return await provider_cache.stale_response(prepared) if prepared else None
+
+        return lambda: quota.guard(name, ctx.organization_id, call, stale=stale)
 
     async def cached_json(
         self,
@@ -195,13 +233,16 @@ class TrendSource(ABC):
         url = f"https://provider-cache.invalid/{name}"
         prepared = provider_cache.prepare(name, "GET", url, params)
         if prepared is None:
-            return await produce()
+            from app.sources import quota
 
-        async def fetch() -> httpx.Response:
+            return await quota.guard(name, ctx.organization_id, produce)
+
+        async def call() -> httpx.Response:
             return httpx.Response(
                 200, json=await produce(), request=httpx.Request("GET", prepared.url)
             )
 
+        fetch = self._guarded(ctx, name, call, prepared)
         return (await provider_cache.get_or_fetch(prepared, fetch)).json()
 
     async def _send(
@@ -220,6 +261,11 @@ class TrendSource(ABC):
                 SourceErrorKind.UNAVAILABLE, f"Connection failed ({type(exc).__name__})."
             ) from exc
         status = resp.status_code
+        retry_after = None
+        if status in (402, 429, 503):
+            from app.sources.quota import parse_retry_after
+
+            retry_after = parse_retry_after(resp.headers.get("retry-after"))
         if status in (401, 403):
             raise SourceError(
                 SourceErrorKind.AUTH,
@@ -228,7 +274,10 @@ class TrendSource(ABC):
             )
         if status == 429:
             raise SourceError(
-                SourceErrorKind.RATE_LIMITED, "Rate limited by the provider.", status=status
+                SourceErrorKind.RATE_LIMITED,
+                "Rate limited by the provider.",
+                status=status,
+                retry_after=retry_after,
             )
         if status == 402:
             # Used by several news APIs for "daily/plan usage limit reached".
@@ -236,6 +285,7 @@ class TrendSource(ABC):
                 SourceErrorKind.RATE_LIMITED,
                 "Usage limit reached for this plan (HTTP 402).",
                 status=status,
+                retry_after=retry_after,
             )
         if status >= 500:
             raise SourceError(
@@ -288,20 +338,29 @@ class TrendSource(ABC):
                 items.extend(result)
         if errors and not items and len(errors) == len(results):
             # Prefer the most actionable error (auth > rate limit > others).
-            order = [SourceErrorKind.AUTH, SourceErrorKind.RATE_LIMITED]
+            order = [
+                SourceErrorKind.AUTH,
+                SourceErrorKind.RATE_LIMITED,
+                SourceErrorKind.BUDGET_EXHAUSTED,
+                SourceErrorKind.COOLING_DOWN,
+            ]
             errors.sort(key=lambda e: order.index(e.kind) if e.kind in order else len(order))
             raise errors[0]
         for error in errors:
-            ctx.warn(self.name, f"some requests failed: {error.message}")
+            verb = "were skipped" if error.kind in SKIPPED_KINDS else "failed"
+            ctx.warn(self.name, f"some requests {verb}: {error.message}")
         return items
+
+
+REMEMBERED_FAILURES = frozenset({SourceErrorKind.UNAVAILABLE, SourceErrorKind.BAD_RESPONSE})
 
 
 class RequestCache:
     """Short-lived cache of GET responses shared across discovery runs.
 
-    Concurrent identical requests wait for one in-flight fetch. Failures are
-    remembered briefly too, so a rate-limited provider isn't hit again by every
-    organization in the same minute.
+    Concurrent identical requests wait for one in-flight fetch. Transient
+    failures are remembered briefly too, so a provider that is down isn't hit
+    again by every organization in the same minute.
     """
 
     SUCCESS_TTL = 600.0
@@ -344,8 +403,10 @@ class RequestCache:
         try:
             response = await fetch()
         except BaseException as exc:
-            # Remember failures briefly; cancellations are not remembered.
-            if isinstance(exc, SourceError):
+            # Remember transient failures briefly (an outage, a bad response).
+            # Rate limits, exhausted quota and bad credentials are not cache
+            # entries: provider cooldowns (app/sources/quota.py) handle those.
+            if isinstance(exc, SourceError) and exc.kind in REMEMBERED_FAILURES:
                 self._entries[key] = (now + self.FAILURE_TTL, future)
                 future.set_exception(exc)
                 future.exception()  # mark retrieved: waiters re-raise it

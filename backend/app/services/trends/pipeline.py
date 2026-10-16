@@ -14,9 +14,16 @@ from sqlalchemy import func, literal_column, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.models.trend import Trend, TrendMention
 from app.services.trends.clustering import Cluster, cluster_items, similar_keys
-from app.services.trends.scoring import MentionView, OrgProfile, most_common, score_trend
+from app.services.trends.scoring import (
+    MentionView,
+    OrgProfile,
+    keyword_match,
+    most_common,
+    score_trend,
+)
 from app.sources.base import RawTrendItem
 
 MATCH_WINDOW = timedelta(days=14)
@@ -29,6 +36,7 @@ class IngestStats:
     trends_updated: int = 0
     mentions_created: int = 0
     unclustered: int = 0
+    filtered: int = 0
 
 
 async def _upsert_mention(
@@ -91,11 +99,36 @@ def _find_match(cluster: Cluster, known: list[tuple[uuid.UUID, str]]) -> uuid.UU
     return None
 
 
+# keyword_match scores: 60 = two shared terms, 70 = industry phrase, 90+ = service/keyword.
+MIN_ORG_MATCH = 60
+
+
+def _item_text(item: RawTrendItem) -> str:
+    news = " ".join(n.get("title") or "" for n in item.raw_data.get("news", []))
+    return " ".join([item.topic or "", item.title, item.description or "", *item.keywords, news])
+
+
+def related_items(items: list[RawTrendItem], profile: OrgProfile) -> list[RawTrendItem]:
+    """Keep only items that clearly connect to the organization's own focus.
+
+    With nothing to compare against (no keywords, services or industry) every
+    item is kept, since relevance can't be judged.
+    """
+    has_focus = bool(profile.tracked_keywords or profile.service_names or profile.industry_terms)
+    if not has_focus:
+        return items
+    return [i for i in items if keyword_match(_item_text(i), profile)["score"] >= MIN_ORG_MATCH]
+
+
 async def ingest(
     db: AsyncSession, org_id: uuid.UUID, items: list[RawTrendItem], profile: OrgProfile
 ) -> IngestStats:
     now = datetime.now(UTC)
     stats = IngestStats()
+    if get_settings().trend_relevance_prefilter:
+        kept = related_items(items, profile)
+        stats.filtered = len(items) - len(kept)
+        items = kept
     clusters, stats.unclustered = cluster_items(items, profile.search_keywords)
 
     known = list(
@@ -112,21 +145,52 @@ async def ingest(
         trend_id = _find_match(cluster, known)
         if trend_id is None:
             first_seen = min((i.published_at or now for i in cluster.items), default=now)
-            trend = Trend(
-                organization_id=org_id,
-                canonical_key=cluster.key,
-                topic=cluster.topic[:300],
-                title=cluster.items[0].title[:500],
-                description=next((i.description for i in cluster.items if i.description), None),
-                keywords=cluster.keywords(),
-                first_seen_at=min(first_seen, now),
-                last_seen_at=now,
+            # The 14-day match window above deliberately limits fuzzy matching,
+            # but the unique key lasts for the lifetime of the organization.
+            # Reuse an exact older match before inserting, and use ON CONFLICT
+            # for the case where another discovery transaction inserts it at
+            # the same time.
+            trend_id = await db.scalar(
+                select(Trend.id).where(
+                    Trend.organization_id == org_id,
+                    Trend.canonical_key == cluster.key,
+                )
             )
-            db.add(trend)
-            await db.flush()
-            trend_id = trend.id
+            created = False
+            if trend_id is None:
+                insert_stmt = insert(Trend).values(
+                    id=uuid.uuid4(),
+                    organization_id=org_id,
+                    canonical_key=cluster.key,
+                    topic=cluster.topic[:300],
+                    title=cluster.items[0].title[:500],
+                    description=next((i.description for i in cluster.items if i.description), None),
+                    keywords=cluster.keywords(),
+                    first_seen_at=min(first_seen, now),
+                    last_seen_at=now,
+                )
+                row = (
+                    await db.execute(
+                        insert_stmt.on_conflict_do_update(
+                            index_elements=["organization_id", "canonical_key"],
+                            set_={"last_seen_at": now},
+                        ).returning(Trend.id, literal_column("(xmax = 0)"))
+                    )
+                ).one()
+                trend_id, created = row
+            if created:
+                stats.trends_created += 1
+            else:
+                # Load the row so scoring and subsequent clusters in this ingest
+                # use its persisted state, including when it predated the window.
+                trend = await db.get(Trend, trend_id)
+                if trend is not None:
+                    trend.last_seen_at = now
+                    trend.keywords = list(dict.fromkeys([*trend.keywords, *cluster.keywords()]))[
+                        :12
+                    ]
+                stats.trends_updated += 1
             known.append((trend_id, cluster.key))
-            stats.trends_created += 1
         else:
             trend = await db.get(Trend, trend_id)
             assert trend is not None

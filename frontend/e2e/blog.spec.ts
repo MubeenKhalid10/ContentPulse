@@ -49,7 +49,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await expect(page.getByText("Content setup saved")).toBeVisible();
 
   // Discover, then shortlist the top trend.
-  await page.getByRole("link", { name: "Trends", exact: true }).first().click();
+  await page.getByRole("link", { name: /Find trends/ }).first().click();
   const startFirst = page.getByRole("button", { name: "Discover New Trends now" }).first();
   const startAgain = page.getByRole("button", { name: "Discover New Trends now" }).last();
   const inProgress = page.getByRole("button", { name: "Discovering…" });
@@ -72,7 +72,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await expect(page.getByText(`Shortlisted “${topic}”`)).toBeVisible();
 
   // Topics can be filtered by Blog; open the shortlisted one.
-  await page.getByRole("link", { name: "Topics", exact: true }).click();
+  await page.getByRole("link", { name: /Pick topics/ }).first().click();
   await page.getByRole("tab", { name: /^Shortlisted/ }).click();
   const topics = page.getByRole("list", { name: "Topics" });
   await expect(topics).toHaveAttribute("aria-busy", "false");
@@ -87,7 +87,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   const seoPlan = dialog.getByRole("group", { name: "SEO plan" });
   await expect(seoPlan).toBeVisible();
   await dialog.getByRole("button", { name: "Draft from playbook" }).click();
-  await expect(dialog.getByLabel("Content angle")).not.toHaveValue("");
+  await expect(dialog.getByLabel("Post idea")).not.toHaveValue("");
   await expect(seoPlan.getByLabel("Primary keyword")).not.toHaveValue("");
   await expect(seoPlan.getByLabel("Outline")).not.toHaveValue("");
   await seoPlan.getByLabel("Target words").fill("1800");
@@ -121,7 +121,10 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await shot(page, "blog-02-studio");
 
   // Featured image: add it on the design task and submit, then one approval.
-  await page.getByRole("button", { name: "Send to design" }).click();
+  // The copy needs an admin's approval before design: approving it opens the design task.
+  await page.getByRole("button", { name: "Submit for approval" }).click();
+  await page.getByRole("link", { name: "Review & approve" }).click();
+  await page.getByRole("button", { name: "Approve copy" }).click();
   await expect(page).toHaveURL(/\/design\//);
   await expect(page.getByText("Design brief", { exact: true })).toBeVisible();
   await expect(page.getByText(/1200×630/).first()).toBeVisible();
@@ -130,7 +133,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await page.getByRole("button", { name: "Upload & submit for approval" }).click();
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
 
-  await page.getByRole("link", { name: "Approvals", exact: true }).click();
+  await page.getByRole("link", { name: /^5. Approve$/ }).click();
   const queue = page.getByRole("list", { name: "Approvals" });
   await expect(queue.getByRole("link")).toHaveCount(1);
   await queue.getByRole("link").click();

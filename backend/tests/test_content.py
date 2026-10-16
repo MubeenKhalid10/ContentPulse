@@ -139,6 +139,19 @@ def test_checks_flag_forbidden_terms_length_and_missing_cta():
 # --- Generation ---------------------------------------------------------------------
 
 
+async def send_to_design(admin, post_id: str) -> dict:
+    """Submit the copy for review and approve it: the admin gate before design."""
+    submitted = await admin.post(f"{API}/{post_id}/submit-for-review")
+    assert submitted.status_code == 200, submitted.text
+    assert submitted.json()["status"] == "content_review"
+    queue = (await admin.get("/api/v1/approvals")).json()["items"]
+    request = next(a for a in queue if a["post"]["id"] == post_id)
+    assert request["stage"] == "copy"
+    approved = await admin.post(f"/api/v1/approvals/{request['id']}/approve", json={})
+    assert approved.status_code == 200, approved.text
+    return (await admin.get(f"{API}/{post_id}")).json()
+
+
 async def test_generate_post_from_approved_strategy(client, internet, content_ai, db):
     admin, org = await setup_org(client)
     strategy = await approved_strategy(admin, org)
@@ -343,7 +356,7 @@ async def test_review_and_hand_off_to_design(client, internet, content_ai):
     # The "In review" step (no reviewer) is gone.
     assert (await admin.post(f"{url}/submit-review")).status_code in (404, 405)
 
-    sent = (await admin.post(f"{url}/send-to-design")).json()
+    sent = await send_to_design(admin, post["id"])
     assert sent["status"] == "design_pending"
     # A typo found during design can still be fixed without leaving design.
     assert sent["editable"] is True
@@ -367,7 +380,7 @@ async def test_empty_post_cant_move_on(client, internet, content_ai):
     strategy = await approved_strategy(admin, org)
     content_ai.post_fail = AIError(AIErrorKind.RATE_LIMITED, "quota")
     post = await generated(admin, strategy)
-    resp = await admin.post(f"{API}/{post['id']}/send-to-design")
+    resp = await admin.post(f"{API}/{post['id']}/submit-for-review")
     assert resp.status_code == 409
 
 
@@ -412,3 +425,39 @@ async def test_content_permissions_and_isolation(client, internet, content_ai):
         await outsider.post(f"{API}/generate", json={"strategy_id": strategy["id"]})
     ).status_code == 404
     assert (await outsider.get(API)).json()["total"] == 0
+
+
+async def test_copy_needs_admin_approval_before_design(client, internet, content_ai):
+    admin, org = await setup_org(client)
+    post = await generated(admin, await approved_strategy(admin, org))
+    url = f"{API}/{post['id']}"
+
+    # No way to skip the gate.
+    assert (await admin.post(f"{url}/send-to-design")).status_code in (404, 405)
+
+    assert (await admin.post(f"{url}/submit-for-review")).json()["status"] == "content_review"
+    queue = (await admin.get("/api/v1/approvals")).json()["items"]
+    [request] = [a for a in queue if a["post"]["id"] == post["id"]]
+    assert request["stage"] == "copy" and request["creative_version"] is None
+    assert (await admin.get("/api/v1/design/tasks")).json()["items"] == []
+
+    # Changes requested: back to the writer, with the reason on record, no design task yet.
+    changes = await admin.post(
+        f"/api/v1/approvals/{request['id']}/request-changes", json={"comment": "Shorter hook"}
+    )
+    assert changes.status_code == 200
+    assert (await admin.get(url)).json()["status"] == "draft"
+    assert (await admin.get("/api/v1/design/tasks")).json()["items"] == []
+
+    # Resubmit and approve: the design brief opens.
+    sent = await send_to_design(admin, post["id"])
+    assert sent["status"] == "design_pending" and sent["design_task"]["id"]
+
+
+async def test_withdrawing_copy_review_clears_the_request(client, internet, content_ai):
+    admin, org = await setup_org(client)
+    post = await generated(admin, await approved_strategy(admin, org))
+    url = f"{API}/{post['id']}"
+    await admin.post(f"{url}/submit-for-review")
+    assert (await admin.post(f"{url}/back-to-draft")).json()["status"] == "draft"
+    assert (await admin.get("/api/v1/approvals")).json()["items"] == []

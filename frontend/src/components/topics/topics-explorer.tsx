@@ -73,8 +73,8 @@ export function TopicsExplorer() {
   return (
     <>
       <PageHeader
-        title="Topics"
-        description="Trends that fit your organization. Shortlist the ones worth posting about, then plan a post for each platform."
+        title="Pick topics"
+        description="Trends that fit your business and are waiting for your decision. Choose the ones worth posting about, then plan one post for each platform."
       />
 
       {noTopicsAtAll ? (

@@ -24,6 +24,16 @@ HELP = {
     "llm_queue_wait_seconds": ("histogram", "Time waiting for quota before a request."),
     "llm_latency_seconds": ("histogram", "Provider request duration."),
     "llm_concurrency": ("gauge", "Provider requests in flight in this process."),
+    # Trend sources (app/sources/quota.py, app/workers): no organization labels.
+    "trend_provider_requests_total": (
+        "counter",
+        "Outbound trend-source requests by outcome (ok, error kind, or skip reason).",
+    ),
+    "trend_provider_latency_seconds": ("histogram", "Outbound trend-source request duration."),
+    "trend_discovery_runs_total": ("counter", "Finished discovery runs by status and trigger."),
+    "trend_discovery_duration_seconds": ("histogram", "Discovery run duration."),
+    "trend_scheduler_runs_started_total": ("counter", "Runs started by the scheduler."),
+    "trend_scheduler_stale_runs_total": ("counter", "Unresponsive runs closed by the scheduler."),
 }
 
 Labels = tuple[tuple[str, str], ...]

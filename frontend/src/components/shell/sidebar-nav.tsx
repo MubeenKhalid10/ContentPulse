@@ -48,12 +48,12 @@ export function SidebarNav({
         );
         if (!items.length) return null;
         return (
-          <div key={section.label ?? i} className="mb-4">
-            {section.label && (
-              <p className="slug px-2.5 pb-1.5 text-muted-foreground">
-                {section.label}
-              </p>
-            )}
+          <Section
+            key={section.label ?? i}
+            label={section.label}
+            collapsible={section.collapsible}
+            hasCurrent={items.some((it) => it.href === current)}
+          >
             <ul className="grid gap-0.5">
               {items.map((item) => {
                 const Icon = item.icon;
@@ -96,10 +96,56 @@ export function SidebarNav({
                 );
               })}
             </ul>
-          </div>
+          </Section>
         );
       })}
     </nav>
+  );
+}
+
+/** A labelled group of links; collapsible ones stay closed until you're inside one. */
+function Section({
+  label,
+  collapsible,
+  hasCurrent,
+  children,
+}: {
+  label?: string;
+  collapsible?: boolean;
+  hasCurrent: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!collapsible) {
+    return (
+      <div className="mb-4">
+        {label && (
+          <p className="slug px-2.5 pb-1.5 text-muted-foreground">{label}</p>
+        )}
+        {children}
+      </div>
+    );
+  }
+  const expanded = open || hasCurrent;
+  return (
+    <div className="mb-2">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setOpen(!expanded)}
+        className="slug flex w-full items-center justify-between rounded-sm px-2.5 py-1.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        {label}
+        <ChevronDownIcon
+          aria-hidden
+          className={cn(
+            "size-4 transition-transform",
+            expanded && "rotate-180",
+          )}
+        />
+      </button>
+      {expanded && <div className="pt-1">{children}</div>}
+    </div>
   );
 }
 

@@ -192,8 +192,9 @@ def align_with_rules(
         fit = max(fit, 60)
         reasons.append("It matches one of your tracked keywords.")
     elif (trend.signals.get("keyword_match") or {}).get("match") == "industry":
-        fit = max(fit, 45)
-        reasons.append("It relates to your industry.")
+        # Industry adjacency alone isn't a tie to the website's own offering.
+        fit = max(fit, 30)
+        reasons.append("It only relates to your industry, not to a specific service or topic.")
     elif keyword_score >= 35:
         fit = max(fit, 25)
     if not reasons:

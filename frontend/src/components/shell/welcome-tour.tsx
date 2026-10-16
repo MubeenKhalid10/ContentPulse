@@ -120,12 +120,13 @@ export function WelcomeTour({ me }: { me: Me }) {
       body: (
         <ul className="grid gap-1.5 text-sm text-muted-foreground">
           <li>
-            • Creators shortlist topics, write each post, add its design and
-            send it for approval.
+            • Creators shortlist topics and write each post, then submit the
+            copy for approval.
           </li>
           <li>
-            • Admins approve posts in Approvals, which makes them ready to
-            publish.
+            • Admins approve the copy first. That opens the design brief, which
+            they can export for a designer. After the design is added, they
+            approve it again and the post is ready to publish.
           </li>
           <li>• Viewers can see everything and share finished posts.</li>
         </ul>

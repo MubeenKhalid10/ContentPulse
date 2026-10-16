@@ -84,7 +84,7 @@ export function AlignmentPanel({
           <div className="grid min-w-0 flex-1 gap-2">
             <CardTitle className="flex items-center gap-2">
               <SparklesIcon className="size-4 text-primary" />
-              Relevance to your organization
+              Does this fit your business?
             </CardTitle>
             {analyzed && (
               <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -189,7 +189,7 @@ export function AlignmentPanel({
               Not analyzed yet. Analysis judges how this trend relates to your
               services, explains the connection with evidence from your
               knowledge base
-              {engineIsAI ? ", and suggests content angles." : "."}
+              {engineIsAI ? ", and suggests post ideas." : "."}
             </p>
             {canReview && (
               <Button onClick={runAnalysis} disabled={analyze.isPending}>
@@ -203,15 +203,20 @@ export function AlignmentPanel({
         {analyzed && (
           <>
             {a.reason && (
-              <p className="text-sm leading-relaxed">
-                <CitedText text={a.reason} />
-              </p>
+              <div className="grid gap-1.5">
+                <p className="text-xs font-medium text-muted-foreground">
+                  How this connects to your website and services
+                </p>
+                <p className="text-sm leading-relaxed">
+                  <CitedText text={a.reason} />
+                </p>
+              </div>
             )}
 
             {!!a.matched_services?.length && (
               <div className="grid gap-1.5">
                 <p className="text-xs font-medium text-muted-foreground">
-                  Connects to
+                  Your services it matches
                 </p>
                 <ul className="flex flex-wrap gap-1.5">
                   {a.matched_services.map((s) => (
@@ -226,7 +231,7 @@ export function AlignmentPanel({
             {!!a.possible_angles?.length && (
               <div className="grid gap-2">
                 <p className="text-xs font-medium text-muted-foreground">
-                  Content angles
+                  Post ideas
                 </p>
                 <ol className="grid gap-2">
                   {a.possible_angles.map((angle, i) => (
@@ -244,10 +249,10 @@ export function AlignmentPanel({
                             size="sm"
                             variant="outline"
                             className="ml-auto"
-                            aria-label={`Plan a post from “${angle.title}”`}
+                            aria-label={`Plan a post from the idea “${angle.title}”`}
                             onClick={() => onPlanAngle(angle)}
                           >
-                            Plan a post from this angle
+                            Plan a post from this idea
                           </Button>
                         )}
                       </p>
@@ -261,7 +266,7 @@ export function AlignmentPanel({
               <p className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
                 This is a basic estimate from keyword and knowledge-base
                 matches. Ask your administrator to turn on AI analysis for
-                written reasoning and tailored content angles.
+                written reasoning and tailored post ideas.
               </p>
             )}
 
@@ -269,8 +274,8 @@ export function AlignmentPanel({
               <div className="grid gap-1.5 rounded-lg bg-destructive/5 p-3">
                 <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
                   <ShieldAlertIcon className="size-3.5" />
-                  Don&apos;t claim (not supported by your profile or knowledge
-                  base)
+                  Avoid saying this (your website and documents don&apos;t back it
+                  up)
                 </p>
                 <ul className="grid list-disc gap-0.5 pl-5 text-sm">
                   {a.unsupported_claims.map((c) => (

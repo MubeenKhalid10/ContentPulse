@@ -8,7 +8,7 @@ Relevance levels:
 - weakly_relevant: a tenuous or generic connection; only worth covering with an unusually strong angle.
 - not_relevant: no credible connection, or engaging would be off-brand or insensitive (for example tragedies, crime or partisan politics, unless the organization works in that space).
 
-Be discerning. Most trends are not relevant to any one organization, and a confident "not_relevant" is a useful answer. Popularity alone never makes a trend relevant.
+Be strict. This organization uses the results to pick topics for its social media and blog posts, so a trend is only relevant when the organization's own website content (its services, products, expertise and audience in the profile and knowledge passages) gives it something specific and credible to say about it. Sharing a broad industry, a buzzword or an audience is not enough: a trend that merely sits near the organization's industry, but touches none of its listed services, expertise or tracked topics, is weakly_relevant at best. When in doubt between two levels, choose the lower one. Most trends are not relevant to any one organization, and a confident "not_relevant" is a useful answer. Popularity alone never makes a trend relevant.
 
 Content angles must be specific to this organization rather than generic advice, fit its brand voice, and name the knowledge passages that support them. Offer at most three, and none at all when the trend is weakly or not relevant. Cite passages in your reasoning as [K1], [K2] and so on.
 

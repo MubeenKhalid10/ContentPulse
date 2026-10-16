@@ -32,6 +32,14 @@ export function useDesignTasks(filters: DesignFilters, limit = 30) {
   });
 }
 
+export interface HandoffDocument {
+  file_name: string;
+  markdown: string;
+}
+
+/** The brief as one Markdown document for a designer working outside the app. */
+export const fetchHandoff = (id: string) => api<HandoffDocument>(`/design/tasks/${id}/handoff`);
+
 export function useDesignTask(id: string) {
   const orgId = useOrgId();
   return useQuery({

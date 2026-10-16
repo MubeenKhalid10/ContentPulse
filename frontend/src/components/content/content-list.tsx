@@ -62,7 +62,7 @@ export function ContentList() {
   return (
     <>
       <PageHeader
-        title="Content studio"
+        title="Write posts"
         description="Write and edit your posts. When the copy is ready, send the post to design. Earlier versions are always kept."
       />
       {nothingYet ? (

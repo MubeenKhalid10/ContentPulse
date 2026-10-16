@@ -29,6 +29,8 @@ from app.schemas.approval import (
 from app.schemas.content import VersionRead
 from app.services import audit
 from app.services.audit import AuditAction
+from app.services.design import briefs as design_briefs
+from app.services.design import service as design
 from app.services.design.service import creative_versions, person
 from app.services.workflow import transition_post
 from app.storage import get_storage
@@ -90,7 +92,10 @@ async def _items(db: AsyncSession, requests: list[ApprovalRequest]) -> list[Appr
         select(
             ApprovalRequest.id,
             func.row_number()
-            .over(partition_by=ApprovalRequest.post_id, order_by=ApprovalRequest.created_at)
+            .over(
+                partition_by=[ApprovalRequest.post_id, ApprovalRequest.creative_version.is_(None)],
+                order_by=ApprovalRequest.created_at,
+            )
             .label("round"),
         )
         .where(ApprovalRequest.post_id.in_(post_ids))
@@ -122,6 +127,7 @@ async def _items(db: AsyncSession, requests: list[ApprovalRequest]) -> list[Appr
         items.append(
             ApprovalListItem(
                 id=r.id,
+                stage="copy" if r.creative_version is None else "design",
                 status=r.status,
                 round=rounds.get(r.id, 1),
                 post=ApprovalPost(
@@ -316,6 +322,7 @@ async def approval_detail(
         rounds=[
             Round(
                 id=r.id,
+                stage="copy" if r.creative_version is None else "design",
                 status=r.status,
                 post_version=r.post_version,
                 creative_version=r.creative_version,
@@ -340,6 +347,14 @@ DECISIONS = {
         "changes_requested",
     ),
     A.REJECTED: (PostStatus.REJECTED, AuditAction.REJECTED, "rejected"),
+}
+
+
+# Where a post goes after a decision on its copy (before any design exists).
+COPY_TARGETS = {
+    A.APPROVED: PostStatus.DESIGN_PENDING,
+    A.CHANGES_REQUESTED: PostStatus.DRAFT,
+    A.REJECTED: PostStatus.REJECTED,
 }
 
 
@@ -375,8 +390,16 @@ async def decide(
     post = await db.get(Post, request.post_id)
     assert post is not None
     target, action, kind = DECISIONS[decision]
+    copy_stage = request.creative_version is None
+    ai_brief = None
+    if copy_stage:
+        # Copy review: approval opens the design brief; it does not finish the post.
+        target = COPY_TARGETS[decision]
     await transition_post(db, post, target, user_id=user_id)
-    if decision == A.APPROVED:
+    if copy_stage and decision == A.APPROVED:
+        brief = await design.open_brief(db, post, user_id)
+        ai_brief = await design_briefs.start_ai_brief(db, brief)
+    elif decision == A.APPROVED:
         # One click: approved posts are locked and ready to publish.
         await transition_post(db, post, PostStatus.FINAL, user_id=user_id)
 
@@ -385,11 +408,17 @@ async def decide(
     if comment:
         db.add(_comment(request, user_id, comment, kind))
 
-    brief = await db.scalar(
-        select(DesignBrief)
-        .where(DesignBrief.post_id == post.id, DesignBrief.status == DesignBriefStatus.SUBMITTED)
-        .order_by(DesignBrief.created_at.desc())
-        .limit(1)
+    brief = (
+        None
+        if copy_stage
+        else await db.scalar(
+            select(DesignBrief)
+            .where(
+                DesignBrief.post_id == post.id, DesignBrief.status == DesignBriefStatus.SUBMITTED
+            )
+            .order_by(DesignBrief.created_at.desc())
+            .limit(1)
+        )
     )
     if brief is not None:
         if decision == A.APPROVED:
@@ -410,10 +439,12 @@ async def decide(
             "approval_request_id": request.id,
             "post_version": request.post_version,
             "creative_version": request.creative_version,
-            **({"scope": scope} if decision == A.CHANGES_REQUESTED else {}),
+            **({"stage": "copy"} if copy_stage else {}),
+            **({"scope": scope} if decision == A.CHANGES_REQUESTED and not copy_stage else {}),
         },
     )
     await db.commit()
+    design_briefs.submit(ai_brief)
     return await approval_detail(db, organization_id, request.id)
 
 

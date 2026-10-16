@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import InvalidStateTransition
 from app.models.approval import ApprovalComment, ApprovalRequest
 from app.models.design import CreativeAsset, DesignBrief
-from app.models.enums import DesignBriefStatus, PostStatus
+from app.models.enums import ApprovalStatus, DesignBriefStatus, PostStatus
 from app.models.post import Post
 from app.models.user import User
 from app.schemas.design import Person, ReviewComment, ReviewSummary
@@ -91,6 +91,62 @@ async def submit_post(
     return request
 
 
+async def submit_copy(
+    db: AsyncSession, post: Post, user_id: uuid.UUID, note: str | None = None
+) -> ApprovalRequest:
+    """DRAFT → CONTENT_REVIEW: an admin approves the written copy before design.
+    The request has no creative version, which marks it as the copy stage."""
+    await transition_post(db, post, PostStatus.CONTENT_REVIEW, user_id=user_id)
+    request = ApprovalRequest(
+        organization_id=post.organization_id,
+        post_id=post.id,
+        post_version=post.current_version,
+        creative_version=None,
+        submitted_by=user_id,
+    )
+    db.add(request)
+    await db.flush()
+    if note:
+        db.add(
+            ApprovalComment(
+                organization_id=post.organization_id,
+                approval_request_id=request.id,
+                post_id=post.id,
+                post_version=post.current_version,
+                creative_version=None,
+                author_id=user_id,
+                body=note,
+                kind="resubmitted",
+            )
+        )
+    audit.record(
+        db,
+        organization_id=post.organization_id,
+        user_id=user_id,
+        action=AuditAction.APPROVAL_REQUESTED,
+        entity_type="post",
+        entity_id=post.id,
+        new_value={
+            "approval_request_id": request.id,
+            "post_version": post.current_version,
+            "stage": "copy",
+        },
+    )
+    return request
+
+
+async def withdraw_copy(db: AsyncSession, post: Post) -> None:
+    """Back to draft before anyone reviewed it: drop the open copy request."""
+    for request in await db.scalars(
+        select(ApprovalRequest).where(
+            ApprovalRequest.post_id == post.id,
+            ApprovalRequest.creative_version.is_(None),
+            ApprovalRequest.status == ApprovalStatus.PENDING,
+        )
+    ):
+        await db.delete(request)
+
+
 async def latest_review(db: AsyncSession, post_id: uuid.UUID) -> ReviewSummary | None:
     """The most recent approval round for a post, with its comments."""
     request = await db.scalar(
@@ -101,7 +157,13 @@ async def latest_review(db: AsyncSession, post_id: uuid.UUID) -> ReviewSummary |
     )
     if request is None:
         return None
-    rounds = await db.scalar(select(func.count()).where(ApprovalRequest.post_id == post_id))
+    # Rounds count within a stage: the copy review is round 1 of its own.
+    rounds = await db.scalar(
+        select(func.count()).where(
+            ApprovalRequest.post_id == post_id,
+            ApprovalRequest.creative_version.is_(None) == (request.creative_version is None),
+        )
+    )
     comments = list(
         await db.scalars(
             select(ApprovalComment)

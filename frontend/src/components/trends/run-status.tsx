@@ -19,6 +19,9 @@ const DOT: Record<SourceResult["status"], string> = {
   not_configured: "bg-muted-foreground/40",
   running: "bg-primary animate-pulse",
   unknown: "bg-muted-foreground/40",
+  budget_exhausted: "bg-warning",
+  cooling_down: "bg-warning",
+  skipped_recent: "bg-muted-foreground/40",
 };
 
 function describe(result: SourceResult): string {
@@ -31,6 +34,12 @@ function describe(result: SourceResult): string {
       return result.error ?? "Not configured";
     case "running":
       return "Collecting…";
+    case "budget_exhausted":
+      return result.error ?? "Skipped: daily request budget used up";
+    case "cooling_down":
+      return result.error ?? "Skipped: provider rate limit cooldown";
+    case "skipped_recent":
+      return result.error ?? "Skipped: collected recently";
     default:
       return "Unknown source";
   }

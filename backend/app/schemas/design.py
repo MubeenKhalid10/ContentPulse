@@ -139,6 +139,11 @@ class TaskDetail(TaskListItem):
     review: ReviewSummary | None = None
 
 
+class HandoffDocument(BaseModel):
+    file_name: str
+    markdown: str
+
+
 class BriefUpdate(BaseModel):
     format: DesignFormat | None = None
     dimensions: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] | None = (

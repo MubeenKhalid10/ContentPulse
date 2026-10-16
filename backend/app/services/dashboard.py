@@ -99,7 +99,7 @@ async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSumm
         relevant_trends=trend_counts[1],
         shortlisted_topics=shortlisted or 0,
         topics_to_review=to_review or 0,
-        drafts=post_counts.get(PostStatus.DRAFT, 0) + post_counts.get(PostStatus.CONTENT_REVIEW, 0),
+        drafts=post_counts.get(PostStatus.DRAFT, 0),
         # Design queue: everything a designer still has to act on.
         design_pending=sum(
             post_counts.get(s, 0)
@@ -110,7 +110,9 @@ async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSumm
                 PostStatus.CHANGES_REQUESTED,
             )
         ),
-        pending_approval=post_counts.get(PostStatus.PENDING_APPROVAL, 0),
+        # Copy awaiting approval plus designs awaiting approval.
+        pending_approval=post_counts.get(PostStatus.PENDING_APPROVAL, 0)
+        + post_counts.get(PostStatus.CONTENT_REVIEW, 0),
         approved=post_counts.get(PostStatus.APPROVED, 0) + post_counts.get(PostStatus.FINAL, 0),
         top_trends=[
             TopTrend(
@@ -140,13 +142,13 @@ async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSumm
 
 PERIODS = (7, 30, 90)
 PIPELINE = {
-    "draft": (PostStatus.DRAFT, PostStatus.CONTENT_REVIEW),
+    "draft": (PostStatus.DRAFT,),
     "design": (
         PostStatus.DESIGN_PENDING,
         PostStatus.DESIGN_IN_PROGRESS,
         PostStatus.DESIGN_UPLOADED,
     ),
-    "approval": (PostStatus.PENDING_APPROVAL,),
+    "approval": (PostStatus.CONTENT_REVIEW, PostStatus.PENDING_APPROVAL),
     "changes": (PostStatus.CHANGES_REQUESTED,),
     "ready": (PostStatus.APPROVED, PostStatus.FINAL),
 }
@@ -288,7 +290,8 @@ async def overview(
         relevant_trends=relevant_trends,
         posts_generated=posts_generated,
         approved_posts=approved_posts,
-        pending_approval=by_status.get(PostStatus.PENDING_APPROVAL, 0),
+        pending_approval=by_status.get(PostStatus.PENDING_APPROVAL, 0)
+        + by_status.get(PostStatus.CONTENT_REVIEW, 0),
         trending=trending,
         platform_breakdown=platforms,
         pipeline=pipeline,

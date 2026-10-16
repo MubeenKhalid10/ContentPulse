@@ -31,7 +31,7 @@ import type { Post, Strategy } from "@/types/api";
 const ROWS: [keyof Strategy, string][] = [
   ["objective", "Objective"],
   ["target_audience", "Audience"],
-  ["content_angle", "Angle"],
+  ["content_angle", "Post idea"],
   ["hook_direction", "Hook"],
   ["cta_direction", "Call to action"],
   ["tone", "Tone"],

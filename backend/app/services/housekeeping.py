@@ -27,9 +27,12 @@ async def prune_llm_requests(now: datetime | None = None) -> int:
 async def prune_provider_cache() -> int:
     """Delete shared provider responses past their stale window, and dead
     leases (bounded batches)."""
-    from app.sources.provider_cache import store
+    from app.sources.provider_cache import persisted_sources, store
 
-    deleted = await store.prune(get_settings().provider_cache_stale_seconds)
+    # Providers no longer allowed in the shared cache lose their stored copies
+    # within the hour (e.g. after a deletion request or a terms change).
+    deleted = await store.purge_except(persisted_sources())
+    deleted += await store.prune(get_settings().provider_cache_stale_seconds)
     if deleted:
         logger.info("Deleted %d expired provider cache entr(ies)", deleted)
     return deleted
@@ -37,7 +40,10 @@ async def prune_provider_cache() -> int:
 
 async def run_housekeeping(now: datetime | None = None) -> dict[str, int]:
     """Every clean-up task (hourly from the in-process scheduler and Celery beat)."""
+    from app.sources.quota import prune_hashtags
+
     return {
         "llm_requests": await prune_llm_requests(now),
         "provider_cache": await prune_provider_cache(),
+        "instagram_hashtags": await prune_hashtags(),
     }

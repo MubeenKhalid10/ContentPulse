@@ -23,6 +23,8 @@ class ApprovalPost(BaseModel):
 
 class ApprovalListItem(BaseModel):
     id: uuid.UUID
+    # "copy": the written post, before design. "design": copy plus the creative.
+    stage: Literal["copy", "design"]
     status: ApprovalStatus
     round: int  # 1 for the first submission of this post, 2 after one revision...
     post: ApprovalPost
@@ -77,6 +79,7 @@ class BriefSummary(BaseModel):
 
 class Round(BaseModel):
     id: uuid.UUID
+    stage: Literal["copy", "design"]
     status: ApprovalStatus
     post_version: int
     creative_version: int | None

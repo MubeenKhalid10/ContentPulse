@@ -81,14 +81,33 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     if settings.metrics_enabled:
+        from fastapi import Request
         from fastapi.responses import PlainTextResponse
 
         from app.ai.metrics import metrics
+        from app.core.errors import Unauthorized
+        from app.sources.observability import snapshot
 
         @app.get("/health/metrics", tags=["health"], response_class=PlainTextResponse)
-        async def llm_metrics() -> str:
-            """LLM gateway metrics for this process (Prometheus text format)."""
-            return metrics.render()
+        async def llm_metrics(request: Request) -> str:
+            """LLM gateway and trend-source metrics (Prometheus text format).
+
+            With METRICS_TOKEN set, scrapers must send `Authorization: Bearer
+            <token>`. No organization data or credentials are ever included.
+            """
+            token = get_settings().metrics_token
+            if token:
+                import hmac
+
+                sent = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+                if not hmac.compare_digest(sent.encode(), token.encode()):
+                    raise Unauthorized("Metrics token required.")
+            try:
+                provider = await snapshot()
+            except Exception:
+                logger.exception("Trend source metrics snapshot failed")
+                provider = ""
+            return metrics.render() + provider
 
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, str]:

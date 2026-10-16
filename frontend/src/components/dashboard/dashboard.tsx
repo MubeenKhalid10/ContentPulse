@@ -55,7 +55,7 @@ import { POST_STATUS_TONE, RELEVANCE_TONE } from "@/lib/tones";
 import { PLATFORM_LABEL } from "@/lib/topics";
 import { sourceName } from "@/lib/trends";
 import { cn } from "@/lib/utils";
-import { nextAction } from "@/lib/workflow";
+import { nextAction, WORKFLOW } from "@/lib/workflow";
 import type {
   DashboardMetric,
   DashboardOverview,
@@ -84,6 +84,21 @@ export function Dashboard() {
   const showSetup =
     can("organization.write") && !setup.loading && !setup.essentialsDone;
   const data = overview.data;
+  const sm = summary.data;
+  // Nothing has happened yet: show the guide, not a wall of empty charts.
+  const isNew =
+    !!sm &&
+    sm.relevant_trends +
+      sm.trends_today +
+      sm.topics_to_review +
+      sm.shortlisted_topics +
+      sm.drafts +
+      sm.design_pending +
+      sm.pending_approval +
+      sm.approved ===
+      0;
+  const [showAll, setShowAll] = useState(false);
+  const simple = isNew && !showAll;
 
   return (
     <>
@@ -109,85 +124,141 @@ export function Dashboard() {
       />
 
       <div className="grid gap-6">
+        {summary.data ? (
+          <NextStepCallout summary={summary.data} />
+        ) : (
+          <Skeleton className="h-28 w-full rounded-xl" />
+        )}
+
         {showSetup && <SetupChecklist setup={setup} />}
 
-        <section
-          aria-label="Key numbers"
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-        >
-          {data ? (
-            <>
-              <MetricCard
-                label="Trends discovered"
-                icon={TrendingUpIcon}
-                metric={data.trends_discovered}
-                days={days}
-                href="/trends"
-                color="var(--success)"
-              />
-              <MetricCard
-                label="Relevant trends"
-                icon={TargetIcon}
-                metric={data.relevant_trends}
-                days={days}
-                href="/trends"
-                color="var(--wire)"
-              />
-              <MetricCard
-                label="Posts written"
-                icon={FileTextIcon}
-                metric={data.posts_generated}
-                days={days}
-                href="/content"
-                color="var(--paper-8)"
-              />
-              <MetricCard
-                label="Approved to publish"
-                icon={SendIcon}
-                metric={data.approved_posts}
-                days={days}
-                href="/approvals"
-                color="var(--flash)"
-              />
-            </>
-          ) : (
-            Array.from({ length: 4 }, (_, i) => (
-              <Skeleton key={i} className="h-32 w-full rounded-xl" />
-            ))
-          )}
-        </section>
+        <HowItWorks />
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-          {/* Main column */}
-          <div className="grid min-w-0 content-start gap-6">
-            {can("trends.read") && <TrendingTopics data={data} />}
-
-            <ContentPipeline summary={summary.data} overview={data} />
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <RecentContent data={data} />
-              {can("trends.read") && (
-                <TopOpportunities summary={summary.data} />
-              )}
-            </div>
+        {simple && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+            <span>
+              Charts and trend lists appear here once ContentPulse has found
+              your first trends.
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setShowAll(true)}>
+              Show the full dashboard
+            </Button>
           </div>
+        )}
 
-          {/* Side column */}
-          <aside
-            aria-label="At a glance"
-            className="grid min-w-0 content-start gap-6"
+        {!simple && (
+          <section
+            aria-label="Key numbers"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
           >
-            {summary.data ? (
-              <NextStepCallout summary={summary.data} />
+            {data ? (
+              <>
+                <MetricCard
+                  label="Trends discovered"
+                  icon={TrendingUpIcon}
+                  metric={data.trends_discovered}
+                  days={days}
+                  href="/trends"
+                  color="var(--success)"
+                />
+                <MetricCard
+                  label="Relevant trends"
+                  icon={TargetIcon}
+                  metric={data.relevant_trends}
+                  days={days}
+                  href="/trends"
+                  color="var(--wire)"
+                />
+                <MetricCard
+                  label="Posts written"
+                  icon={FileTextIcon}
+                  metric={data.posts_generated}
+                  days={days}
+                  href="/content"
+                  color="var(--paper-8)"
+                />
+                <MetricCard
+                  label="Approved to publish"
+                  icon={SendIcon}
+                  metric={data.approved_posts}
+                  days={days}
+                  href="/approvals"
+                  color="var(--flash)"
+                />
+              </>
             ) : (
-              <Skeleton className="h-36 w-full rounded-xl" />
+              Array.from({ length: 4 }, (_, i) => (
+                <Skeleton key={i} className="h-32 w-full rounded-xl" />
+              ))
             )}
-            {can("trends.read") && <SourceHealth />}
-            <PlatformBreakdown data={data} />
-          </aside>
-        </div>
+          </section>
+        )}
+
+        {!simple && (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            {/* Main column */}
+            <div className="grid min-w-0 content-start gap-6">
+              {can("trends.read") && <TrendingTopics data={data} />}
+
+              <ContentPipeline summary={summary.data} overview={data} />
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <RecentContent data={data} />
+                {can("trends.read") && (
+                  <TopOpportunities summary={summary.data} />
+                )}
+              </div>
+            </div>
+
+            {/* Side column */}
+            <aside
+              aria-label="At a glance"
+              className="grid min-w-0 content-start gap-6"
+            >
+              {can("trends.read") && <SourceHealth />}
+              <PlatformBreakdown data={data} />
+            </aside>
+          </div>
+        )}
       </div>
     </>
+  );
+}
+
+// --- How it works --------------------------------------------------------------------
+
+/** The whole product in one row: five steps, each a link, in plain words. */
+function HowItWorks() {
+  const can = useCan();
+  const steps = WORKFLOW.filter((s) => can(s.permission));
+  return (
+    <section aria-labelledby="how-title" className="grid gap-3">
+      <div className="grid gap-0.5">
+        <h2 id="how-title" className="text-base font-semibold">
+          How ContentPulse works
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Every post goes through the same five steps. Nothing is published
+          until a person approves it.
+        </p>
+      </div>
+      <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {steps.map((s) => (
+          <li key={s.href}>
+            <Link
+              href={s.href}
+              className="group grid h-full gap-1.5 rounded-xl border bg-card p-4 transition-colors hover:bg-muted"
+            >
+              <span className="grid size-6 place-items-center rounded-full bg-muted text-xs font-semibold tabular-nums group-hover:bg-background">
+                {s.n}
+              </span>
+              <span className="text-sm font-medium">{s.label}</span>
+              <span className="text-xs text-muted-foreground">{s.summary}</span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -947,16 +1018,19 @@ function SourceHealth() {
             {enabled.slice(0, 7).map((s) => {
               const status = sourceStatus(s);
               return (
-                <li key={s.key} className="flex items-center gap-2 text-sm">
+                <li
+                  key={s.key}
+                  className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 text-sm"
+                >
                   <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                  <span className="flex items-center gap-1.5 text-xs">
+                  <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs">
                     <span
                       className={cn("size-1.5 rounded-full", status.tone)}
                       aria-hidden
                     />
                     {status.label}
                   </span>
-                  <span className="w-16 text-right text-xs text-muted-foreground">
+                  <span className="shrink-0 whitespace-nowrap text-right text-xs text-muted-foreground">
                     {s.last_success_at ? timeAgo(s.last_success_at) : "—"}
                   </span>
                 </li>

@@ -332,7 +332,15 @@ export type SourcePricing = "free" | "free_tier" | "paid" | "unavailable";
 export type RunStatus = "queued" | "running" | "succeeded" | "failed";
 
 export interface SourceResult {
-  status: "ok" | "failed" | "not_configured" | "running" | "unknown";
+  status:
+    | "ok"
+    | "failed"
+    | "not_configured"
+    | "running"
+    | "unknown"
+    | "budget_exhausted"
+    | "cooling_down"
+    | "skipped_recent";
   items: number;
   error: string | null;
   error_kind: string | null;
@@ -380,6 +388,8 @@ export interface TrendSourceInfo {
   last_success_at: string | null;
   last_failure_at: string | null;
   last_error: string | null;
+  /** Provider-wide pause after a rate limit; no requests until then. */
+  cooldown_until?: string | null;
 }
 
 export interface Signal {
@@ -852,6 +862,8 @@ export interface ReviewSummary {
 
 export interface Approval {
   id: string;
+  /** "copy": the written post, before design. "design": the finished creative. */
+  stage: "copy" | "design";
   status: ApprovalStatus;
   round: number;
   post: { id: string; title: string | null; platform: Platform; status: PostStatus; current_version: number };

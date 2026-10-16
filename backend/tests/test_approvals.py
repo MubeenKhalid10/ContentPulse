@@ -48,7 +48,9 @@ async def test_submission_enters_the_queue_with_full_context(client, internet, d
     assert topic["relevance_level"] == "highly_relevant" and topic["sources"]  # trend sources (§53)
     assert topic["coverage"] and topic["coverage"][0]["url"]
     assert [v["version_number"] for v in detail["versions"]] == [1]
-    assert [r["status"] for r in detail["rounds"]] == ["pending"] and detail["comments"] == []
+    assert [r["status"] for r in detail["rounds"] if r["stage"] == "design"] == [
+        "pending"
+    ] and detail["comments"] == []
 
     summary = (await admin.get("/api/v1/dashboard/summary")).json()
     assert summary["pending_approval"] == 1
@@ -136,7 +138,10 @@ async def test_changes_requested_revision_and_resubmit(client, internet, design_
     [round2] = queue["items"]
     assert round2["round"] == 2 and round2["creative_version"] == 2 and round2["id"] != item["id"]
     detail = (await admin.get(f"{API}/{round2['id']}")).json()
-    assert [r["status"] for r in detail["rounds"]] == ["changes_requested", "pending"]
+    assert [r["status"] for r in detail["rounds"] if r["stage"] == "design"] == [
+        "changes_requested",
+        "pending",
+    ]
     assert [c["kind"] for c in detail["comments"]] == ["changes_requested", "resubmitted"]
     assert detail["comments"][1]["creative_version"] == 2
     assert [c["version"] for c in detail["creatives"]] == [2, 1]  # nothing replaced

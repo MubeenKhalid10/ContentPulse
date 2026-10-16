@@ -37,7 +37,6 @@ from app.services.approvals import workflow as approvals
 from app.services.audit import AuditAction
 from app.services.content import blog, generation
 from app.services.content.copy import check_copy
-from app.services.design import briefs as design_briefs
 from app.services.design import service as design
 from app.services.topics.platforms import PLATFORM_LABELS, get_rules
 from app.services.workflow import transition_post
@@ -54,9 +53,9 @@ EDITABLE = (
     P.CHANGES_REQUESTED,
 )
 STATUS_GROUPS: dict[str, list[PostStatus] | None] = {
-    "drafts": [P.DRAFT, P.CONTENT_REVIEW, P.CHANGES_REQUESTED],
+    "drafts": [P.DRAFT, P.CHANGES_REQUESTED],
     "design": [P.DESIGN_PENDING, P.DESIGN_IN_PROGRESS, P.DESIGN_UPLOADED],
-    "approval": [P.PENDING_APPROVAL],
+    "approval": [P.CONTENT_REVIEW, P.PENDING_APPROVAL],
     "approved": [P.APPROVED, P.FINAL],
     "archived": [P.ARCHIVED, P.REJECTED],
     "all": None,
@@ -496,7 +495,7 @@ async def restore_version(
 
 ACTIONS: dict[str, PostStatus] = {
     "back-to-draft": P.DRAFT,
-    "send-to-design": P.DESIGN_PENDING,
+    "submit-for-review": P.CONTENT_REVIEW,
     "archive": P.ARCHIVED,
 }
 
@@ -510,21 +509,21 @@ async def transition(
 ) -> PostDetail:
     post = await _get_post(db, organization_id, post_id)
     target = ACTIONS[action]
-    if target == P.DESIGN_PENDING:
+    if target == P.CONTENT_REVIEW:
         if not post.current_version:
             raise InvalidStateTransition("Generate or write the post before moving it on.")
         if await generation.active_job(db, post.id):
             raise Conflict("This post is being generated. Wait for it to finish.")
     previous = post.status
-    await transition_post(db, post, target, user_id=user_id)
-    ai_brief = None
-    if target == P.DESIGN_PENDING:
-        brief = await design.open_brief(db, post, user_id)
-        ai_brief = await design_briefs.start_ai_brief(db, brief)
-    elif previous in DESIGN_STATUSES:
-        await design.cancel_briefs(db, post)
+    if target == P.CONTENT_REVIEW:
+        await approvals.submit_copy(db, post, user_id)
+    else:
+        await transition_post(db, post, target, user_id=user_id)
+        if previous == P.CONTENT_REVIEW:
+            await approvals.withdraw_copy(db, post)
+        elif previous in DESIGN_STATUSES:
+            await design.cancel_briefs(db, post)
     await db.commit()
-    design_briefs.submit(ai_brief)
     return await post_detail(db, organization_id, post.id)
 
 

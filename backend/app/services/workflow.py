@@ -44,9 +44,10 @@ _P = PostStatus
 POST_MACHINE: StateMachine[PostStatus] = StateMachine(
     "post",
     {
-        _P.DRAFT: {_P.DESIGN_PENDING, _P.ARCHIVED},
-        # Legacy: the review step was removed; old rows were moved to draft.
-        _P.CONTENT_REVIEW: {_P.DRAFT, _P.DESIGN_PENDING, _P.ARCHIVED},
+        # The copy needs an admin's approval before any design work starts.
+        _P.DRAFT: {_P.CONTENT_REVIEW, _P.ARCHIVED},
+        # Admin approves the copy → design; asks for changes → back to draft.
+        _P.CONTENT_REVIEW: {_P.DRAFT, _P.DESIGN_PENDING, _P.REJECTED, _P.ARCHIVED},
         _P.DESIGN_PENDING: {_P.DESIGN_IN_PROGRESS, _P.DESIGN_UPLOADED, _P.DRAFT, _P.ARCHIVED},
         _P.DESIGN_IN_PROGRESS: {_P.DESIGN_UPLOADED, _P.DESIGN_PENDING, _P.ARCHIVED},
         _P.DESIGN_UPLOADED: {_P.PENDING_APPROVAL, _P.DESIGN_IN_PROGRESS, _P.ARCHIVED},

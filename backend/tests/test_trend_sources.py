@@ -214,9 +214,20 @@ async def test_request_cache_shares_inflight_and_remembers_failures():
     async def fail():
         nonlocal calls
         calls += 1
-        raise SourceError(SourceErrorKind.RATE_LIMITED, "slow down")
+        raise SourceError(SourceErrorKind.UNAVAILABLE, "provider down")
 
     for _ in range(3):
         with pytest.raises(SourceError):
             await cache.get_or_fetch("bad", fail)
-    assert calls == 2  # the failure is remembered instead of retried immediately
+    assert calls == 2  # the outage is remembered instead of retried immediately
+
+    async def limited():
+        nonlocal calls
+        calls += 1
+        raise SourceError(SourceErrorKind.RATE_LIMITED, "slow down")
+
+    for _ in range(2):
+        with pytest.raises(SourceError):
+            await cache.get_or_fetch("limited", limited)
+    # Rate limits aren't cache entries: provider cooldowns handle them.
+    assert calls == 4

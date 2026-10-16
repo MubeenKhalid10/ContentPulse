@@ -18,7 +18,7 @@ from app.storage.s3 import S3Storage
 from app.workers.runner import runner
 from tests.conftest import add_member, create_org, register
 from tests.test_alignment import internet, setup_org  # noqa: F401  (fixtures)
-from tests.test_content import ContentAI, approved_strategy, generated
+from tests.test_content import ContentAI, approved_strategy, generated, send_to_design
 from tests.test_topics import gpt6_topic
 
 API = "/api/v1/design/tasks"
@@ -72,7 +72,7 @@ async def in_design(admin, org) -> tuple[dict, dict]:
         json={"brand_colors": ["#0F766E", "#111827"], "typography": "Inter"},
     )
     post = await generated(admin, await approved_strategy(admin, org))
-    sent = (await admin.post(f"/api/v1/content/{post['id']}/send-to-design")).json()
+    sent = await send_to_design(admin, post["id"])
     await runner.wait_idle()  # the AI brief, when configured
     task = (await admin.get(f"{API}/{sent['design_task']['id']}")).json()
     return post, task
@@ -127,6 +127,32 @@ async def test_rule_based_brief_when_sent_to_design(client, internet, design_ai)
     assert detail["design_task"] == {"id": task["id"], "status": "open"}
 
 
+async def test_handoff_document_is_self_contained(client, internet, design_ai):
+    admin, org = await setup_org(client)
+    design_ai.brief_fail = AIError(AIErrorKind.UNAVAILABLE, "Gemini error (503).")
+    post, task = await in_design(admin, org)
+
+    resp = await admin.get(f"{API}/{task['id']}/handoff")
+    assert resp.status_code == 200, resp.text
+    doc = resp.json()
+    assert doc["file_name"].startswith("design-brief-") and doc["file_name"].endswith(
+        "_linkedin.md"
+    )
+    md = doc["markdown"]
+    for heading in (
+        "What this post is",
+        "take away",
+        "The full post",
+        "Slides",
+        "Brand",
+        "Export guide for LinkedIn",
+        "Before you hand it back",
+    ):
+        assert heading in md
+    assert "1080×1350" in md and "#0F766E" in md and "synergy" in md
+    assert post["current"]["hook"] in md and "1. the 20-hour problem." in md
+
+
 async def test_ai_brief_replaces_rules_brief(client, internet, design_ai, db):
     admin, org = await setup_org(client)
     _, task = await in_design(admin, org)
@@ -175,7 +201,7 @@ async def test_back_to_draft_cancels_and_resend_keeps_designer(client, internet,
     assert (await admin.get(f"{API}/{task['id']}")).json()["status"] == "cancelled"
     assert (await admin.get(API)).json()["counts"]["cancelled"] == 1
 
-    resent = (await admin.post(f"/api/v1/content/{post['id']}/send-to-design")).json()
+    resent = await send_to_design(admin, post["id"])
     new_task = (await admin.get(f"{API}/{resent['design_task']['id']}")).json()
     assert new_task["id"] != task["id"]
     assert new_task["status"] == "assigned" and new_task["assignee"]["id"] == designer.user["id"]

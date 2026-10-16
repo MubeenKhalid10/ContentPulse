@@ -48,6 +48,7 @@ class _Health:
     last_success_at: datetime | None = None
     last_failure_at: datetime | None = None
     last_error: str | None = None
+    cooldown_until: datetime | None = None
 
 
 def _platform_health(row: TrendSource | None) -> _Health:
@@ -59,7 +60,10 @@ def _platform_health(row: TrendSource | None) -> _Health:
     error = row.last_error if is_public_error(row.last_error) else None
     if row.last_error and error is None and row.health != SourceHealth.HEALTHY:
         error = "The last request failed."
-    return _Health(row.health, row.last_success_at, row.last_failure_at, error)
+    cooldown = row.cooldown_until
+    if cooldown is not None and cooldown <= datetime.now(UTC):
+        cooldown = None
+    return _Health(row.health, row.last_success_at, row.last_failure_at, error, cooldown)
 
 
 async def _organization_health(
@@ -126,6 +130,7 @@ async def list_sources(
                 last_success_at=row.last_success_at,
                 last_failure_at=row.last_failure_at,
                 last_error=row.last_error,
+                cooldown_until=row.cooldown_until,
             )
         )
     return out

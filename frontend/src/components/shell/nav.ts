@@ -42,6 +42,8 @@ export interface NavItem {
 
 export interface NavSection {
   label?: string;
+  /** Rarely-needed pages: folded away until you're on one of them. */
+  collapsible?: boolean;
   items: NavItem[];
 }
 
@@ -52,10 +54,10 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    label: "Workflow",
+    label: "Your 5 steps",
     items: WORKFLOW.map((s) => ({
       href: s.href,
-      label: s.label,
+      label: `${s.n}. ${s.label}`,
       icon: STEP_ICONS[s.href],
       permission: s.permission,
       // Sources fold out under Trends.
@@ -72,7 +74,8 @@ export const NAV: NavSection[] = [
     })),
   },
   {
-    label: "Organization",
+    label: "Set up your organization",
+    collapsible: true,
     items: [
       { href: "/organization/profile", label: "Profile", icon: Building2Icon },
       {
@@ -100,7 +103,8 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    label: "Admin",
+    label: "Team & account",
+    collapsible: true,
     items: [
       { href: "/team", label: "Team", icon: UsersIcon },
       {
@@ -109,10 +113,7 @@ export const NAV: NavSection[] = [
         icon: ActivityIcon,
         permission: "organization.write",
       },
+      { href: "/settings", label: "Settings", icon: SettingsIcon },
     ],
-  },
-  {
-    label: "Account",
-    items: [{ href: "/settings", label: "Settings", icon: SettingsIcon }],
   },
 ];

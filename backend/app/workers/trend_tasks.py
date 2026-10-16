@@ -12,9 +12,10 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import httpx
-from sqlalchemy import or_, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 
+from app.ai.metrics import metrics
 from app.core.config import Settings, get_settings
 from app.core.logging import logger
 from app.db.session import SessionLocal
@@ -24,11 +25,18 @@ from app.services.knowledge.fetcher import Resolver, system_resolver
 from app.services.trends import pipeline
 from app.services.trends.inputs import load_org_inputs
 from app.sources import SOURCES, get_source
-from app.sources.base import RawTrendItem, SourceContext, SourceError, SourceErrorKind
+from app.sources.base import (
+    SKIPPED_KINDS,
+    RawTrendItem,
+    SourceContext,
+    SourceError,
+    SourceErrorKind,
+)
 from app.sources.base import TrendSource as Adapter
 from app.workers.tasks import enqueue
 
 LOOKBACK = timedelta(hours=48)
+SKIPPED_STATUSES = {kind.value for kind in SKIPPED_KINDS}
 STALE_AFTER = timedelta(minutes=10)
 
 
@@ -103,6 +111,34 @@ async def _record_health(key: str, error: SourceError | None) -> None:
         await db.commit()
 
 
+async def _recently_collected(
+    db, organization_id: uuid.UUID, run_id: uuid.UUID, settings: Settings
+) -> dict[str, int]:
+    """Sources this organization collected successfully within their
+    PROVIDER_MIN_REFRESH_MINUTES: {source: minutes ago}."""
+    minimums = settings.provider_min_refresh_minutes
+    if not minimums:
+        return {}
+    window = _now() - timedelta(minutes=max(minimums.values()))
+    runs = await db.scalars(
+        select(TrendDiscoveryRun)
+        .where(
+            TrendDiscoveryRun.organization_id == organization_id,
+            TrendDiscoveryRun.id != run_id,
+            TrendDiscoveryRun.created_at >= window,
+        )
+        .order_by(TrendDiscoveryRun.created_at.desc())
+    )
+    out: dict[str, int] = {}
+    for run in runs:
+        for key, minutes in minimums.items():
+            result = (run.results or {}).get(key) or {}
+            age = (_now() - run.created_at).total_seconds() / 60
+            if key not in out and result.get("status") == "ok" and age < minutes:
+                out[key] = max(int(age), 0)
+    return out
+
+
 async def _run_source(
     adapter: Adapter, ctx: SourceContext, time_limit: float
 ) -> tuple[str, list[RawTrendItem], SourceError | None, int]:
@@ -132,6 +168,10 @@ async def _finish(run_id: uuid.UUID, status: DiscoveryRunStatus, error: str | No
         run.error = error
         run.finished_at = run.heartbeat_at = _now()
         await db.commit()
+    metrics.inc("trend_discovery_runs_total", status=status.value, trigger=run.trigger.value)
+    if run.started_at:
+        seconds = (run.finished_at - run.started_at).total_seconds()
+        metrics.observe("trend_discovery_duration_seconds", seconds, trigger=run.trigger.value)
 
 
 async def _discover(run_id: uuid.UUID) -> None:
@@ -142,6 +182,7 @@ async def _discover(run_id: uuid.UUID) -> None:
         org_inputs = await load_org_inputs(db, run.organization_id, run.locations or None)
         org_inputs_org_id = run.organization_id
         requested = list(run.sources)
+        recent = await _recently_collected(db, run.organization_id, run.id, settings)
 
     inputs, profile = org_inputs.inputs, org_inputs.profile
     results: dict[str, dict] = {}
@@ -158,6 +199,14 @@ async def _discover(run_id: uuid.UUID) -> None:
                 "status": "not_configured",
                 "items": 0,
                 "error": f"Set {missing}." if missing else config.note,
+            }
+            continue
+        if key in recent:
+            results[key] = {
+                "status": "skipped_recent",
+                "items": 0,
+                "error": f"Collected {recent[key]} minutes ago; the minimum interval for "
+                "this source hasn't passed yet.",
             }
             continue
         results[key] = {"status": "running", "items": 0, "mode": config.mode}
@@ -194,6 +243,7 @@ async def _discover(run_id: uuid.UUID) -> None:
             # question, so their responses can be shared (provider cache).
             since=_now().replace(minute=0, second=0, microsecond=0) - LOOKBACK,
             resolver=resolver,
+            organization_id=str(org_inputs_org_id),
         )
         outcomes = await asyncio.gather(
             *(_run_source(a, ctx, settings.trend_source_timeout_seconds) for a in runnable)
@@ -202,10 +252,13 @@ async def _discover(run_id: uuid.UUID) -> None:
 
     items: dict[tuple[str, str], RawTrendItem] = {}
     for key, source_items, error, duration_ms in outcomes:
-        await _record_health(key, error)
+        skipped = error is not None and error.kind in SKIPPED_KINDS
+        if not skipped:  # a deliberate skip says nothing about the provider's health
+            await _record_health(key, error)
+        status = error.kind.value if skipped else ("failed" if error else "ok")
         results[key] = {
             **results[key],
-            "status": "failed" if error else "ok",
+            "status": status,
             "items": len(source_items),
             "error": error.message if error else None,
             "error_kind": error.kind.value if error else None,
@@ -230,7 +283,11 @@ async def _discover(run_id: uuid.UUID) -> None:
     failed = [k for k, _, error, _ in outcomes if error]
     if len(failed) == len(outcomes):
         reasons = "; ".join(f"{SOURCES[k].name}: {results[k]['error']}" for k in failed)
-        await _finish(run_id, DiscoveryRunStatus.FAILED, f"All sources failed. {reasons}")
+        if all(results[k]["status"] in SKIPPED_STATUSES for k in failed):
+            summary = "No source could run (budgets or provider cooldowns)."
+        else:
+            summary = "All sources failed."
+        await _finish(run_id, DiscoveryRunStatus.FAILED, f"{summary} {reasons}")
         return
     await _finish(run_id, DiscoveryRunStatus.SUCCEEDED)
     if settings.alignment_auto_analyze:

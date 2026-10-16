@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArticlePreview } from "@/components/content/article-preview";
+import { HandoffButtons } from "@/components/design/handoff-buttons";
 import { useAssignTask, useDesignTask } from "@/hooks/use-design";
 import { useMembers } from "@/hooks/use-organization";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -194,6 +195,7 @@ function BriefCard({ task: t, canEdit, onEdit }: { task: DesignTaskDetail; canEd
             )}
           </CardDescription>
         </div>
+        <HandoffButtons id={t.id} />
         {canEdit && (
           <Button size="sm" variant="ghost" onClick={onEdit}>
             <PencilIcon />

@@ -26,6 +26,7 @@ from typing import Any, Literal
 import httpx
 
 from app.core.config import Settings
+from app.sources import quota
 from app.sources.base import (
     Configuration,
     RawTrendItem,
@@ -257,11 +258,16 @@ class InstagramSource(TrendSource):
         # spend one lookup; the token travels in a header, never in the key.
         name = "instagram.hashtag_search" if path == "ig_hashtag_search" else "instagram.top_media"
         credential = token_cache.fingerprint("instagram", ctx.settings.instagram_access_token)
+
+        async def produce() -> dict:
+            if path == "ig_hashtag_search":
+                # Only real searches (not cache hits) use one of the account's
+                # 30 unique hashtags per 7 days.
+                await quota.reserve_hashtag(user_id, params.get("q", ""))
+            return await graph_get(ctx.client, ctx.settings, path, query)
+
         return await self.cached_json(
-            ctx,
-            name,
-            {"path": path, **query, "credential": credential},
-            lambda: graph_get(ctx.client, ctx.settings, path, query),
+            ctx, name, {"path": path, **query, "credential": credential}, produce
         )
 
     async def _hashtag(self, ctx: SourceContext, tag: str) -> list[RawTrendItem]:

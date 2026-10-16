@@ -40,7 +40,7 @@ const STEPS: Step[] = [
   },
   {
     id: "trends",
-    title: "Trends arrive, scored for relevance",
+    title: "Find trends, scored for fit",
     who: "Automatic · hourly to daily",
     body: "ContentPulse collects what's trending in the client's markets and scores every trend from 0 to 100 against their services and material. Popular but irrelevant trends never reach your team.",
     points: [
@@ -52,9 +52,9 @@ const STEPS: Step[] = [
   },
   {
     id: "plan",
-    title: "Pick a topic and plan the post",
+    title: "Pick topics and plan each post",
     who: "Creator",
-    body: "Shortlist the trends worth running, then choose the platform. The plan suggests an angle, a format and a goal, based on the platform's playbook.",
+    body: "Shortlist the trends worth running, then choose the platform. The plan suggests a post idea, a format and a goal, based on the platform's playbook.",
     points: [
       "LinkedIn, X, Instagram, Facebook, blog",
       "One click from plan to draft",
@@ -63,9 +63,9 @@ const STEPS: Step[] = [
   },
   {
     id: "write",
-    title: "The post is written from the client's material",
+    title: "Write posts from the client's material",
     who: "Creator · AI or templates",
-    body: "The draft uses only what the client's own documents support, in their voice, sized for the platform. Edit it, ask for another version, or restore an earlier one.",
+    body: "The draft uses only what the client's own documents support, in their voice, sized for the platform. Edit it, ask for another version, or restore an earlier one. Then submit the copy to an admin for approval.",
     points: [
       "Grounded in the knowledge base",
       "Versions you can compare and restore",
@@ -74,15 +74,15 @@ const STEPS: Step[] = [
   },
   {
     id: "design",
-    title: "Add the design",
-    who: "Creator",
-    body: "Upload the image or video your designer made, or generate one with AI from the design brief and the post.",
-    points: ["Upload any size", "Or generate an image from the brief"],
+    title: "Add designs",
+    who: "Admin · Creator",
+    body: "Once the admin approves the copy, the design brief and brand guidelines open. Export them for your UI/UX designer, then upload the image or video, or generate one with AI.",
+    points: ["Export the brief as one file", "Upload any size, or generate from the brief"],
     screen: <DesignScreen />,
   },
   {
     id: "approve",
-    title: "Approve it, then publish",
+    title: "Approve, then publish",
     who: "Admin",
     body: "The admin sees the post exactly as it will look in the feed, and approves it or sends it back with a note. Approved posts are ready to share or copy to the platform.",
     points: [
@@ -252,7 +252,7 @@ function TrendsScreen() {
   return (
     <>
       <ScreenTitle
-        title="Trends"
+        title="Find trends"
         sub="Today · scored against your services and knowledge base"
       />
       <ul className="divide-y divide-border border-y border-border">
@@ -319,7 +319,7 @@ function PlanScreen() {
           </Field>
           <Field label="Format">Text post with a checklist</Field>
         </div>
-        <Field label="Angle">
+        <Field label="Post idea">
           Three questions small firms should answer this week.
         </Field>
         <Field label="Goal">Book compliance reviews</Field>
@@ -339,7 +339,7 @@ function PlanScreen() {
 function WriteScreen() {
   return (
     <>
-      <ScreenTitle title="Content studio" sub="LinkedIn · version 2 of 2" />
+      <ScreenTitle title="Write posts" sub="LinkedIn · version 2 of 2" />
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
           <PlatformTag platform="linkedin" />
@@ -371,7 +371,7 @@ function WriteScreen() {
 function DesignScreen() {
   return (
     <>
-      <ScreenTitle title="Design" sub="LinkedIn image · 1200 × 1200" />
+      <ScreenTitle title="Add designs" sub="LinkedIn image · 1200 × 1200" />
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="relative grid aspect-square place-items-center overflow-hidden rounded-lg bg-[oklch(0.22_0.03_255)] p-4 text-[oklch(0.96_0.01_95)]">
           <span className="headline text-center text-2xl leading-none">
@@ -409,7 +409,7 @@ function ApproveScreen() {
   return (
     <>
       <ScreenTitle
-        title="Approvals"
+        title="Approve posts"
         sub="Copy v2 · design v1 · sent by a creator"
       />
       <div className="grid gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

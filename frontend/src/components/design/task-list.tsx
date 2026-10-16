@@ -60,7 +60,7 @@ export function DesignTaskList() {
   return (
     <>
       <PageHeader
-        title="Design"
+        title="Add designs"
         description="Posts that need a visual. Open a task, upload the finished design, then submit it for approval."
       />
       {counts?.all === 0 && !filters.q && !filters.platform && !filters.mine ? (
