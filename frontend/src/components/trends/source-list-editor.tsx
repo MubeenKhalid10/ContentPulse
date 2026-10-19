@@ -31,7 +31,7 @@ const COPY: Record<
 
 /**
  * A source's own list (Reddit's subreddits, RSS's feeds), edited right on its
- * card in Trends › Sources and saved to the organization's settings.
+ * card in Trends › Discovery Sources and saved to the organization's settings.
  */
 export function SourceListEditor({
   field,

@@ -32,6 +32,7 @@ from app.services import audit
 from app.services.alignment import service as alignment
 from app.services.audit import AuditAction
 from app.services.topics import sync as topic_sync
+from app.services.trends import visibility
 from app.services.trends.inputs import load_org_inputs
 from app.services.workflow import TREND_MACHINE
 from app.sources import SOURCES
@@ -189,7 +190,7 @@ async def start_discovery(
     if not chosen:
         raise AppError(
             ErrorCode.VALIDATION_ERROR,
-            "No trend sources are enabled. Enable at least one in Trends › Sources.",
+            "No trend sources are enabled. Turn one on in Trends › Discovery Sources.",
         )
 
     active = await db.scalar(
@@ -284,11 +285,14 @@ async def list_trends(
     offset: int,
     relevance: str | None = None,
 ) -> TrendPage:
-    filters = [Trend.organization_id == organization_id]
+    # Discovery Sources: only trends reported by a source this organization
+    # has switched on (attribution from trend_mentions, not Trend.sources).
+    enabled = await visibility.feed_sources(db, organization_id)
+    if source:
+        enabled = [s for s in enabled if s == source]
+    filters = [Trend.organization_id == organization_id, visibility.visible(enabled)]
     if status in STATUS_FILTERS:
         filters.append(Trend.status.in_(STATUS_FILTERS[status]))
-    if source:
-        filters.append(Trend.sources.contains([source]))
     if location:
         filters.append(Trend.locations.contains([location]))
     if q:

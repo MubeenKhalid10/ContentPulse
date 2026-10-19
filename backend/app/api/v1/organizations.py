@@ -10,6 +10,7 @@ from app.api.deps import DB, AppSettings, CurrentUser, OrgContext, org_permissio
 from app.core.errors import AppError, ErrorCode, Forbidden
 from app.core.permissions import Permission, Role
 from app.models.audit import AuditLog
+from app.models.enums import TrendFrequency
 from app.models.user import User
 from app.schemas.organization import (
     AuditLogRead,
@@ -119,9 +120,19 @@ async def get_settings(ctx: CanRead, db: DB):
 
 
 @router.patch("/{organization_id}/settings", response_model=SettingsRead)
-async def update_settings(data: SettingsUpdate, ctx: CanWrite, db: DB):
+async def update_settings(data: SettingsUpdate, ctx: CanWrite, db: DB, app_settings: AppSettings):
     settings = await org_service.get_settings(db, ctx.organization_id)
     changes = data.changes()
+    background = changes.pop("background_discovery", None)
+    if background is not None and "trend_frequency" not in changes:
+        if not background:
+            changes["trend_frequency"] = TrendFrequency.MANUAL
+        elif settings.trend_frequency == TrendFrequency.MANUAL:
+            # The backend owns the schedule: switching on uses its default.
+            default = TrendFrequency(app_settings.trend_default_frequency)
+            changes["trend_frequency"] = (
+                default if default != TrendFrequency.MANUAL else TrendFrequency.EVERY_3_HOURS
+            )
     updated = await org_service.apply_changes(
         db,
         settings,

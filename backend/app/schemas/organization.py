@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, EmailStr, Field, StringConstraints
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, StringConstraints, computed_field
 
 from app.core.permissions import Role
 from app.models.enums import MemberStatus, OfferingKind, Platform, TrendFrequency
@@ -85,6 +85,7 @@ class SettingsUpdate(PatchModel):
             "subreddits",
             "rss_feeds",
             "trend_frequency",
+            "background_discovery",
         }
     )
 
@@ -99,6 +100,9 @@ class SettingsUpdate(PatchModel):
     subreddits: Annotated[list[Subreddit], Field(max_length=30)] | None = None
     rss_feeds: Annotated[list[HttpUrlStr], Field(max_length=30)] | None = None
     trend_frequency: TrendFrequency | None = None
+    # The organization's only scheduling choice: keep trends updated in the
+    # background (on the schedule the backend sets) or only when asked.
+    background_discovery: bool | None = None
 
 
 class SettingsRead(ORMModel):
@@ -114,6 +118,11 @@ class SettingsRead(ORMModel):
     rss_feeds: list[str]
     trend_frequency: TrendFrequency
     updated_at: datetime
+
+    @computed_field
+    @property
+    def background_discovery(self) -> bool:
+        return self.trend_frequency != TrendFrequency.MANUAL
 
 
 # --- Brand ------------------------------------------------------------------

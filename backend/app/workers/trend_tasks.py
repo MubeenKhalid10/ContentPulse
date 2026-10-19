@@ -230,7 +230,7 @@ async def _discover(run_id: uuid.UUID) -> None:
         await _finish(
             run_id,
             DiscoveryRunStatus.FAILED,
-            "None of the enabled sources are configured. See Trends › Sources.",
+            "None of the enabled sources are configured. See Trends › Discovery Sources.",
         )
         return
 

@@ -2,7 +2,7 @@ import type { DesignFormat, PostStatus } from "@/types/api";
 
 export const POST_STATUS_LABEL: Record<PostStatus, string> = {
   draft: "Draft",
-  content_review: "Waiting for copy approval",
+  content_review: "Waiting for content approval",
   design_pending: "Needs design",
   design_in_progress: "In design",
   design_uploaded: "Design added",

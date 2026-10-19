@@ -28,12 +28,14 @@ from app.schemas.dashboard import (
     TopTrend,
     TrendingTopic,
 )
+from app.services.trends import visibility
 
 
 async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSummary:
     """All dashboard counters in one round of queries (spec §43)."""
     since = datetime.now(UTC) - timedelta(hours=24)
     org = organization_id
+    shown = visibility.visible(await visibility.feed_sources(db, org))
 
     trend_counts = (
         await db.execute(
@@ -45,7 +47,7 @@ async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSumm
                     ),
                     Trend.status.notin_([TrendStatus.REJECTED, TrendStatus.ARCHIVED]),
                 ),
-            ).where(Trend.organization_id == org)
+            ).where(Trend.organization_id == org, shown)
         )
     ).one()
 
@@ -74,6 +76,7 @@ async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSumm
         select(Trend)
         .where(
             Trend.organization_id == org,
+            shown,
             Trend.status.in_([TrendStatus.NEW, TrendStatus.ANALYZED]),
             Trend.last_seen_at >= datetime.now(UTC) - timedelta(days=7),
             Trend.opportunity_score.is_not(None),
@@ -205,14 +208,16 @@ async def overview(
     today = end.astimezone(zone).date()
     start = datetime.combine(today - timedelta(days=days - 1), time.min, zone).astimezone(UTC)
     window = {"start": start, "end": end, "days": days, "timezone": timezone}
+    enabled = await visibility.feed_sources(db, org)
+    shown = visibility.visible(enabled)
 
     trends_discovered = await _metric(
-        db, Trend.first_seen_at, [Trend.organization_id == org], **window
+        db, Trend.first_seen_at, [Trend.organization_id == org, shown], **window
     )
     relevant_trends = await _metric(
         db,
         Trend.first_seen_at,
-        [Trend.organization_id == org, Trend.relevance_level.in_(RELEVANT)],
+        [Trend.organization_id == org, shown, Trend.relevance_level.in_(RELEVANT)],
         **window,
     )
     posts_generated = await _metric(db, Post.created_at, [Post.organization_id == org], **window)
@@ -253,6 +258,7 @@ async def overview(
         select(Trend)
         .where(
             Trend.organization_id == org,
+            shown,
             Trend.last_seen_at >= start,
             Trend.status.notin_([TrendStatus.REJECTED, TrendStatus.ARCHIVED]),
         )
@@ -268,7 +274,7 @@ async def overview(
             TrendingTopic(
                 id=t.id,
                 topic=t.topic,
-                source=t.sources[0] if t.sources else None,
+                source=next((s for s in t.sources if s in enabled), None),
                 category=t.category,
                 relevance_level=t.relevance_level.value if t.relevance_level else None,
                 opportunity_score=t.opportunity_score,

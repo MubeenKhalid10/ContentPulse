@@ -62,6 +62,7 @@ export const settingsSchema = z.object({
   subreddits: z.array(z.string().regex(/^(r\/)?[A-Za-z0-9_]{2,21}$/, "Use subreddit names like r/automation.")),
   rss_feeds: z.array(z.string().regex(/^https?:\/\/\S+\.\S+/i, "Feeds must be full URLs (https://…)")),
   trend_frequency: z.enum(["manual", "hourly", "every_3_hours", "every_6_hours", "daily"]),
+  background_discovery: z.boolean(),
 });
 
 export const inviteSchema = z.object({

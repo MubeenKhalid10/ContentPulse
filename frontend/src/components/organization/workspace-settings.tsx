@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckIcon } from "lucide-react";
 import Link from "next/link";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -19,12 +19,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { backgroundHint } from "@/components/trends/background-discovery";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrgSettings, useUpdateSettings } from "@/hooks/use-organization";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import {
-  FREQUENCY_OPTIONS,
   LANGUAGE_OPTIONS,
   PLATFORM_OPTIONS,
   timezoneOptions,
@@ -94,7 +95,7 @@ const setupSchema = settingsSchema.pick({
   default_language: true,
   default_timezone: true,
   tracked_keywords: true,
-  trend_frequency: true,
+  background_discovery: true,
 });
 type Input = z.input<typeof setupSchema>;
 type Output = z.output<typeof setupSchema>;
@@ -140,10 +141,11 @@ function SetupForm({
       default_language: settings.default_language,
       default_timezone: settings.default_timezone,
       tracked_keywords: settings.tracked_keywords,
-      trend_frequency: settings.trend_frequency,
+      background_discovery: settings.background_discovery,
     },
   });
   const { errors, isDirty } = form.formState;
+  const background = useWatch({ control: form.control, name: "background_discovery" });
 
   return (
     <form
@@ -294,7 +296,7 @@ function SetupForm({
                 href="/trends/sources"
                 className="underline underline-offset-4"
               >
-                Trends › Sources
+                Trends › Discovery Sources
               </Link>
               .
             </CardDescription>
@@ -320,20 +322,19 @@ function SetupForm({
               />
             </FormField>
             <FormField
-              id="trend_frequency"
-              label="How Often to Check for New Trends"
-              hint="If it is set to daily, Daily runs happen at 8:00 in your organization's timezone."
-              className="sm:max-w-xs"
+              id="background_discovery"
+              label="Update trends in the background"
+              hint={backgroundHint(background, settings.trend_frequency)}
             >
               <Controller
                 control={form.control}
-                name="trend_frequency"
+                name="background_discovery"
                 render={({ field }) => (
-                  <SimpleSelect
-                    id="trend_frequency"
-                    value={field.value}
-                    onChange={field.onChange}
-                    options={FREQUENCY_OPTIONS}
+                  <Switch
+                    id="background_discovery"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    aria-describedby="background_discovery-hint"
                     disabled={!canEdit}
                   />
                 )}

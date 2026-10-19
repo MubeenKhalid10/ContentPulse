@@ -94,6 +94,8 @@ export interface OrganizationSettings {
   subreddits: string[];
   rss_feeds: string[];
   trend_frequency: TrendFrequency;
+  /** On: the backend keeps trends updated on its schedule. Off: manual only. */
+  background_discovery: boolean;
   updated_at: string;
 }
 

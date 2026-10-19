@@ -43,11 +43,12 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
 
   // Sources: one click from Trends; free ones ready, keyed ones explain what's missing.
   await page.getByRole("link", { name: /Find trends/ }).first().click();
-  const strip = page.getByRole("region", { name: "Trend sources" });
+  const strip = page.getByRole("region", { name: "Discovery sources" });
   await expect(strip).toContainText(/Watching \d+ sources/);
-  await strip.getByRole("link", { name: "Manage sources" }).click();
+  await strip.getByRole("link", { name: "Discovery Sources" }).click();
   await expect(page).toHaveURL(/\/trends\/sources$/);
-  // A source's own settings sit on its card: subreddits under Reddit.
+  // A source's own settings sit on its row: subreddits under Reddit.
+  await page.getByRole("button", { name: "Reddit settings" }).click();
   const subreddits = page.getByLabel("Subreddits to follow");
   await subreddits.fill("r/automation");
   await subreddits.press("Enter");
@@ -80,10 +81,12 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
 
   // Open the top trend: explained score and linked evidence.
   const topic = (await rows.first().getByRole("link").textContent())!.trim();
-  // The discovery schedule can be changed right here.
-  await page.getByRole("combobox", { name: "How often to check for new trends" }).click();
-  await page.getByRole("option", { name: "Once a day", exact: true }).click();
-  await expect(page.getByText("Discovery schedule saved")).toBeVisible();
+  // Background updates can be switched off right here (the backend owns the schedule).
+  const background = page.getByRole("switch", { name: "Update trends in the background" });
+  await expect(background).toBeChecked();
+  await background.click();
+  await expect(page.getByText("Trends will update only when you ask")).toBeVisible();
+  await expect(background).not.toBeChecked();
   await rows.first().getByRole("link").click();
   await expect(page.getByRole("heading", { level: 1, name: topic })).toBeVisible();
   await expect(page.getByText("Why it's trending", { exact: true })).toBeVisible();

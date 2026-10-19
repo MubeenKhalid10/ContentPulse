@@ -66,7 +66,7 @@ export const NAV: NavSection[] = [
           ? [
               {
                 href: "/trends/sources",
-                label: "Trend sources",
+                label: "Discovery Sources",
                 icon: RadarIcon,
               },
             ]

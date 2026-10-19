@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import get_settings
 from app.models.enums import DiscoveryRunStatus, RunTrigger, TrendFrequency
 from app.models.trend import TrendDiscoveryRun
 from app.workers import scheduler
@@ -59,6 +60,47 @@ async def test_new_organizations_default_to_three_hours_and_custom_choices_stay(
     for choice in ("daily", "hourly", "every_6_hours", "manual", "every_3_hours"):
         resp = await admin.patch(url, json={"trend_frequency": choice})
         assert resp.status_code == 200 and resp.json()["trend_frequency"] == choice
+
+
+async def test_background_discovery_switch_uses_the_backend_schedule(client, monkeypatch):
+    admin, org = await setup(client)
+    url = f"/api/v1/organizations/{org['id']}/settings"
+    body = (await admin.get(url)).json()
+    assert body["background_discovery"] is True and body["trend_frequency"] == "every_3_hours"
+
+    off = (await admin.patch(url, json={"background_discovery": False})).json()
+    assert off["background_discovery"] is False and off["trend_frequency"] == "manual"
+
+    # Switching back on picks the backend's schedule, not a client-chosen one.
+    monkeypatch.setattr(get_settings(), "trend_default_frequency", "every_6_hours")
+    on = (await admin.patch(url, json={"background_discovery": True})).json()
+    assert on["background_discovery"] is True and on["trend_frequency"] == "every_6_hours"
+
+    # Already on: an existing schedule is kept, not reset.
+    await admin.patch(url, json={"trend_frequency": "daily"})
+    kept = (await admin.patch(url, json={"background_discovery": True})).json()
+    assert kept["trend_frequency"] == "daily"
+
+    # A backend default of "manual" can't make "on" mean "off".
+    await admin.patch(url, json={"background_discovery": False})
+    monkeypatch.setattr(get_settings(), "trend_default_frequency", "manual")
+    on = (await admin.patch(url, json={"background_discovery": True})).json()
+    assert on["trend_frequency"] == "every_3_hours"
+
+    assert (await admin.patch(url, json={"background_discovery": None})).status_code == 422
+
+
+async def test_background_discovery_needs_settings_permission(client):
+    from tests.conftest import add_member
+
+    admin, org = await setup(client)
+    url = f"/api/v1/organizations/{org['id']}/settings"
+    viewer = await add_member(client, admin, org["id"], "v@acme.example.com", "viewer")
+    assert (await viewer.patch(url, json={"background_discovery": False})).status_code == 403
+    outsider = await register(client, "out@other.example.com")
+    resp = await outsider.patch(url, json={"background_discovery": False})
+    assert resp.status_code in (403, 404)
+    assert (await admin.get(url)).json()["background_discovery"] is True
 
 
 async def test_scheduler_follows_each_organizations_frequency(client, db, monkeypatch):

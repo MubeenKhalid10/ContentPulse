@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { SimpleSelect } from "@/components/shared/simple-select";
+import { BackgroundDiscoveryToggle } from "@/components/trends/background-discovery";
 import { RunStatus } from "@/components/trends/run-status";
 import { TrendRow } from "@/components/trends/trend-row";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -19,7 +20,6 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import {
   useOrgSettings,
   useOrgId,
-  useUpdateSettings,
 } from "@/hooks/use-organization";
 import {
   type RelevanceFilter,
@@ -33,7 +33,6 @@ import {
 } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { FREQUENCY_OPTIONS } from "@/lib/options";
 import type { TrendSourceInfo } from "@/types/api";
 import { sourceName } from "@/lib/trends";
 import { cn } from "@/lib/utils";
@@ -128,6 +127,7 @@ export function TrendsExplorer() {
         }
         actions={
           <>
+            <BackgroundDiscoveryToggle />
             {canDiscover && (
               <Button
                 disabled={running || discover.isPending || enabledCount === 0}
@@ -160,7 +160,7 @@ export function TrendsExplorer() {
                 <p className="text-lg font-medium">No trends collected yet</p>
                 <p className="text-sm text-muted-foreground">
                   {enabledCount
-                    ? `ContentPulse checks ${enabledCount} source${enabledCount === 1 ? "" : "s"} on your schedule. Run discovery now to see what's rising.`
+                    ? `ContentPulse checks ${enabledCount} source${enabledCount === 1 ? "" : "s"}${settings.data?.background_discovery ? " in the background" : " when you ask"}. Run discovery now to see what's rising.`
                     : "Enable at least one source to start discovering trends."}
                 </p>
               </div>
@@ -212,7 +212,6 @@ export function TrendsExplorer() {
                 onChange={(e) => update({ q: e.target.value })}
                 className="w-full sm:w-56"
               />
-              <CheckFrequency />
               <div className="flex flex-wrap gap-2 sm:ml-auto">
                 <SimpleSelect
                   aria-label="Relevance"
@@ -356,7 +355,7 @@ function SourcesStrip({ sources }: { sources: TrendSourceInfo[] }) {
   const shown = on.slice(0, 4).map((s) => s.name);
   return (
     <section
-      aria-label="Trend sources"
+      aria-label="Discovery sources"
       className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-card px-4 py-3"
     >
       <RadarIcon
@@ -390,37 +389,9 @@ function SourcesStrip({ sources }: { sources: TrendSourceInfo[] }) {
         )}
       </p>
       <Link href="/trends/sources" className={buttonVariants({ size: "sm" })}>
-        Manage sources <ArrowRightIcon />
+        Discovery Sources <ArrowRightIcon />
       </Link>
     </section>
   );
 }
 
-/** How often discovery runs, set right where the trends appear (admins). */
-function CheckFrequency() {
-  const settings = useOrgSettings();
-  const update = useUpdateSettings();
-  const canEdit = useCan()("organization.write");
-  if (!settings.data) return null;
-  return (
-    <label className="flex items-center gap-2 text-sm sm:ml-49">
-      <span className="font-bold whitespace-nowrap">How often to check for new trends</span>
-      <SimpleSelect
-        aria-label="How often to check for new trends"
-        value={settings.data.trend_frequency}
-        options={FREQUENCY_OPTIONS}
-        disabled={!canEdit || update.isPending}
-        onChange={(trend_frequency) =>
-          update.mutate(
-            { trend_frequency },
-            {
-              onSuccess: () => toast.success("Discovery schedule saved"),
-              onError: (e) => toast.error(errorMessage(e)),
-            },
-          )
-        }
-        className="w-40"
-      />
-    </label>
-  );
-}
