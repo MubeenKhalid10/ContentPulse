@@ -10,6 +10,8 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["APP_ENV"] = "test"
 os.environ["AUTH_PROVIDER"] = "local"
 os.environ["TREND_SCHEDULER_ENABLED"] = "false"
+# Tests run discovery repeatedly; test_discovery_window.py turns the window on.
+os.environ["TREND_MANUAL_REUSE_WINDOW"] = "false"
 os.environ["TASK_BACKEND"] = "inprocess"
 # Opt-in per test (tests/test_operations.py): limits and retry delays would
 # otherwise make unrelated tests slow or order-dependent.

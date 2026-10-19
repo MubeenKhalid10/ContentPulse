@@ -28,15 +28,15 @@ import type { DesignTask, DesignTaskFilter } from "@/types/api";
 
 const PAGE = 30;
 const TABS: { value: DesignTaskFilter; label: string }[] = [
-  { value: "todo", label: "To do" },
-  { value: "submitted", label: "Waiting for approval" },
-  { value: "done", label: "Done" },
-  { value: "all", label: "All" },
+  { value: "todo", label: "Designs to create" },
+  { value: "submitted", label: "Waiting for design approval" },
+  { value: "done", label: "Approved designs" },
+  { value: "all", label: "All design tasks" },
 ];
 const EMPTY: Record<DesignTaskFilter, string> = {
   todo: "No open design tasks. Posts appear here when they're sent to design from the content studio.",
-  submitted: "Nothing submitted for approval yet.",
-  done: "No completed designs yet.",
+  submitted: "No designs waiting for approval.",
+  done: "No approved designs yet.",
   cancelled: "No cancelled tasks.",
   all: "No design tasks yet.",
 };

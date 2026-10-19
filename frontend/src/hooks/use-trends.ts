@@ -3,10 +3,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useOrgId } from "@/hooks/use-organization";
-import { api } from "@/lib/api";
+import { api, apiDownload } from "@/lib/api";
 import type {
   DiscoveryRun,
+  DiscoveryWindow,
   AIStatus,
+  ExportWindow,
   MarketOption,
   RelevanceLevel,
   RunStarted,
@@ -29,9 +31,18 @@ export interface TrendFilters {
   q: string;
 }
 
+/** The trends page shows only trends seen in the last 7 days (older ones
+ * stay in the database, hidden). Same window as the CSV export. */
+export const TREND_WINDOW_DAYS = 7;
+
 export function useTrends(filters: TrendFilters, limit: number) {
   const orgId = useOrgId();
-  const params = new URLSearchParams({ status: filters.status, sort: filters.sort, limit: String(limit) });
+  const params = new URLSearchParams({
+    status: filters.status,
+    sort: filters.sort,
+    limit: String(limit),
+    seen_within_days: String(TREND_WINDOW_DAYS),
+  });
   if (filters.source) params.set("source", filters.source);
   if (filters.location) params.set("location", filters.location);
   if (filters.relevance) params.set("relevance", filters.relevance);
@@ -69,6 +80,17 @@ export function useDiscoveryRuns() {
     // runs (started by the server) show up without a reload.
     refetchInterval: (query) =>
       query.state.data?.some((r) => r.status === "queued" || r.status === "running") ? 2000 : 30_000,
+  });
+}
+
+/** When the stored trends were last refreshed and when the next discovery is due. */
+export function useDiscoveryWindow() {
+  const orgId = useOrgId();
+  return useQuery({
+    queryKey: [...root(orgId ?? "none"), "discovery"],
+    queryFn: () => api<DiscoveryWindow>(`/trends/discovery`),
+    enabled: !!orgId,
+    refetchInterval: 60_000,
   });
 }
 
@@ -110,8 +132,16 @@ export function useDiscover() {
     mutationFn: (body: { sources?: string[] } = {}) =>
       api<RunStarted>(`/trends/discover`, { method: "POST", body }),
     // Refresh runs on success *and* on 409 (a scheduled run is already going),
-    // so the page shows the active run and starts polling it.
-    onSettled: () => queryClient.invalidateQueries({ queryKey: [...root(orgId!), "runs"] }),
+    // so the page shows the active run and starts polling it. Inside the
+    // discovery window nothing is collected: reload the stored trends.
+    onSettled: (result) => {
+      queryClient.invalidateQueries({ queryKey: [...root(orgId!), "runs"] });
+      queryClient.invalidateQueries({ queryKey: [...root(orgId!), "discovery"] });
+      if (result && !result.started) {
+        queryClient.invalidateQueries({ queryKey: root(orgId!) });
+        queryClient.invalidateQueries({ queryKey: ["org", orgId, "dashboard"] });
+      }
+    },
   });
 }
 
@@ -145,3 +175,41 @@ export const useOverrideRelevance = () =>
   useTrendMutation(({ id, level }: { id: string; level: RelevanceLevel | null }) =>
     api<TrendDetail>(`/trends/${id}/relevance`, { method: "PATCH", body: { relevance_level: level } }),
   );
+
+/** The seven-day range a CSV export would cover now (admins only). */
+export function useExportWindow(enabled: boolean) {
+  const orgId = useOrgId();
+  return useQuery({
+    queryKey: [...root(orgId ?? "none"), "export-window"],
+    queryFn: () => api<ExportWindow>("/trends/export/window"),
+    enabled: !!orgId && enabled,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+}
+
+export interface TrendsExport {
+  blob: Blob;
+  filename: string;
+  rows: number;
+  start: string;
+  end: string;
+  timezone: string;
+}
+
+/** Download the CSV. The range comes back from the server, captured once. */
+export function useExportTrends() {
+  return useMutation({
+    mutationFn: async (): Promise<TrendsExport> => {
+      const file = await apiDownload("/trends/export.csv");
+      return {
+        blob: file.blob,
+        filename: file.filename,
+        rows: Number(file.headers.get("X-Export-Rows") ?? 0),
+        start: file.headers.get("X-Export-Start") ?? "",
+        end: file.headers.get("X-Export-End") ?? "",
+        timezone: file.headers.get("X-Export-Timezone") ?? "",
+      };
+    },
+  });
+}

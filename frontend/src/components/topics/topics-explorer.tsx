@@ -41,7 +41,6 @@ const TABS: { value: TopicStatusFilter; label: string; count: (c: TopicPage["cou
   { value: "open", label: "To review", count: (c) => c.new + c.reviewed },
   { value: "shortlisted", label: "Shortlisted", count: (c) => c.shortlisted },
   { value: "rejected", label: "Rejected", count: (c) => c.rejected },
-  { value: "archived", label: "Archived", count: (c) => c.archived },
 ];
 const EMPTY: Record<TopicStatusFilter, string> = {
   open: "Nothing waiting for review. New topics appear here after trends are analyzed.",
@@ -53,13 +52,17 @@ const EMPTY: Record<TopicStatusFilter, string> = {
 
 export function TopicsExplorer() {
   const canManage = useCan()("topics.manage");
-  const [filters, setFilters] = usePersistedState<TopicFilters>("topics", {
+  const [saved, setFilters] = usePersistedState<TopicFilters>("topics", {
     status: "open",
     relevance: "",
     platform: "",
     sort: "score",
     q: "",
   });
+  // A tab saved before "Archived" was removed.
+  const filters = TABS.some((t) => t.value === saved.status)
+    ? saved
+    : { ...saved, status: "open" as const };
   const [limit, setLimit] = useState(PAGE);
   const topics = useTopics(filters, limit);
   const update = (patch: Partial<TopicFilters>) => {

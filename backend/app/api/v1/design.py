@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Path, Query
 
 from app.api.deps import DB, OrgContext, active_org_any_permission, active_org_permission
 from app.core.permissions import Permission
@@ -139,6 +139,16 @@ async def register_assets(task_id: uuid.UUID, data: RegisterAssets, ctx: CanUplo
         task_id,
         [f.model_dump() for f in data.files],
         data.note,
+    )
+
+
+@router.post("/{task_id}/versions/{version}/use", response_model=TaskDetail)
+async def use_version(
+    task_id: uuid.UUID, version: Annotated[int, Path(ge=1)], ctx: CanUpload, db: DB
+):
+    """Make an earlier creative version the newest (the one reviewers see)."""
+    return await service.use_version(
+        db, ctx.organization_id, ctx.user.id, ctx.role, task_id, version
     )
 
 

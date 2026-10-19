@@ -3,7 +3,7 @@
 import { CheckCircle2Icon, MessageSquareWarningIcon, XCircleIcon } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { COMMENT_KIND_LABEL } from "@/lib/approvals";
+import { approvalStatusLabel, COMMENT_KIND_LABEL } from "@/lib/approvals";
 import { timeAgo } from "@/lib/format";
 import type { ReviewSummary } from "@/types/api";
 
@@ -11,11 +11,12 @@ import type { ReviewSummary } from "@/types/api";
 export function ReviewBanner({ review, children }: { review: ReviewSummary | null; children?: React.ReactNode }) {
   if (!review || review.status === "pending") return null;
   const decisions = review.comments.filter((c) => c.kind !== "resubmitted");
-  const title = {
-    changes_requested: `Changes requested (round ${review.round})`,
-    approved: "Approved",
-    rejected: "Rejected",
-  }[review.status];
+  // A content review has no design attached; a design review always has one.
+  const stage = review.creative_version == null ? "copy" : "design";
+  const title =
+    review.status === "changes_requested"
+      ? `${approvalStatusLabel(review.status, stage)} (round ${review.round})`
+      : approvalStatusLabel(review.status, stage);
   const Icon = { changes_requested: MessageSquareWarningIcon, approved: CheckCircle2Icon, rejected: XCircleIcon }[review.status];
 
   return (

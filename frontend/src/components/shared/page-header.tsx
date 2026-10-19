@@ -4,18 +4,26 @@ export function PageHeader({
   title,
   description,
   actions,
+  contentClassName,
+  actionsClassName,
 }: {
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
+  contentClassName?: string;
+  actionsClassName?: string;
 }) {
   return (
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b-[3px] border-double border-foreground pb-4">
-      <div className="grid gap-1.5">
+      <div className={`grid gap-1.5 ${contentClassName ?? ""}`}>
         <h1 className="headline text-4xl">{title}</h1>
         {description && <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className={`flex flex-wrap items-center ${actionsClassName ?? "gap-2"}`}>
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

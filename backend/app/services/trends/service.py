@@ -2,7 +2,8 @@
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import Text, cast, func, nulls_last, select
 from sqlalchemy.exc import IntegrityError
@@ -16,9 +17,10 @@ from app.models.enums import (
     RelevanceLevel,
     RunTrigger,
     SourceHealth,
+    TrendFrequency,
     TrendStatus,
 )
-from app.models.organization import OrganizationSettings
+from app.models.organization import Organization, OrganizationSettings
 from app.models.trend import Trend, TrendDiscoveryRun, TrendMention, TrendSource
 from app.schemas.trend import (
     AnalysisStatus,
@@ -37,7 +39,7 @@ from app.services.trends.inputs import load_org_inputs
 from app.services.workflow import TREND_MACHINE
 from app.sources import SOURCES
 from app.sources.base import is_public_error
-from app.workers import trend_tasks
+from app.workers import scheduler, trend_tasks
 from app.workers.tasks import enqueue
 
 ACTIVE_RUN = (DiscoveryRunStatus.QUEUED, DiscoveryRunStatus.RUNNING)
@@ -237,6 +239,82 @@ async def start_discovery(
     return run
 
 
+@dataclass
+class DiscoveryWindow:
+    """The organization's current discovery window: when its stored trends
+    were last refreshed and when the next collection is due."""
+
+    background: bool
+    last_run: TrendDiscoveryRun | None
+    next_discovery_at: datetime | None
+    now: datetime
+    enforced: bool = True
+
+    @property
+    def can_discover(self) -> bool:
+        """Whether a manual discovery would call the providers now."""
+        return (
+            not self.enforced
+            or self.next_discovery_at is None
+            or self.now >= self.next_discovery_at
+        )
+
+
+def _next_daily_slot(after: datetime, timezone: str) -> datetime:
+    try:
+        tz = ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = ZoneInfo("UTC")
+    local = after.astimezone(tz)
+    slot = datetime.combine(local.date(), scheduler.DAILY_AT, tzinfo=tz)
+    if slot <= local:
+        slot += timedelta(days=1)
+    return slot.astimezone(UTC)
+
+
+async def discovery_window(
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    settings: Settings,
+    now: datetime | None = None,
+) -> DiscoveryWindow:
+    """One collection per window. With background discovery on, the window
+    is the organization's schedule (the scheduler, triggered by Supabase Cron,
+    starts the next run when it ends); with it off, it is
+    TREND_MANUAL_WINDOW_MINUTES. Only a successful run opens a window, so a
+    failed or missing collection never blocks the button."""
+    now = now or datetime.now(UTC)
+    row = (
+        await db.execute(
+            select(OrganizationSettings.trend_frequency, Organization.timezone)
+            .join(Organization, Organization.id == OrganizationSettings.organization_id)
+            .where(OrganizationSettings.organization_id == organization_id)
+        )
+    ).first()
+    frequency, timezone = row if row else (TrendFrequency.MANUAL, "UTC")
+    last = await db.scalar(
+        select(TrendDiscoveryRun)
+        .where(
+            TrendDiscoveryRun.organization_id == organization_id,
+            TrendDiscoveryRun.status == DiscoveryRunStatus.SUCCEEDED,
+        )
+        .order_by(TrendDiscoveryRun.created_at.desc())
+        .limit(1)
+    )
+    background = frequency != TrendFrequency.MANUAL
+    next_at = None
+    if last is not None:
+        if frequency in scheduler.INTERVALS:
+            next_at = last.created_at + scheduler.INTERVALS[frequency]
+        elif frequency == TrendFrequency.DAILY:
+            next_at = _next_daily_slot(last.created_at, timezone)
+        else:
+            next_at = last.created_at + timedelta(minutes=settings.trend_manual_window_minutes)
+    return DiscoveryWindow(
+        background, last, next_at, now, enforced=settings.trend_manual_reuse_window
+    )
+
+
 async def get_run(
     db: AsyncSession, organization_id: uuid.UUID, run_id: uuid.UUID
 ) -> TrendDiscoveryRun:
@@ -284,6 +362,7 @@ async def list_trends(
     limit: int,
     offset: int,
     relevance: str | None = None,
+    seen_since: datetime | None = None,
 ) -> TrendPage:
     # Discovery Sources: only trends reported by a source this organization
     # has switched on (attribution from trend_mentions, not Trend.sources).
@@ -300,6 +379,8 @@ async def list_trends(
         filters.append(Trend.topic.ilike(pattern) | cast(Trend.keywords, Text).ilike(pattern))
     if min_score is not None:
         filters.append(Trend.opportunity_score >= min_score)
+    if seen_since is not None:
+        filters.append(Trend.last_seen_at >= seen_since)
     if relevance == "relevant":
         filters.append(
             Trend.relevance_level.in_([RelevanceLevel.HIGHLY_RELEVANT, RelevanceLevel.RELEVANT])

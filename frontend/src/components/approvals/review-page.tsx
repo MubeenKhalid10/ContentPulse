@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAddComment, useApproval, useApprove, useFinalize, useReject, useRequestChanges } from "@/hooks/use-approvals";
 import { ApiError, errorMessage } from "@/lib/api";
-import { APPROVAL_STATUS_LABEL, COMMENT_KIND_LABEL } from "@/lib/approvals";
+import { approvalStatusLabel, COMMENT_KIND_LABEL } from "@/lib/approvals";
 import { useCan } from "@/lib/auth";
 import { POST_STATUS_LABEL, fullText } from "@/lib/content";
 import { cleanNote, formatDateTime, timeAgo } from "@/lib/format";
@@ -76,7 +76,7 @@ export function ReviewPage({ id }: { id: string }) {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">{a.post.title ?? "Untitled post"}</h1>
           <PlatformTag platform={a.post.platform} />
-          <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>{APPROVAL_STATUS_LABEL[a.status]}</Tag>
+          <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>{approvalStatusLabel(a.status, a.stage)}</Tag>
           <Tag tone={a.stage === "copy" ? "sky" : "violet"}>{a.stage === "copy" ? "Copy review" : "Design review"}</Tag>
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
           {a.post.status === "final" && (
@@ -191,7 +191,7 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
               ? "Copy approved: ready for design"
               : a.post.status === "final" && a.status === "approved"
                 ? "Ready to publish"
-                : APPROVAL_STATUS_LABEL[a.status]}
+                : approvalStatusLabel(a.status, a.stage)}
           </CardTitle>
           <CardDescription>
             {a.reviewer && `${a.status === "approved" ? "Approved" : "Decided"} by ${a.reviewer.name ?? a.reviewer.email}`}
@@ -237,7 +237,7 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Waiting for approval</CardTitle>
+          <CardTitle>{approvalStatusLabel("pending", a.stage)}</CardTitle>
           <CardDescription>
             {a.stage === "copy"
               ? "An admin will approve the copy, which opens the design brief, or ask for changes."

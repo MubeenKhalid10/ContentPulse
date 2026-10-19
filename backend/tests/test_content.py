@@ -4,7 +4,7 @@ draft → design hand-off (spec §23-26, §40, §56)."""
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.ai.provider import (
     USER_MESSAGES,
@@ -14,6 +14,8 @@ from app.ai.provider import (
     set_ai_provider,
 )
 from app.models.ai import AIGenerationJob, PromptTemplate
+from app.models.enums import Platform, PostStatus
+from app.models.post import Post
 from app.services.content.copy import check_copy, normalize_hashtags, parse_output
 from app.workers.runner import runner
 from tests.conftest import add_member, create_org, register
@@ -397,6 +399,28 @@ async def test_filters(client, internet, content_ai):
         ({"q": "nothing like this"}, 0),
     ]:
         assert (await admin.get(API, params=params)).json()["total"] == expected, params
+
+
+async def test_approval_tab_lists_only_posts_waiting_for_content_approval(client, db):
+    admin = await register(client, "admin@acme.example.com")
+    org = await create_org(admin)
+    post = Post(
+        organization_id=uuid.UUID(org["id"]),
+        platform=Platform.LINKEDIN,
+        title="Tab check",
+        status=PostStatus.CONTENT_REVIEW,
+    )
+    db.add(post)
+    await db.commit()
+    for status, expected in [
+        (PostStatus.CONTENT_REVIEW, 1),
+        (PostStatus.PENDING_APPROVAL, 0),  # design approval: not on the content page
+    ]:
+        await db.execute(update(Post).where(Post.id == post.id).values(status=status))
+        await db.commit()
+        page = (await admin.get(API, params={"status": "approval"})).json()
+        assert page["total"] == expected, status
+        assert page["counts"]["approval"] == expected, status
 
 
 async def test_content_permissions_and_isolation(client, internet, content_ai):

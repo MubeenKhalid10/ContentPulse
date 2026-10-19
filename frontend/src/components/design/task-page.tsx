@@ -96,8 +96,8 @@ export function DesignTaskPage({ id }: { id: string }) {
       <ReviewBanner review={t.review} />
       {t.status === "submitted" && t.review?.status === "pending" && (
         <Alert className="mb-6">
-          <AlertTitle>Waiting for approval</AlertTitle>
-          <AlertDescription>An admin will approve the post or ask for changes. You&apos;ll see their decision here.</AlertDescription>
+          <AlertTitle>Waiting for design approval</AlertTitle>
+          <AlertDescription>An admin will approve the design or ask for changes. You&apos;ll see their decision here.</AlertDescription>
         </Alert>
       )}
       {t.status === "cancelled" && (
@@ -111,19 +111,32 @@ export function DesignTaskPage({ id }: { id: string }) {
         </Alert>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="grid min-w-0 grid-cols-1 content-start gap-6 lg:col-span-2">
-          <BriefCard task={t} canEdit={canEditBrief} onEdit={() => setEditing(true)} />
-          <ContentCard task={t} />
-          <BrandCard task={t} canEdit={canEditBrief} canEditBrand={can("organization.write")} />
-        </div>
-        <div className="grid min-w-0 grid-cols-1 content-start gap-6">
-          {canWork && <CreativeUploader task={t} canSubmit={can("design.submit")} />}
-          <CreativeVersions task={t} />
-          {!canWork && !t.creatives.length && (
-            <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No creative uploaded yet.</p>
-          )}
-        </div>
+      <div className="grid gap-8">
+        <ContentCard task={t} />
+
+        <section aria-labelledby="design-group" className="grid gap-4">
+          <div className="grid gap-1 border-b pb-2">
+            <h2 id="design-group" className="text-lg font-semibold">
+              Design
+            </h2>
+            <p className="text-sm text-muted-foreground">The brief, your brand rules and the design files for this post.</p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid min-w-0 grid-cols-1 content-start gap-6 lg:col-span-2">
+              <BriefCard task={t} canEdit={canEditBrief} onEdit={() => setEditing(true)} />
+              <BrandCard task={t} canEdit={canEditBrief} canEditBrand={can("organization.write")} />
+            </div>
+            <div className="grid min-w-0 grid-cols-1 content-start gap-6">
+              {canWork && <CreativeUploader task={t} canSubmit={can("design.submit")} />}
+              <CreativeVersions task={t} canUse={canWork} />
+              {!canWork && !t.creatives.length && (
+                <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No creative uploaded yet.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
       </div>
       <BriefDialog task={t} open={editing} onClose={() => setEditing(false)} />
     </>
@@ -249,7 +262,7 @@ function ContentCard({ task: t }: { task: DesignTaskDetail }) {
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start gap-2">
         <div className="grid flex-1 gap-1">
-          <CardTitle>Post copy</CardTitle>
+          <CardTitle>Post Content</CardTitle>
           <CardDescription>
             Version {t.content.version}
             {t.post.topic_title && ` · ${t.post.topic_title}`}
@@ -258,7 +271,7 @@ function ContentCard({ task: t }: { task: DesignTaskDetail }) {
       </CardHeader>
       <CardContent>
         {t.post.platform === "blog" ? (
-          <div className="max-h-[36rem] overflow-y-auto">
+          <div className="max-h-[24rem] overflow-y-auto">
             <ArticlePreview
               title={t.post.title}
               seo={t.content.blog}

@@ -47,12 +47,9 @@ export function setActiveOrgId(id: string | null) {
 
 type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
-export async function api<T>(path: string, options: { method?: Method; body?: unknown } = {}): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json" };
-  // A file (Blob) is sent as the raw body with its own type; anything else as JSON.
-  const raw = typeof Blob !== "undefined" && options.body instanceof Blob;
-  if (raw) headers["Content-Type"] = (options.body as Blob).type || "application/octet-stream";
-  else if (options.body !== undefined) headers["Content-Type"] = "application/json";
+/** The active organization and, in Supabase mode, the access token. */
+async function contextHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
   const orgId = typeof window !== "undefined" ? getActiveOrgId() : null;
   if (orgId) headers["X-Organization-Id"] = orgId;
   if (typeof window !== "undefined") {
@@ -61,6 +58,25 @@ export async function api<T>(path: string, options: { method?: Method; body?: un
     const token = await supabaseAccessToken().catch(() => null);
     if (token) headers.Authorization = `Bearer ${token}`;
   }
+  return headers;
+}
+
+async function failure(response: Response): Promise<ApiError> {
+  const error = (await response.json().catch(() => null))?.error;
+  return new ApiError(
+    response.status,
+    error?.code ?? "INTERNAL_ERROR",
+    error?.message ?? `Request failed (${response.status})`,
+    error?.details,
+  );
+}
+
+export async function api<T>(path: string, options: { method?: Method; body?: unknown } = {}): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json", ...(await contextHeaders()) };
+  // A file (Blob) is sent as the raw body with its own type; anything else as JSON.
+  const raw = typeof Blob !== "undefined" && options.body instanceof Blob;
+  if (raw) headers["Content-Type"] = (options.body as Blob).type || "application/octet-stream";
+  else if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
   let response: Response;
   try {
@@ -79,18 +95,31 @@ export async function api<T>(path: string, options: { method?: Method; body?: un
   }
 
   if (response.status === 204) return undefined as T;
+  if (!response.ok) throw await failure(response);
+  return (await response.json().catch(() => null)) as T;
+}
 
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = payload?.error;
-    throw new ApiError(
-      response.status,
-      error?.code ?? "INTERNAL_ERROR",
-      error?.message ?? `Request failed (${response.status})`,
-      error?.details,
-    );
+export interface Download {
+  blob: Blob;
+  filename: string;
+  headers: Headers;
+}
+
+/** GET a file (CSV, ...) with the same organization and auth as `api`. */
+export async function apiDownload(path: string, accept = "text/csv"): Promise<Download> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/v1${path}`, {
+      headers: { Accept: accept, ...(await contextHeaders()) },
+      credentials: "same-origin",
+    });
+  } catch {
+    throw new ApiError(0, "NETWORK_ERROR", "Cannot reach the server. Check your connection.");
   }
-  return payload as T;
+  if (!response.ok) throw await failure(response);
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "download";
+  return { blob: await response.blob(), filename, headers: response.headers };
 }
 
 export function errorMessage(error: unknown): string {

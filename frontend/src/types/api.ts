@@ -22,6 +22,7 @@ export type Permission =
   | "knowledge.write"
   | "trends.read"
   | "trends.manage"
+  | "trends.export"
   | "topics.read"
   | "topics.manage"
   | "content.read"
@@ -368,10 +369,35 @@ export interface DiscoveryRun {
   finished_at: string | null;
 }
 
+/** One collection per discovery window (GET /trends/discovery). */
+/** The range a trends CSV export covers: trends last seen in [start, end). */
+export interface ExportWindow {
+  organization_id: string;
+  organization_name: string;
+  timezone: string;
+  start: string;
+  end: string;
+  filename: string;
+}
+
+export interface DiscoveryWindow {
+  background: boolean;
+  last_discovery_at: string | null;
+  next_discovery_at: string | null;
+  /** Whether "Discover New Trends" would collect now. */
+  can_discover: boolean;
+  /** Trends the last successful discovery added. */
+  new_trends: number;
+}
+
 export interface RunStarted {
+  /** False inside the discovery window: nothing was collected and `run` is
+   * the latest successful run, whose trends are already stored. */
+  started: boolean;
   run_id: string;
   status: RunStatus;
   run: DiscoveryRun;
+  window: DiscoveryWindow;
 }
 
 export interface TrendSourceInfo {

@@ -17,7 +17,6 @@ import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -135,17 +134,12 @@ export function TrendDetailView({ id }: { id: string }) {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="grid content-start gap-6 lg:col-span-2">
           <AlignmentPanel trend={t} canReview={canReview} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Why it&apos;s trending</CardTitle>
-              <CardDescription>
-                The signals behind the opportunity score.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SignalBreakdown signals={t.signals} />
-            </CardContent>
-          </Card>
+          <CollapsibleCard
+            title="Why it's trending"
+            description="The signals behind the opportunity score."
+          >
+            <SignalBreakdown signals={t.signals} />
+          </CollapsibleCard>
 
           <CollapsibleCard
             title="Evidence"

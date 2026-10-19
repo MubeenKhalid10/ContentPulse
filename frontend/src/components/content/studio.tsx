@@ -2,7 +2,6 @@
 
 import {
   AlertTriangleIcon,
-  ArchiveIcon,
   ArrowLeftIcon,
   CheckCircle2Icon,
   CopyPlusIcon,
@@ -29,16 +28,6 @@ import {
   VariantsPanel,
 } from "@/components/content/studio-panels";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -291,7 +280,6 @@ function StudioActions({
   const action = usePostAction();
   const variant = useCreateVariant();
   const [regenOpen, setRegenOpen] = useState(false);
-  const [confirmArchive, setConfirmArchive] = useState(false);
   const onError = (e: unknown) => toast.error(errorMessage(e));
   const run = (kind: PostAction) =>
     action.mutate({ id: post.id, action: kind }, { onSuccess: () => toast.success(ACTION_COPY[kind]), onError });
@@ -300,9 +288,8 @@ function StudioActions({
   const s = post.status;
   const canVariant = canGenerate && post.editable && !!post.content_strategy_id;
   // A post waiting for a decision can't be archived; withdraw nothing mid-review.
-  const canArchive = canEdit && s !== "archived" && s !== "pending_approval" && s !== "content_review";
   const canBackToDraft = canEdit && (s === "design_pending" || s === "content_review");
-  const hasMore = canVariant || canArchive || canBackToDraft;
+  const hasMore = canVariant || canBackToDraft;
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -330,18 +317,11 @@ function StudioActions({
           Submit for approval
         </Button>
       )}
-      {s === "content_review" && (
-        <>
-          <Tag tone="sky" dot>
-            Waiting for an admin to approve the copy
-          </Tag>
-          {canReview && post.review && (
-            <Link href={`/approvals/${post.review.request_id}`} className={buttonVariants({ size: "sm" })}>
-              <CheckCircle2Icon />
-              Review &amp; approve
-            </Link>
-          )}
-        </>
+      {s === "content_review" && canReview && post.review && (
+        <Link href={`/approvals/${post.review.request_id}`} className={buttonVariants({ size: "sm" })}>
+          <CheckCircle2Icon />
+          Review &amp; approve
+        </Link>
       )}
       {DESIGN_STEP.includes(s) && post.design_task && (
         <Link href={`/design/${post.design_task.id}`} className={buttonVariants({ size: "sm" })}>
@@ -381,37 +361,10 @@ function StudioActions({
                 {s === "content_review" ? "Withdraw from review" : "Take back from design"}
               </DropdownMenuItem>
             )}
-            {canArchive && (
-              <DropdownMenuItem variant="destructive" onClick={() => setConfirmArchive(true)}>
-                <ArchiveIcon />
-                Archive post
-              </DropdownMenuItem>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
       <RegenerateDialog post={post} open={regenOpen} onClose={() => setRegenOpen(false)} />
-      <AlertDialog open={confirmArchive} onOpenChange={setConfirmArchive}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Archive this post?</AlertDialogTitle>
-            <AlertDialogDescription>
-              It leaves the workflow but stays in the Archived tab with all its versions.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                run("archive");
-                setConfirmArchive(false);
-              }}
-            >
-              Archive
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

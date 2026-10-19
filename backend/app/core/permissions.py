@@ -24,6 +24,8 @@ class Permission(StrEnum):
     KNOWLEDGE_WRITE = "knowledge.write"
     TRENDS_READ = "trends.read"
     TRENDS_MANAGE = "trends.manage"
+    # Download the organization's trends as CSV (admins only).
+    TRENDS_EXPORT = "trends.export"
     TOPICS_READ = "topics.read"
     TOPICS_MANAGE = "topics.manage"
     CONTENT_READ = "content.read"
@@ -49,6 +51,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.KNOWLEDGE_WRITE,
             P.TRENDS_READ,
             P.TRENDS_MANAGE,
+            P.TRENDS_EXPORT,
             P.TOPICS_READ,
             P.TOPICS_MANAGE,
             P.CONTENT_READ,

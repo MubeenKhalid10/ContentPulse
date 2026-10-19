@@ -59,10 +59,42 @@ class RunRead(ORMModel):
     finished_at: datetime | None
 
 
+class DiscoveryWindowRead(BaseModel):
+    """When the stored trends were last refreshed and when the next
+    collection is due (one per discovery window)."""
+
+    background: bool
+    last_discovery_at: datetime | None
+    next_discovery_at: datetime | None
+    # Whether "Discover New Trends" would collect now; otherwise it only
+    # reads the stored trends.
+    can_discover: bool
+    # Trends the last successful discovery added.
+    new_trends: int
+
+
 class RunStarted(BaseModel):
+    """Answer to "Discover New Trends". `started` is false inside the
+    discovery window: nothing was collected and `run` is the latest
+    successful run, whose trends are already stored."""
+
+    started: bool = True
     run_id: uuid.UUID
     status: DiscoveryRunStatus
     run: RunRead
+    window: DiscoveryWindowRead
+
+
+class ExportWindowRead(BaseModel):
+    """The range a trends CSV export would cover if downloaded now:
+    trends last seen in [start, end), shown in `timezone`."""
+
+    organization_id: uuid.UUID
+    organization_name: str
+    timezone: str
+    start: datetime
+    end: datetime
+    filename: str
 
 
 class SourceInfo(BaseModel):

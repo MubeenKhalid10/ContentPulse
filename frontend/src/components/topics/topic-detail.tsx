@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { TOPIC_STATUS_TONE } from "@/lib/tones";
+import { CollapsibleCard } from "@/components/shared/collapsible-card";
 import { Tag } from "@/components/shared/tag";
 import { PostRow } from "@/components/content/content-list";
 import { EditTopicDialog } from "@/components/topics/edit-topic-dialog";
@@ -188,17 +189,12 @@ export function TopicDetailView({ id }: { id: string }) {
             )
           )}
           {trend && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Why it&apos;s trending</CardTitle>
-                <CardDescription>
-                  The signals behind the opportunity score.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SignalBreakdown signals={trend.signals} />
-              </CardContent>
-            </Card>
+            <CollapsibleCard
+              title="Why it's trending"
+              description="The signals behind the opportunity score."
+            >
+              <SignalBreakdown signals={trend.signals} />
+            </CollapsibleCard>
           )}
           {trend && trend.mentions.length > 0 && (
             <Card>

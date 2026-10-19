@@ -27,6 +27,15 @@ pg_cron (*/30) ──> pg_net http_post ──X-Ingest-Secret──> Render: POS
 
 No Edge Function is needed: pg_net can call the API directly.
 
+**Why every 30 minutes for a 3-hour cadence.** Each organization is collected
+once per discovery window: 3 hours after its last successful run, by default.
+A 30-minute trigger starts the next run at most 30 minutes after the window
+ends, whatever time the last run happened. A fixed `0 */3 * * *` trigger would
+skip a whole cycle whenever a run drifted past the slot. Inside the window,
+"Discover New Trends" in the app collects nothing: `POST /trends/discover`
+returns `started: false` and `next_discovery_at`, and the page shows the stored
+trends (`TREND_MANUAL_REUSE_WINDOW`, `app/api/v1/trends.py`).
+
 ## 0. Read-only checks (run first, change nothing)
 
 Run these in the Supabase SQL editor of the ContentPulse project:

@@ -36,29 +36,32 @@ import { cn } from "@/lib/utils";
 import type { Post, PostGroup } from "@/types/api";
 
 const PAGE = 30;
+// Content stages only: posts in design are on the Design page, and approved
+// or rejected posts on the Approvals page. There is no archive.
 const TABS: { value: PostGroup; label: string }[] = [
-  { value: "drafts", label: "Drafts" },
-  { value: "design", label: "In design" },
-  { value: "approval", label: "Waiting for approval" },
-  { value: "approved", label: "Ready to publish" },
-  { value: "archived", label: "Archived" },
+  { value: "drafts", label: "Draft posts" },
+  { value: "approval", label: "Waiting for content approval" },
 ];
 const EMPTY: Record<PostGroup, string> = {
   drafts:
     "No drafts. Open a shortlisted topic, plan a post and click Write post.",
   design: "Nothing in design right now.",
-  approval: "Nothing waiting for approval.",
+  approval: "No posts waiting for content approval.",
   approved: "Nothing ready to publish yet.",
   archived: "No archived posts.",
   all: "No posts yet.",
 };
 
 export function ContentList() {
-  const [filters, setFilters] = usePersistedState<ContentFilters>("content", {
+  const [saved, setFilters] = usePersistedState<ContentFilters>("content", {
     status: "drafts",
     platform: "",
     q: "",
   });
+  // A tab saved before "In design", "Ready to publish" and "Archived" were removed.
+  const filters = TABS.some((t) => t.value === saved.status)
+    ? saved
+    : { ...saved, status: "drafts" as const };
   const [limit, setLimit] = useState(PAGE);
   const posts = usePosts(filters, limit);
   const update = (patch: Partial<ContentFilters>) => {

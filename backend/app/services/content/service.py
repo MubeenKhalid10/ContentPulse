@@ -55,7 +55,9 @@ EDITABLE = (
 STATUS_GROUPS: dict[str, list[PostStatus] | None] = {
     "drafts": [P.DRAFT, P.CHANGES_REQUESTED],
     "design": [P.DESIGN_PENDING, P.DESIGN_IN_PROGRESS, P.DESIGN_UPLOADED],
-    "approval": [P.CONTENT_REVIEW, P.PENDING_APPROVAL],
+    # Content approval only. Posts waiting for design approval are listed
+    # on the design and approvals pages.
+    "approval": [P.CONTENT_REVIEW],
     "approved": [P.APPROVED, P.FINAL],
     "archived": [P.ARCHIVED, P.REJECTED],
     "all": None,

@@ -1,14 +1,17 @@
 import type { DesignFormat, PostStatus } from "@/types/api";
 
+/** Status tags. Each says in words where the post is (color is a hint only),
+ * and content vs design approval are never both called "approval". */
 export const POST_STATUS_LABEL: Record<PostStatus, string> = {
   draft: "Draft",
   content_review: "Waiting for content approval",
-  design_pending: "Needs design",
-  design_in_progress: "In design",
-  design_uploaded: "Design added",
-  pending_approval: "Waiting for approval",
-  changes_requested: "Changes needed",
-  approved: "Ready to publish",
+  design_pending: "Waiting for a designer",
+  design_in_progress: "Design in progress",
+  design_uploaded: "Design uploaded, not yet submitted",
+  pending_approval: "Waiting for design approval",
+  // Only design approval sends a post back with changes (content goes back to Draft).
+  changes_requested: "Design changes requested",
+  approved: "Design approved, waiting to be finalized",
   final: "Ready to publish",
   rejected: "Rejected",
   archived: "Archived",

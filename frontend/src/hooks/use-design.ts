@@ -84,6 +84,12 @@ export const useStartTask = () =>
 export const useGenerateImage = () =>
   useTaskMutation((id: string) => api<DesignTaskDetail>(`/design/tasks/${id}/generate-image`, { method: "POST" }));
 
+/** Make an earlier creative version the newest (the one reviewers see). */
+export const useUseCreativeVersion = () =>
+  useTaskMutation(({ id, version }: { id: string; version: number }) =>
+    api<DesignTaskDetail>(`/design/tasks/${id}/versions/${version}/use`, { method: "POST" }),
+  );
+
 export const useSubmitTask = () =>
   useTaskMutation((id: string) => api<DesignTaskDetail>(`/design/tasks/${id}/submit`, { method: "POST" }));
 

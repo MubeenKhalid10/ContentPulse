@@ -23,7 +23,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useApproveAll, useApprovals } from "@/hooks/use-approvals";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { APPROVAL_STATUS_LABEL } from "@/lib/approvals";
+import { approvalStatusLabel } from "@/lib/approvals";
 import { timeAgo, timeOfDay } from "@/lib/format";
 import { PLATFORM_OPTIONS } from "@/lib/options";
 import { cn } from "@/lib/utils";
@@ -39,13 +39,14 @@ const STAGES: { value: ApprovalStage; label: string }[] = [
   { value: "copy", label: "Content approval" },
   { value: "design", label: "Design approval" },
 ];
-const TABS: { value: ApprovalFilter; label: string }[] = [
-  { value: "pending", label: "Waiting for approval" },
-  { value: "approved", label: "Approved" },
-  { value: "changes_requested", label: "Changes needed" },
-  { value: "rejected", label: "Rejected" },
-  { value: "all", label: "All" },
-];
+const TAB_FILTERS: ApprovalFilter[] = ["pending", "approved", "changes_requested", "rejected", "all"];
+
+/** Tab names say which approval they are about. */
+function tabLabel(filter: ApprovalFilter, stage: ApprovalStage): string {
+  if (filter === "all") return stage === "copy" ? "All content reviews" : "All design reviews";
+  if (filter === "reviewed") return "Reviewed";
+  return approvalStatusLabel(filter, stage);
+}
 
 export function ApprovalList() {
   const [{ stage: savedStage, status, platform }, setFilters] =
@@ -157,14 +158,14 @@ export function ApprovalList() {
                 }}
               >
                 <TabsList>
-                  {TABS.map((tab) => (
-                    <TabsTrigger key={tab.value} value={tab.value}>
-                      {tab.label}
+                  {TAB_FILTERS.map((filter) => (
+                    <TabsTrigger key={filter} value={filter}>
+                      {tabLabel(filter, stage)}
                       {counts &&
-                        tab.value !== "all" &&
-                        counts[tab.value] > 0 && (
+                        filter !== "all" &&
+                        counts[filter] > 0 && (
                           <span className="ml-1 rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
-                            {counts[tab.value]}
+                            {counts[filter]}
                           </span>
                         )}
                     </TabsTrigger>
@@ -317,7 +318,7 @@ function ApprovalRow({
             {a.post.title ?? "Untitled post"}
           </Link>
           <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>
-            {APPROVAL_STATUS_LABEL[a.status]}
+            {approvalStatusLabel(a.status, a.stage)}
           </Tag>
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
         </div>

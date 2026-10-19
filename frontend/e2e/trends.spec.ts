@@ -230,13 +230,14 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await expect(page.getByText("Logo back to the brand position")).toBeVisible();
   await page.getByRole("button", { name: "Submit current design for approval" }).click();
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
-  await expect(page.getByText("Waiting for approval", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Waiting for design approval", { exact: true }).first()).toBeVisible();
   await page.getByRole("link", { name: /Add designs/ }).first().click();
-  await page.getByRole("tab", { name: /^Waiting for approval/ }).click();
+  await page.getByRole("tab", { name: /^Waiting for design approval/ }).click();
   await expect(page.getByRole("list", { name: "Design tasks" }).getByRole("link")).toHaveCount(1);
+  // Design approval is not content approval: the post isn't on the content page's tab.
   await page.getByRole("link", { name: /Write posts/ }).first().click();
-  await page.getByRole("tab", { name: /^Waiting for approval/ }).click();
-  await expect(page.getByRole("list", { name: "Posts" }).getByRole("link")).toHaveCount(1);
+  await page.getByRole("tab", { name: /^Waiting for content approval/ }).click();
+  await expect(page.getByText("No posts waiting for content approval.")).toBeVisible();
 
   // Review: ask for changes, the creator uploads a new design and resubmits
   // in one click, then one "Approve" makes the post ready to publish.

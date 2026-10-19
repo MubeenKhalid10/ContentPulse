@@ -5,6 +5,7 @@ import {
   FileTextIcon,
   FilmIcon,
   LoaderCircleIcon,
+  RotateCcwIcon,
   SendIcon,
   SparklesIcon,
   UploadCloudIcon,
@@ -18,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useGenerateImage, useSubmitTask, useUploadCreatives } from "@/hooks/use-design";
+import { useGenerateImage, useSubmitTask, useUploadCreatives, useUseCreativeVersion } from "@/hooks/use-design";
 import { errorMessage } from "@/lib/api";
 import { formatBytes } from "@/lib/design";
 import { cleanNote, formatDateTime, timeAgo } from "@/lib/format";
@@ -227,13 +228,17 @@ function GenerateImage({ task }: { task: DesignTaskDetail }) {
   );
 }
 
-export function CreativeVersions({ task }: { task: DesignTaskDetail }) {
+export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDetail; canUse?: boolean }) {
+  const use = useUseCreativeVersion();
   if (!task.creatives.length) return null;
   return (
     <Card>
       <CardHeader>
         <CardTitle>Creative versions</CardTitle>
-        <CardDescription>Every upload is kept. The newest version is the one reviewers see.</CardDescription>
+        <CardDescription>
+          Every upload is kept. The newest version is the one reviewers see
+          {canUse && task.creatives.length > 1 ? ": use an older one to make it the newest again." : "."}
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
         {task.creatives.map((v, i) => (
@@ -247,6 +252,30 @@ export function CreativeVersions({ task }: { task: DesignTaskDetail }) {
               </span>
             </div>
             {v.note && <p className="text-sm text-muted-foreground">{cleanNote(v.note)}</p>}
+            {canUse && i > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-fit"
+                disabled={use.isPending}
+                aria-label={`Use version ${v.version}`}
+                onClick={() =>
+                  use.mutate(
+                    { id: task.id, version: v.version },
+                    {
+                      onSuccess: () =>
+                        toast.success(`Version ${v.version} is now the newest`, {
+                          description: "Submit it for design approval when you're ready.",
+                        }),
+                      onError: (e) => toast.error(errorMessage(e)),
+                    },
+                  )
+                }
+              >
+                <RotateCcwIcon />
+                Use this version
+              </Button>
+            )}
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {v.files.map((f) => (
                 <CreativeTile key={f.id} file={f} />

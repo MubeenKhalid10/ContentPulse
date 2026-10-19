@@ -107,8 +107,8 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await expect(editor.getByLabel("Introduction")).not.toHaveValue("");
   await expect(editor.getByLabel("Body")).toHaveValue(/^## /);
   await expect(editor.getByLabel("Hashtags")).toHaveCount(0);
-  const preview = page.getByRole("figure", { name: "Search result preview" });
-  await expect(preview).toBeVisible();
+  // The preview is the article only (no search-result snippet).
+  await expect(page.getByRole("figure", { name: "Search result preview" })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1 }).filter({ hasText: topic }).first()).toBeVisible();
 
   // SEO fields are versioned like the copy.
@@ -117,7 +117,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await editor.getByRole("button", { name: "Save version" }).click();
   await expect(page.getByText("Saved as version 2")).toBeVisible();
   await expect(page.getByRole("list", { name: "Versions" }).getByText("Edited SEO details")).toBeVisible();
-  await expect(preview).toContainText("practical-guide");
+  await expect(editor.getByLabel("Slug", { exact: true })).toHaveValue("practical-guide");
   await shot(page, "blog-02-studio");
 
   // Featured image: add it on the design task and submit, then one approval.
@@ -128,7 +128,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await expect(page).toHaveURL(/\/design\//);
   await expect(page.getByText("Design brief", { exact: true })).toBeVisible();
   await expect(page.getByText(/1200×630/).first()).toBeVisible();
-  await expect(page.getByRole("figure", { name: "Search result preview" })).toBeVisible();
+  await expect(page.getByRole("figure", { name: "Search result preview" })).toHaveCount(0);
   await page.getByLabel("Choose creative files").setInputFiles("e2e/fixtures/creative-slide-1.png");
   await page.getByRole("button", { name: "Upload & submit for approval" }).click();
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
@@ -138,7 +138,8 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   const queue = page.getByRole("list", { name: "Approvals" });
   await expect(queue.getByRole("link")).toHaveCount(1);
   await queue.getByRole("link").click();
-  await expect(page.getByRole("figure", { name: "Search result preview" })).toContainText("practical-guide");
+  await expect(page.getByRole("heading", { level: 1 }).filter({ hasText: topic }).first()).toBeVisible();
+  await expect(page.getByRole("figure", { name: "Search result preview" })).toHaveCount(0);
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(page.getByText("Locked and ready to publish. Use Share on the post.")).toBeVisible();
   // Blog is exported for the website's CMS, never published automatically.

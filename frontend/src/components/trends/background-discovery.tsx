@@ -5,8 +5,10 @@ import { toast } from "sonner";
 
 import { Switch } from "@/components/ui/switch";
 import { useOrgSettings, useUpdateSettings } from "@/hooks/use-organization";
+import { useDiscoveryWindow } from "@/hooks/use-trends";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
+import { timeUntil } from "@/lib/format";
 import { FREQUENCY_OPTIONS } from "@/lib/options";
 import { cn } from "@/lib/utils";
 import type { TrendFrequency } from "@/types/api";
@@ -18,10 +20,18 @@ export function scheduleLabel(frequency: TrendFrequency): string | null {
   return label ? label.toLowerCase() : null;
 }
 
-export function backgroundHint(on: boolean, frequency: TrendFrequency): string {
+export function backgroundHint(
+  on: boolean,
+  frequency: TrendFrequency,
+  nextDiscoveryAt?: string | null,
+): string {
   if (!on) return "Trends update only when you select Discover New Trends now.";
   const schedule = scheduleLabel(frequency);
-  return `New trends arrive automatically${schedule ? ` (${schedule})` : ""}. ContentPulse manages the schedule.`;
+  const next =
+    nextDiscoveryAt && Date.parse(nextDiscoveryAt) > Date.now()
+      ? ` Next update in about ${timeUntil(nextDiscoveryAt)}.`
+      : "";
+  return `New trends arrive automatically${schedule ? ` (${schedule})` : ""}.${next || " ContentPulse manages the schedule."}`;
 }
 
 /**
@@ -32,19 +42,24 @@ export function BackgroundDiscoveryToggle({ className }: { className?: string })
   const settings = useOrgSettings();
   const update = useUpdateSettings();
   const canEdit = useCan()("organization.write");
+  const discovery = useDiscoveryWindow();
   const labelId = useId();
   const hintId = useId();
   if (!settings.data) return null;
   const on = settings.data.background_discovery;
 
   return (
-    <div className={cn("flex items-center gap-3", className)}>
+    <div className={cn("flex items-center gap-3 rounded-md border bg-card px-3 py-2", className)}>
       <div className="grid gap-0.5 text-left">
         <span id={labelId} className="text-sm font-bold whitespace-nowrap">
           Update trends in the background
         </span>
         <span id={hintId} className="max-w-72 text-xs text-muted-foreground">
-          {update.isPending ? "Saving…" : backgroundHint(on, settings.data.trend_frequency)}
+          {update.isPending ? "Saving…" : backgroundHint(
+                on,
+                settings.data.trend_frequency,
+                discovery.data?.next_discovery_at,
+              )}
         </span>
       </div>
       <Switch

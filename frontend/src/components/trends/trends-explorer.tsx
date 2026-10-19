@@ -11,6 +11,7 @@ import { SimpleSelect } from "@/components/shared/simple-select";
 import { BackgroundDiscoveryToggle } from "@/components/trends/background-discovery";
 import { RunStatus } from "@/components/trends/run-status";
 import { TrendRow } from "@/components/trends/trend-row";
+import { TrendsExport } from "@/components/trends/trends-export";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ import {
   useOrgId,
 } from "@/hooks/use-organization";
 import {
+  TREND_WINDOW_DAYS,
   type RelevanceFilter,
   type TrendFilters,
   useAIStatus,
@@ -33,7 +35,8 @@ import {
 } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import type { TrendSourceInfo } from "@/types/api";
+import { timeOfDay, timeUntil } from "@/lib/format";
+import type { RunStarted, TrendSourceInfo } from "@/types/api";
 import { sourceName } from "@/lib/trends";
 import { cn } from "@/lib/utils";
 
@@ -104,6 +107,17 @@ export function TrendsExplorer() {
     setLimit(PAGE);
   };
 
+  const runDiscovery = () => {
+    const shownAt = trends.dataUpdatedAt;
+    discover.mutate(
+      {},
+      {
+        onSuccess: (result) => onDiscoverStarted(result, shownAt),
+        onError: onDiscoverError,
+      },
+    );
+  };
+
   const noRunsYet = runs.data && runs.data.length === 0;
   const enabledCount = settings.data?.enabled_sources.length ?? 0;
 
@@ -111,6 +125,8 @@ export function TrendsExplorer() {
     <>
       <PageHeader
         title="Find trends"
+        contentClassName="max-w-[430px]"
+        actionsClassName="ml-auto justify-end gap-3"
         description={
           <>
             Everything that
@@ -131,12 +147,7 @@ export function TrendsExplorer() {
             {canDiscover && (
               <Button
                 disabled={running || discover.isPending || enabledCount === 0}
-                onClick={() =>
-                  discover.mutate(
-                    {},
-                    { onSuccess: onDiscoverStarted, onError: onDiscoverError },
-                  )
-                }
+                onClick={runDiscovery}
               >
                 <RadarIcon />
                 {running ? "Discovering…" : "Discover New Trends now"}
@@ -147,6 +158,7 @@ export function TrendsExplorer() {
       />
 
       <div className="grid min-w-0 grid-cols-1 gap-6">
+        {can("trends.export") && <TrendsExport />}
         {sources.data && <SourcesStrip sources={sources.data} />}
         {latest && <RunStatus run={latest} />}
 
@@ -166,15 +178,7 @@ export function TrendsExplorer() {
               </div>
               {canDiscover && enabledCount > 0 ? (
                 <Button
-                  onClick={() =>
-                    discover.mutate(
-                      {},
-                      {
-                        onSuccess: onDiscoverStarted,
-                        onError: onDiscoverError,
-                      },
-                    )
-                  }
+                  onClick={runDiscovery}
                   disabled={discover.isPending}
                 >
                   <RadarIcon />
@@ -256,6 +260,10 @@ export function TrendsExplorer() {
               </div>
             ) : trends.data?.items.length ? (
               <>
+                <p className="text-sm text-muted-foreground">
+                  {trends.data.total} trend{trends.data.total === 1 ? "" : "s"} seen in the last{" "}
+                  {TREND_WINDOW_DAYS} days. Older trends are hidden automatically.
+                </p>
                 <ul
                   className={cn(
                     "grid min-w-0 grid-cols-1 gap-3 transition-opacity",
@@ -294,8 +302,8 @@ export function TrendsExplorer() {
                   : filters.status === "active"
                     ? running
                       ? "Collecting… trends will appear here shortly."
-                      : "No active trends right now."
-                    : `No ${filters.status} trends.`}
+                      : `No active trends in the last ${TREND_WINDOW_DAYS} days.`
+                    : `No ${filters.status} trends in the last ${TREND_WINDOW_DAYS} days.`}
                 {filters.source && ` (${sourceName(filters.source)})`}
               </p>
             )}
@@ -306,8 +314,29 @@ export function TrendsExplorer() {
   );
 }
 
-const onDiscoverStarted = () =>
-  toast.success("Discovery started. Results appear here in a minute.");
+/** Inside the discovery window nothing is collected: the page reloads the
+ * stored trends and says when the next discovery is due. Trends count as new
+ * only if that discovery finished after the list on screen was loaded. */
+function onDiscoverStarted(result: RunStarted, shownAt: number) {
+  if (result.started) {
+    toast.success("Discovery started. Results appear here in a minute.");
+    return;
+  }
+  const info = result.window;
+  const next = info.next_discovery_at;
+  const wait = next ? `in ${timeUntil(next)} (${timeOfDay(next)})` : "soon";
+  const last = info.last_discovery_at;
+  if (info.new_trends > 0 && last && Date.parse(last) > shownAt) {
+    toast.success(
+      `Showing the latest trends: ${info.new_trends} new from the ${timeOfDay(last)} discovery.`,
+      { description: `The next discovery runs ${wait}.` },
+    );
+  } else {
+    toast.message("No new trends found since the last discovery.", {
+      description: `New discovery will be available ${wait}.`,
+    });
+  }
+}
 
 function onDiscoverError(error: unknown) {
   if (error instanceof ApiError && error.status === 409) {

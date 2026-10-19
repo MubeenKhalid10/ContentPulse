@@ -17,6 +17,16 @@ export function timeAgo(iso: string, now = Date.now()): string {
   return "just now";
 }
 
+/** "2h 14m", "45m", "under a minute": how long until `iso` (never negative). */
+export function timeUntil(iso: string, now = Date.now()): string {
+  const minutes = Math.ceil((new Date(iso).getTime() - now) / 60_000);
+  if (minutes <= 0) return "under a minute";
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!hours) return `${rest}m`;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }

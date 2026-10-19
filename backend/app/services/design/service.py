@@ -697,6 +697,40 @@ async def record_version(
     return version
 
 
+async def use_version(
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    role,
+    task_id: uuid.UUID,
+    version: int,
+) -> TaskDetail:
+    """Make an earlier creative version the one reviewers see: its files are
+    recorded again as the newest version (the same stored files, no copy).
+    History is kept, like restoring a post version."""
+    brief, post = await _workable(db, organization_id, user_id, role, task_id)
+    assets = list(
+        await db.scalars(
+            select(CreativeAsset)
+            .where(CreativeAsset.post_id == post.id, CreativeAsset.version == version)
+            .order_by(CreativeAsset.position)
+        )
+    )
+    if not assets:
+        raise NotFound("Creative version")
+    latest = await db.scalar(
+        select(func.max(CreativeAsset.version)).where(CreativeAsset.post_id == post.id)
+    )
+    if version == latest:
+        raise InvalidStateTransition("This is already the newest version.")
+    files = [(a.file_name, a.file_type, a.file_size, a.storage_key) for a in assets]
+    await record_version(
+        db, organization_id, user_id, brief, post, files, f"Reused version {version}"
+    )
+    await db.commit()
+    return await task_detail(db, organization_id, brief.id)
+
+
 async def submit(
     db: AsyncSession,
     organization_id: uuid.UUID,

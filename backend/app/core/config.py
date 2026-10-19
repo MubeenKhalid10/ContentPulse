@@ -240,6 +240,13 @@ class Settings(BaseSettings):
     # frequency applies again (no endless retries).
     trend_failure_retry_minutes: int = Field(default=30, ge=1)
     trend_failure_max_retries: int = Field(default=2, ge=0)
+    # "Discover New Trends" collects at most once per discovery window: the
+    # organization's schedule interval (every 3 hours by default), or the
+    # minutes below when background discovery is off. Inside the window the
+    # button only reads the stored trends and reports when the next discovery
+    # is due; providers are not called.
+    trend_manual_reuse_window: bool = True
+    trend_manual_window_minutes: int = Field(default=180, ge=1)
 
     # Shared provider-response cache (app/sources/cache_policy.py). Identical
     # public requests from different organizations reuse one response.

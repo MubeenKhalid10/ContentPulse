@@ -69,7 +69,8 @@ export function Markdown({ text }: { text: string }) {
   return <>{blocks}</>;
 }
 
-/** How a blog article reads: search snippet, then the article itself. */
+/** The article as readers will see it (only the published content; the SEO
+ * fields are edited and shown in the post's settings). */
 export function ArticlePreview({
   title,
   seo,
@@ -85,23 +86,11 @@ export function ArticlePreview({
 }) {
   const headline = seo?.seo_title || title;
   return (
-    <div className="grid gap-4">
-      {(seo?.meta_title || seo?.meta_description) && (
-        <figure aria-label="Search result preview" className="grid gap-0.5 rounded-lg border p-3 text-sm">
-          <span className="truncate text-xs text-muted-foreground">yourwebsite.com › blog › {seo?.slug || "…"}</span>
-          <span className="truncate text-base text-blue-700 dark:text-blue-400">{seo?.meta_title || headline}</span>
-          <span className="line-clamp-2 text-muted-foreground">{seo?.meta_description}</span>
-        </figure>
-      )}
-      <article className="grid gap-3 rounded-lg bg-muted/50 p-4 text-sm leading-relaxed">
-        {headline && <h1 className="text-xl font-semibold text-balance">{headline}</h1>}
-        {intro && <Markdown text={intro} />}
-        {body && <Markdown text={body} />}
-        {cta && <p className="border-l-2 border-primary pl-3 font-medium">{cta}</p>}
-        {!!seo?.keywords?.length && (
-          <p className="text-xs text-muted-foreground">Keywords: {seo.keywords.join(", ")}</p>
-        )}
-      </article>
-    </div>
+    <article className="grid gap-3 rounded-lg bg-muted/50 p-4 text-sm leading-relaxed">
+      {headline && <h1 className="text-xl font-semibold text-balance">{headline}</h1>}
+      {intro && <Markdown text={intro} />}
+      {body && <Markdown text={body} />}
+      {cta && <p className="border-l-2 border-primary pl-3 font-medium">{cta}</p>}
+    </article>
   );
 }

@@ -2,15 +2,18 @@
 
 import {
   AlertTriangleIcon,
+  ChevronRightIcon,
   LoaderCircleIcon,
   RefreshCwIcon,
   ShieldAlertIcon,
   SparklesIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { SimpleSelect } from "@/components/shared/simple-select";
+import { AngleDialog } from "@/components/trends/angle-dialog";
 import {
   RELEVANCE,
   RELEVANCE_OPTIONS,
@@ -60,6 +63,7 @@ export function AlignmentPanel({
   const analyze = useAnalyzeTrend();
   const override = useOverrideRelevance();
   const a = trend.alignment;
+  const [openAngle, setOpenAngle] = useState<PossibleAngle | null>(null);
   const running =
     trend.analysis?.status === "queued" || trend.analysis?.status === "running";
   const failed = trend.analysis?.status === "failed";
@@ -235,8 +239,23 @@ export function AlignmentPanel({
                 </p>
                 <ol className="grid gap-2">
                   {a.possible_angles.map((angle, i) => (
-                    <li key={i} className="grid gap-1 rounded-lg border p-3">
-                      <p className="text-sm font-medium">{angle.title}</p>
+                    <li
+                      key={i}
+                      className="relative grid gap-1 rounded-lg border p-3 transition-colors hover:bg-muted/40"
+                    >
+                      {/* The whole card opens the idea's details. */}
+                      <button
+                        type="button"
+                        onClick={() => setOpenAngle(angle)}
+                        aria-label={`Details of the idea “${angle.title}”`}
+                        className="flex items-start gap-2 text-left text-sm font-medium outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-ring"
+                      >
+                        <span className="flex-1">{angle.title}</span>
+                        <ChevronRightIcon
+                          aria-hidden
+                          className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        />
+                      </button>
                       <p className="text-sm text-muted-foreground">
                         <CitedText text={angle.angle} />
                       </p>
@@ -248,7 +267,7 @@ export function AlignmentPanel({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="ml-auto"
+                            className="relative z-10 ml-auto"
                             aria-label={`Plan a post from the idea “${angle.title}”`}
                             onClick={() => onPlanAngle(angle)}
                           >
@@ -259,6 +278,18 @@ export function AlignmentPanel({
                     </li>
                   ))}
                 </ol>
+                <AngleDialog
+                  angle={openAngle}
+                  trend={trend}
+                  onClose={() => setOpenAngle(null)}
+                  onPlan={
+                    onPlanAngle &&
+                    ((angle) => {
+                      setOpenAngle(null);
+                      onPlanAngle(angle);
+                    })
+                  }
+                />
               </div>
             )}
 
