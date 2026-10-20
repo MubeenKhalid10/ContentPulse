@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useFromHere } from "@/components/shared/back-link";
 import { PostRow } from "@/components/content/content-list";
 import { CollapsibleCard } from "@/components/shared/collapsible-card";
 import { Badge } from "@/components/ui/badge";
@@ -147,6 +148,7 @@ export function SourcesPanel({ post }: { post: PostDetail }) {
 }
 
 export function StrategyPanel({ post }: { post: PostDetail }) {
+  const fromHere = useFromHere();
   const s = post.strategy;
   if (!s) return null;
   const rows: [string, string | null][] = [
@@ -183,7 +185,7 @@ export function StrategyPanel({ post }: { post: PostDetail }) {
         </dl>
         {post.topic && (
           <Link
-            href={`/topics/${post.topic.id}`}
+            href={fromHere(`/topics/${post.topic.id}`)}
             className="text-sm underline-offset-4 hover:underline"
           >
             Open the topic

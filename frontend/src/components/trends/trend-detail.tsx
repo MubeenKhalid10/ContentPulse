@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeftIcon, ExternalLinkIcon, ListChecksIcon } from "lucide-react";
+import { ExternalLinkIcon, ListChecksIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 
 import { TREND_STATUS_TONE } from "@/lib/tones";
+import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { CollapsibleCard } from "@/components/shared/collapsible-card";
 import { Tag } from "@/components/shared/tag";
 import { AlignmentPanel } from "@/components/trends/alignment-panel";
@@ -37,6 +38,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function TrendDetailView({ id }: { id: string }) {
+  const fromHere = useFromHere();
   const trend = useTrend(id);
   const markets = useMarkets();
   const can = useCan();
@@ -46,15 +48,7 @@ export function TrendDetailView({ id }: { id: string }) {
     [markets.data],
   );
 
-  const back = (
-    <Link
-      href="/trends"
-      className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-    >
-      <ArrowLeftIcon className="size-4" />
-      Trends
-    </Link>
-  );
+  const back = <BackLink href="/trends" label="Trends" />;
 
   if (trend.isError) {
     const notFound =
@@ -117,7 +111,7 @@ export function TrendDetailView({ id }: { id: string }) {
         <div className="flex flex-wrap gap-1.5">
           {t.topic_id && (
             <Link
-              href={`/topics/${t.topic_id}`}
+              href={fromHere(`/topics/${t.topic_id}`)}
               className={buttonVariants({
                 variant: t.status === "shortlisted" ? "default" : "outline",
                 size: "sm",

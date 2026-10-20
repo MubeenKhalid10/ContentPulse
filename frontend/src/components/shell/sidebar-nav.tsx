@@ -104,6 +104,9 @@ export function SidebarNav({
 }
 
 /** A labelled group of links; collapsible ones stay closed until you're inside one. */
+/** Section headings stand out from the links under them. */
+const SECTION_LABEL = "slug text-xs font-bold text-foreground";
+
 function Section({
   label,
   collapsible,
@@ -120,7 +123,7 @@ function Section({
     return (
       <div className="mb-4">
         {label && (
-          <p className="slug px-2.5 pb-1.5 text-muted-foreground">{label}</p>
+          <p className={cn(SECTION_LABEL, "px-2.5 pb-1.5")}>{label}</p>
         )}
         {children}
       </div>
@@ -133,7 +136,10 @@ function Section({
         type="button"
         aria-expanded={expanded}
         onClick={() => setOpen(!expanded)}
-        className="slug flex w-full items-center justify-between rounded-sm px-2.5 py-1.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+        className={cn(
+          SECTION_LABEL,
+          "flex w-full items-center justify-between rounded-sm px-2.5 py-1.5 outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50",
+        )}
       >
         {label}
         <ChevronDownIcon

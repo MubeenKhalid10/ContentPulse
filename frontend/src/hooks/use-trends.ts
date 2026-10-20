@@ -10,7 +10,6 @@ import type {
   AIStatus,
   ExportWindow,
   MarketOption,
-  RelevanceLevel,
   RunStarted,
   TrendDetail,
   TrendPage,
@@ -169,11 +168,6 @@ export function useAIStatus() {
 export const useAnalyzeTrend = () =>
   useTrendMutation((id: string) =>
     api<{ job_id: string; status: string }>(`/trends/${id}/analyze`, { method: "POST" }),
-  );
-
-export const useOverrideRelevance = () =>
-  useTrendMutation(({ id, level }: { id: string; level: RelevanceLevel | null }) =>
-    api<TrendDetail>(`/trends/${id}/relevance`, { method: "PATCH", body: { relevance_level: level } }),
   );
 
 /** The seven-day range a CSV export would cover now (admins only). */

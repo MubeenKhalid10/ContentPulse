@@ -62,7 +62,11 @@ test("content, design and approval tabs name their stage", async ({ page }) => {
   await page.goto("/content");
   await expect(page.getByRole("tab", { name: /^Draft posts/ })).toBeVisible();
   // No Archived tab (there is no archiving).
-  expect(await tabNames(page)).toEqual(["Draft posts", "Waiting for content approval"]);
+  expect(await tabNames(page)).toEqual([
+    "Draft posts",
+    "Changes requested",
+    "Approval status",
+  ]);
 
   // Topics: no Archived tab either.
   const topic = {
@@ -132,9 +136,8 @@ test("content, design and approval tabs name their stage", async ({ page }) => {
   await expect(page.getByRole("list", { name: "Design tasks" })).toBeVisible();
   expect(await tabNames(page)).toEqual([
     "Designs to create",
-    "Waiting for design approval",
-    "Approved designs",
-    "All design tasks",
+    "Changes requested",
+    "Approval status",
   ]);
   await expect(page.getByRole("list", { name: "Design tasks" })).toContainText(
     "Waiting for design approval",
@@ -186,26 +189,18 @@ test("content, design and approval tabs name their stage", async ({ page }) => {
   await page.goto("/approvals");
   const queue = page.getByRole("list", { name: "Approvals" });
   await expect(queue).toContainText("Waiting for content approval");
-  expect(await tabNames(page)).toEqual(
-    expect.arrayContaining([
-      "Waiting for content approval",
-      "Content approved",
-      "Content changes requested",
-      "Content rejected",
-      "All content reviews",
-    ]),
-  );
+  expect(await tabNames(page)).toEqual([
+    "Content approval",
+    "Design approval",
+    "Ready to post",
+  ]);
   await page.getByRole("tab", { name: /Design approval/ }).click();
   await expect(queue).toContainText("Waiting for design approval");
-  expect(await tabNames(page)).toEqual(
-    expect.arrayContaining([
-      "Waiting for design approval",
-      "Design approved",
-      "Design changes requested",
-      "Design rejected",
-      "All design reviews",
-    ]),
-  );
+  expect(await tabNames(page)).toEqual([
+    "Content approval",
+    "Design approval",
+    "Ready to post",
+  ]);
 });
 
 test("a post waiting for content approval shows one status tag", async ({

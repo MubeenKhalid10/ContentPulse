@@ -245,6 +245,7 @@ async def guard[T](
     stale: Callable[[], Awaitable[T | None]] | None = None,
 ) -> T:
     """Run one outbound provider request under cooldown and budget control."""
+    from app.sources import bookkeeping
     from app.sources.base import SourceError, SourceErrorKind
     from app.sources.observability import record_request
 
@@ -252,7 +253,7 @@ async def guard[T](
     if get_settings().provider_budget_mode == "off":
         return await _timed(source, call)
     try:
-        until = await active_cooldown(source)
+        until = await bookkeeping.cooldown(source, lambda: active_cooldown(source))
     except Exception:
         logger.warning("Provider cooldown check failed (%s)", source, exc_info=True)
         until = None
@@ -279,22 +280,28 @@ async def guard[T](
         result = await _timed(source, call)
     except SourceError as exc:
         skipped = exc.kind in (SourceErrorKind.BUDGET_EXHAUSTED, SourceErrorKind.COOLING_DOWN)
-        await _settle(reservation, "released" if skipped else "failed")
+        await bookkeeping.later(lambda: _settle(reservation, "released" if skipped else "failed"))
         if exc.kind == SourceErrorKind.RATE_LIMITED:
             try:
-                await start_cooldown(source, status=exc.status, retry_after=exc.retry_after)
+                until = await start_cooldown(source, status=exc.status, retry_after=exc.retry_after)
+                bookkeeping.cooldown_started(source, until)
             except Exception:
                 logger.warning("Could not record a cooldown (%s)", source, exc_info=True)
         raise
     except BaseException:
-        await _settle(reservation, "failed")
+        await bookkeeping.later(lambda: _settle(reservation, "failed"))
         raise
-    await _settle(reservation, "completed")
+    await bookkeeping.later(lambda: _settle(reservation, "completed"))
+    if bookkeeping.needs_clear(source):
+        await bookkeeping.later(lambda: _clear_quietly(source))
+    return result
+
+
+async def _clear_quietly(source: str) -> None:
     try:
         await clear_failures(source)
     except Exception:
         pass
-    return result
 
 
 async def _timed[T](source: str, call: Callable[[], Awaitable[T]]) -> T:

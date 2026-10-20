@@ -2,7 +2,6 @@
 
 import {
   AlertTriangleIcon,
-  ArrowLeftIcon,
   CheckCircle2Icon,
   CopyPlusIcon,
   EllipsisIcon,
@@ -10,6 +9,7 @@ import {
   PaletteIcon,
   RefreshCwIcon,
   SendIcon,
+  Trash2Icon,
   Undo2Icon,
 } from "lucide-react";
 import Link from "next/link";
@@ -18,6 +18,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
+import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { ReviewBanner } from "@/components/approvals/review-banner";
 import { PostEditor } from "@/components/content/post-editor";
@@ -46,7 +47,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useResubmitPost } from "@/hooks/use-approvals";
-import { type PostAction, useCreateVariant, usePost, usePostAction, useRegenerate } from "@/hooks/use-content";
+import { type PostAction, useCreateVariant, useDeletePost, usePost, usePostAction, useRegenerate } from "@/hooks/use-content";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { POST_STATUS_LABEL } from "@/lib/content";
@@ -54,17 +55,13 @@ import { PLATFORM_LABEL } from "@/lib/topics";
 import type { PostDetail } from "@/types/api";
 
 export function ContentStudio({ id }: { id: string }) {
+  const fromHere = useFromHere();
   const post = usePost(id);
   const can = useCan();
   const canEdit = can("content.edit");
   const canGenerate = can("content.generate");
 
-  const back = (
-    <Link href="/content" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-      <ArrowLeftIcon className="size-4" />
-      Write posts
-    </Link>
-  );
+  const back = <BackLink href="/content" label="Write posts" />;
 
   if (post.isError) {
     const notFound = post.error instanceof ApiError && post.error.status === 404;
@@ -109,7 +106,7 @@ export function ContentStudio({ id }: { id: string }) {
             {p.topic && (
               <>
                 {" · "}
-                <Link href={`/topics/${p.topic.id}`} className="underline-offset-4 hover:underline">
+                <Link href={fromHere(`/topics/${p.topic.id}`)} className="underline-offset-4 hover:underline">
                   {p.topic.title}
                 </Link>
               </>
@@ -117,7 +114,7 @@ export function ContentStudio({ id }: { id: string }) {
             {p.design_task && (
               <>
                 {" · "}
-                <Link href={`/design/${p.design_task.id}`} className="font-medium text-foreground underline-offset-4 hover:underline">
+                <Link href={fromHere(`/design/${p.design_task.id}`)} className="font-medium text-foreground underline-offset-4 hover:underline">
                   Design task
                 </Link>
               </>
@@ -197,6 +194,9 @@ function ResubmitControl({ postId }: { postId: string }) {
 
 function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail; canGenerate: boolean; generating: boolean }) {
   const regenerate = useRegenerate();
+  const remove = useDeletePost();
+  const canEdit = useCan()("content.edit");
+  const router = useRouter();
   const g = post.generation;
   if (!g) return null;
   if (generating) {
@@ -224,18 +224,39 @@ function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail;
             {g.error}
             {post.current && " Your saved versions are unchanged."}
           </span>
-          {canGenerate && post.editable && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="justify-self-start"
-              disabled={regenerate.isPending}
-              onClick={() => regenerate.mutate({ id: post.id }, { onError: (e) => toast.error(errorMessage(e)) })}
-            >
-              <RefreshCwIcon />
-              Try again
-            </Button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {canGenerate && post.editable && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={regenerate.isPending || remove.isPending}
+                onClick={() => regenerate.mutate({ id: post.id }, { onError: (e) => toast.error(errorMessage(e)) })}
+              >
+                <RefreshCwIcon />
+                Try again
+              </Button>
+            )}
+            {/* Nothing written yet: the post can go, without touching the others. */}
+            {canEdit && !post.current && post.status === "draft" && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={regenerate.isPending || remove.isPending}
+                onClick={() =>
+                  remove.mutate(post.id, {
+                    onSuccess: () => {
+                      toast.success("Failed post deleted");
+                      router.push("/content");
+                    },
+                    onError: (e) => toast.error(errorMessage(e)),
+                  })
+                }
+              >
+                <Trash2Icon />
+                Delete post
+              </Button>
+            )}
+          </div>
         </AlertDescription>
       </Alert>
     );
@@ -275,6 +296,7 @@ function StudioActions({
   canShare: boolean;
   generating: boolean;
 }) {
+  const fromHere = useFromHere();
   const router = useRouter();
   const canReview = useCan()("approval.manage");
   const action = usePostAction();
@@ -318,13 +340,13 @@ function StudioActions({
         </Button>
       )}
       {s === "content_review" && canReview && post.review && (
-        <Link href={`/approvals/${post.review.request_id}`} className={buttonVariants({ size: "sm" })}>
+        <Link href={fromHere(`/approvals/${post.review.request_id}`)} className={buttonVariants({ size: "sm" })}>
           <CheckCircle2Icon />
           Review &amp; approve
         </Link>
       )}
       {DESIGN_STEP.includes(s) && post.design_task && (
-        <Link href={`/design/${post.design_task.id}`} className={buttonVariants({ size: "sm" })}>
+        <Link href={fromHere(`/design/${post.design_task.id}`)} className={buttonVariants({ size: "sm" })}>
           <PaletteIcon />
           {s === "changes_requested" ? "Update design & resubmit" : "Add design & submit"}
         </Link>

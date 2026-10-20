@@ -9,13 +9,6 @@ export const RELEVANCE: Record<RelevanceLevel, { label: string }> = {
   not_relevant: { label: "Not relevant" },
 };
 
-export const RELEVANCE_OPTIONS = (
-  Object.keys(RELEVANCE) as RelevanceLevel[]
-).map((value) => ({
-  value,
-  label: RELEVANCE[value].label,
-}));
-
 /** Green = strong fit, teal = fits, amber = borderline, gray = no fit. */
 export function RelevanceBadge({
   level,

@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeftIcon, LoaderCircleIcon, PencilIcon, SparklesIcon } from "lucide-react";
+import { LoaderCircleIcon, PencilIcon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
+import { BackLink } from "@/components/shared/back-link";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { ReviewBanner } from "@/components/approvals/review-banner";
 import { BriefDialog } from "@/components/design/brief-dialog";
@@ -37,12 +38,7 @@ export function DesignTaskPage({ id }: { id: string }) {
   const can = useCan();
   const [editing, setEditing] = useState(false);
 
-  const back = (
-    <Link href="/design" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-      <ArrowLeftIcon className="size-4" />
-      Design
-    </Link>
-  );
+  const back = <BackLink href="/design" label="Design" />;
   if (task.isError) {
     const notFound = task.error instanceof ApiError && task.error.status === 404;
     return (
@@ -111,9 +107,8 @@ export function DesignTaskPage({ id }: { id: string }) {
         </Alert>
       )}
 
+      {/* Design first: this is the designer's page; the copy it goes with follows. */}
       <div className="grid gap-8">
-        <ContentCard task={t} />
-
         <section aria-labelledby="design-group" className="grid gap-4">
           <div className="grid gap-1 border-b pb-2">
             <h2 id="design-group" className="text-lg font-semibold">
@@ -137,6 +132,8 @@ export function DesignTaskPage({ id }: { id: string }) {
             </div>
           </div>
         </section>
+
+        <ContentCard task={t} />
       </div>
       <BriefDialog task={t} open={editing} onClose={() => setEditing(false)} />
     </>

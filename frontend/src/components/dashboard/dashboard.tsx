@@ -10,7 +10,6 @@ import {
   FileTextIcon,
   ListChecksIcon,
   PaletteIcon,
-  SearchIcon,
   SendIcon,
   SparklesIcon,
   TargetIcon,
@@ -22,6 +21,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { SearchInput } from "@/components/shared/search-input";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { sourceStatus } from "@/components/trends/sources-manager";
@@ -33,7 +33,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKnowledgeSummary } from "@/hooks/use-knowledge";
 import {
@@ -47,6 +46,7 @@ import {
   useServices,
 } from "@/hooks/use-organization";
 import { useTrendAction, useTrendSources } from "@/hooks/use-trends";
+import { withFrom } from "@/lib/back";
 import { errorMessage } from "@/lib/api";
 import { useCan, useMe } from "@/lib/auth";
 import { POST_STATUS_LABEL } from "@/lib/content";
@@ -270,7 +270,6 @@ function TrendSearch() {
   return (
     <form
       role="search"
-      className="relative"
       onSubmit={(e) => {
         e.preventDefault();
         const query = q.trim();
@@ -288,17 +287,12 @@ function TrendSearch() {
         router.push("/trends");
       }}
     >
-      <SearchIcon
-        aria-hidden
-        className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-      />
-      <Input
-        type="search"
+      <SearchInput
         aria-label="Search trends"
         placeholder="Search trends…"
         value={q}
-        onChange={(e) => setQ(e.target.value)}
-        className="w-56 pl-8"
+        onChange={setQ}
+        className="w-56"
       />
     </form>
   );
@@ -556,7 +550,7 @@ function TrendingRow({ topic: t }: { topic: DashboardTrendingTopic }) {
     <tr className="align-middle">
       <td className="max-w-56 py-2.5 pr-3">
         <Link
-          href={`/trends/${t.id}`}
+          href={withFrom(`/trends/${t.id}`, "/dashboard")}
           className="font-medium underline-offset-4 hover:underline"
         >
           {t.topic}
@@ -609,7 +603,7 @@ function TrendingRow({ topic: t }: { topic: DashboardTrendingTopic }) {
       <td className="py-2.5 text-right whitespace-nowrap">
         {t.shortlisted || !canShortlist ? (
           <Link
-            href={`/trends/${t.id}`}
+            href={withFrom(`/trends/${t.id}`, "/dashboard")}
             className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             {t.shortlisted ? "Shortlisted" : "Open"}
@@ -778,7 +772,7 @@ function RecentContent({ data }: { data?: DashboardOverview }) {
             {data.recent_posts.map((p) => (
               <li key={p.id}>
                 <Link
-                  href={`/content/${p.id}`}
+                  href={withFrom(`/posts/${p.id}`, "/dashboard")}
                   className="-mx-2 grid gap-1.5 rounded-md px-2 py-2.5 hover:bg-muted/60"
                 >
                   <span className="truncate text-sm font-medium">
@@ -838,7 +832,7 @@ function TopOpportunities({ summary }: { summary?: DashboardSummary }) {
             {trends.map((t) => (
               <li key={t.id}>
                 <Link
-                  href={`/trends/${t.id}`}
+                  href={withFrom(`/trends/${t.id}`, "/dashboard")}
                   className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 hover:bg-muted/60"
                 >
                   <span className="grid min-w-0 flex-1">

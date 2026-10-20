@@ -6,15 +6,19 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  FILTER_SEARCH,
+  FILTER_SELECT,
+  FilterBar,
+} from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
+import { SearchInput } from "@/components/shared/search-input";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { BackgroundDiscoveryToggle } from "@/components/trends/background-discovery";
-import { RunStatus } from "@/components/trends/run-status";
 import { TrendRow } from "@/components/trends/trend-row";
 import { TrendsExport } from "@/components/trends/trends-export";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -160,7 +164,6 @@ export function TrendsExplorer() {
       <div className="grid min-w-0 grid-cols-1 gap-6">
         {can("trends.export") && <TrendsExport />}
         {sources.data && <SourcesStrip sources={sources.data} />}
-        {latest && <RunStatus run={latest} />}
 
         {noRunsYet ? (
           <Card>
@@ -196,12 +199,13 @@ export function TrendsExplorer() {
           </Card>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-3">
+            <FilterBar>
               <Tabs
                 value={filters.status}
                 onValueChange={(v) =>
                   update({ status: v as TrendFilters["status"] })
                 }
+                className="shrink-0"
               >
                 <TabsList>
                   <TabsTrigger value="active">Active</TabsTrigger>
@@ -209,48 +213,46 @@ export function TrendsExplorer() {
                   <TabsTrigger value="rejected">Rejected</TabsTrigger>
                 </TabsList>
               </Tabs>
-              <Input
+              <SearchInput
                 aria-label="Search trends"
                 placeholder="Search topics and keywords"
                 value={filters.q}
-                onChange={(e) => update({ q: e.target.value })}
-                className="w-full sm:w-56"
+                onChange={(q) => update({ q })}
+                className={FILTER_SEARCH}
               />
-              <div className="flex flex-wrap gap-2 sm:ml-auto">
-                <SimpleSelect
-                  aria-label="Relevance"
-                  value={filters.relevance || "all"}
-                  onChange={(v) =>
-                    update({
-                      relevance: v === "all" ? "" : (v as RelevanceFilter),
-                    })
-                  }
-                  options={RELEVANCE_FILTERS}
-                  className="w-44"
-                />
-                <SimpleSelect
-                  aria-label="Source"
-                  value={filters.source || "all"}
-                  onChange={(v) => update({ source: v === "all" ? "" : v })}
-                  options={sourceOptions}
-                  className="w-40"
-                />
-                <SimpleSelect
-                  aria-label="Location"
-                  value={filters.location || "all"}
-                  onChange={(v) => update({ location: v === "all" ? "" : v })}
-                  options={locationOptions}
-                  className="w-40"
-                />
-                <SimpleSelect
-                  aria-label="Sort by"
-                  value={filters.sort}
-                  onChange={(v) => update({ sort: v })}
-                  options={SORTS}
-                  className="w-44"
-                />
-              </div>
-            </div>
+              <SimpleSelect
+                aria-label="Relevance"
+                value={filters.relevance || "all"}
+                onChange={(v) =>
+                  update({
+                    relevance: v === "all" ? "" : (v as RelevanceFilter),
+                  })
+                }
+                options={RELEVANCE_FILTERS}
+                className={FILTER_SELECT}
+              />
+              <SimpleSelect
+                aria-label="Source"
+                value={filters.source || "all"}
+                onChange={(v) => update({ source: v === "all" ? "" : v })}
+                options={sourceOptions}
+                className={FILTER_SELECT}
+              />
+              <SimpleSelect
+                aria-label="Location"
+                value={filters.location || "all"}
+                onChange={(v) => update({ location: v === "all" ? "" : v })}
+                options={locationOptions}
+                className={FILTER_SELECT}
+              />
+              <SimpleSelect
+                aria-label="Sort by"
+                value={filters.sort}
+                onChange={(v) => update({ sort: v })}
+                options={SORTS}
+                className={FILTER_SELECT}
+              />
+            </FilterBar>
 
             {trends.isPending ? (
               <div className="grid gap-3">

@@ -5,12 +5,14 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, Conflict, ErrorCode, InvalidStateTransition, NotFound
 from app.models.ai import AIGenerationJob
+from app.models.approval import ApprovalRequest
 from app.models.enums import (
+    ApprovalStatus,
     JobStatus,
     Platform,
     PostStatus,
@@ -53,15 +55,54 @@ EDITABLE = (
     P.CHANGES_REQUESTED,
 )
 STATUS_GROUPS: dict[str, list[PostStatus] | None] = {
-    "drafts": [P.DRAFT, P.CHANGES_REQUESTED],
+    "drafts": [P.DRAFT],
+    # Sent back by an approver (see _group_clause).
+    "changes": [P.DRAFT, P.CHANGES_REQUESTED],
     "design": [P.DESIGN_PENDING, P.DESIGN_IN_PROGRESS, P.DESIGN_UPLOADED],
-    # Content approval only. Posts waiting for design approval are listed
-    # on the design and approvals pages.
-    "approval": [P.CONTENT_REVIEW],
+    # Approval status on Write posts: copy waiting for approval, or approved
+    # (the post has moved on to design or is ready).
+    "approval": [
+        P.CONTENT_REVIEW,
+        P.DESIGN_PENDING,
+        P.DESIGN_IN_PROGRESS,
+        P.DESIGN_UPLOADED,
+        P.PENDING_APPROVAL,
+        P.APPROVED,
+        P.FINAL,
+    ],
     "approved": [P.APPROVED, P.FINAL],
     "archived": [P.ARCHIVED, P.REJECTED],
     "all": None,
 }
+# Changes requested on the copy put the post back to DRAFT; on the design
+# they leave it CHANGES_REQUESTED.
+_LATEST_REVIEW = (
+    select(ApprovalRequest.status)
+    .where(ApprovalRequest.post_id == Post.id)
+    .order_by(ApprovalRequest.created_at.desc())
+    .limit(1)
+    .scalar_subquery()
+)
+SENT_BACK = or_(
+    Post.status == P.CHANGES_REQUESTED,
+    # IS NOT DISTINCT FROM: a never-reviewed draft (no request, NULL) is not sent back.
+    and_(
+        Post.status == P.DRAFT,
+        _LATEST_REVIEW.is_not_distinct_from(ApprovalStatus.CHANGES_REQUESTED),
+    ),
+)
+
+
+def _group_clause(group: str):
+    statuses = STATUS_GROUPS[group]
+    clause = Post.status.in_(statuses) if statuses is not None else true()
+    if group == "drafts":
+        return and_(clause, ~SENT_BACK)
+    if group == "changes":
+        return and_(clause, SENT_BACK)
+    return clause
+
+
 COPY_FIELDS = ("hook", "body", "cta", "hashtags", "mentions")
 DESIGN_STATUSES = (P.DESIGN_PENDING, P.DESIGN_IN_PROGRESS, P.DESIGN_UPLOADED)
 META_FIELDS = ("visual_concept", "design_format", "blog")
@@ -178,19 +219,13 @@ async def list_posts(
             or_(PostVersion.hook.ilike(pattern), PostVersion.body.ilike(pattern)),
         )
         filters.append(or_(Post.title.ilike(pattern), Post.id.in_(matching_versions)))
-    by_status = dict(
-        (
-            await db.execute(
-                select(Post.status, func.count()).where(*filters).group_by(Post.status)
-            )
-        ).all()
-    )
-    counts = {
-        group: sum(by_status.get(s, 0) for s in statuses) if statuses else sum(by_status.values())
-        for group, statuses in STATUS_GROUPS.items()
-    }
-    if (statuses := STATUS_GROUPS[status]) is not None:
-        filters.append(Post.status.in_(statuses))
+    row = (
+        await db.execute(
+            select(*(func.count().filter(_group_clause(g)) for g in STATUS_GROUPS)).where(*filters)
+        )
+    ).one()
+    counts = dict(zip(STATUS_GROUPS, row, strict=True))
+    filters.append(_group_clause(status))
     total = await db.scalar(select(func.count()).select_from(Post).where(*filters))
     posts = list(
         await db.scalars(
@@ -350,6 +385,29 @@ async def create_variant(
     _record(db, variant, user_id, AuditAction.CONTENT_GENERATED, {"kind": "variant"})
     await generation.start(db, variant, kind="variant", source_post_id=source.id, user_id=user_id)
     return await post_detail(db, organization_id, variant.id)
+
+
+async def delete_post(
+    db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, post_id: uuid.UUID
+) -> None:
+    """Only a post with nothing written (its writing failed) can be deleted.
+    A post with content is archived instead, so its history stays."""
+    post = await _get_post(db, organization_id, post_id)
+    if post.current_version or post.status != P.DRAFT:
+        raise Conflict(
+            "Only a post whose writing failed, with nothing written yet, can be deleted."
+        )
+    if await generation.active_job(db, post.id):
+        raise Conflict("This post is still being written.")
+    _record(
+        db,
+        post,
+        user_id,
+        AuditAction.CONTENT_DELETED,
+        {"title": post.title, "platform": post.platform.value},
+    )
+    await db.delete(post)
+    await db.commit()
 
 
 # --- Editing ----------------------------------------------------------------------

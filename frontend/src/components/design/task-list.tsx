@@ -8,10 +8,15 @@ import { POST_STATUS_TONE } from "@/lib/tones";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { DayGroups } from "@/components/shared/day-groups";
 import { PageHeader } from "@/components/shared/page-header";
+import {
+  FILTER_SEARCH,
+  FILTER_SELECT,
+  FilterBar,
+} from "@/components/shared/filter-bar";
+import { SearchInput } from "@/components/shared/search-input";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -29,12 +34,13 @@ import type { DesignTask, DesignTaskFilter } from "@/types/api";
 const PAGE = 30;
 const TABS: { value: DesignTaskFilter; label: string }[] = [
   { value: "todo", label: "Designs to create" },
-  { value: "submitted", label: "Waiting for design approval" },
-  { value: "done", label: "Approved designs" },
-  { value: "all", label: "All design tasks" },
+  { value: "changes", label: "Changes requested" },
+  { value: "approval", label: "Approval status" },
 ];
 const EMPTY: Record<DesignTaskFilter, string> = {
   todo: "No open design tasks. Posts appear here when they're sent to design from the content studio.",
+  changes: "Nothing sent back. Designs an approver asks you to change appear here.",
+  approval: "No designs sent for approval yet.",
   submitted: "No designs waiting for approval.",
   done: "No approved designs yet.",
   cancelled: "No cancelled tasks.",
@@ -43,12 +49,16 @@ const EMPTY: Record<DesignTaskFilter, string> = {
 
 export function DesignTaskList() {
   const isDesigner = useCan()("design.upload");
-  const [filters, setFilters] = usePersistedState<DesignFilters>("design", {
+  const [saved, setFilters] = usePersistedState<DesignFilters>("design", {
     status: "todo",
     mine: false,
     platform: "",
     q: "",
   });
+  // A tab saved before it was removed falls back to the first one.
+  const filters: DesignFilters = TABS.some((t) => t.value === saved.status)
+    ? saved
+    : { ...saved, status: "todo" };
   const [limit, setLimit] = useState(PAGE);
   const tasks = useDesignTasks(filters, limit);
   const update = (patch: Partial<DesignFilters>) => {
@@ -77,16 +87,17 @@ export function DesignTaskList() {
         </Card>
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-6">
-          <div className="flex flex-wrap items-center gap-3">
+          <FilterBar>
             <Tabs
               value={filters.status}
               onValueChange={(v) => update({ status: v as DesignTaskFilter })}
+              className="shrink-0"
             >
               <TabsList>
                 {TABS.map((tab) => (
                   <TabsTrigger key={tab.value} value={tab.value}>
                     {tab.label}
-                    {counts && tab.value !== "all" && counts[tab.value] > 0 && (
+                    {counts && counts[tab.value] > 0 && (
                       <span className="ml-1 rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
                         {counts[tab.value]}
                       </span>
@@ -95,41 +106,39 @@ export function DesignTaskList() {
                 ))}
               </TabsList>
             </Tabs>
-            <Input
+            <SearchInput
               aria-label="Search tasks"
               placeholder="Search tasks"
               value={filters.q}
-              onChange={(e) => update({ q: e.target.value })}
-              className="w-full sm:w-56"
+              onChange={(q) => update({ q })}
+              className={FILTER_SEARCH}
             />
-            <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
-              {isDesigner && (
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="mine"
-                    checked={filters.mine}
-                    onCheckedChange={(mine) => update({ mine })}
-                  />
-                  <Label htmlFor="mine">Assigned to me</Label>
-                </div>
-              )}
-              <SimpleSelect
-                aria-label="Platform"
-                value={filters.platform || "all"}
-                onChange={(v) =>
-                  update({
-                    platform:
-                      v === "all" ? "" : (v as DesignFilters["platform"]),
-                  })
-                }
-                options={[
-                  { value: "all", label: "Any platform" },
-                  ...PLATFORM_OPTIONS,
-                ]}
-                className="w-40"
-              />
-            </div>
-          </div>
+            {isDesigner && (
+              <div className="flex shrink-0 items-center gap-2">
+                <Switch
+                  id="mine"
+                  checked={filters.mine}
+                  onCheckedChange={(mine) => update({ mine })}
+                />
+                <Label htmlFor="mine">Assigned to me</Label>
+              </div>
+            )}
+            <SimpleSelect
+              aria-label="Platform"
+              value={filters.platform || "all"}
+              onChange={(v) =>
+                update({
+                  platform:
+                    v === "all" ? "" : (v as DesignFilters["platform"]),
+                })
+              }
+              options={[
+                { value: "all", label: "Any platform" },
+                ...PLATFORM_OPTIONS,
+              ]}
+              className={FILTER_SELECT}
+            />
+          </FilterBar>
 
           {tasks.isPending ? (
             <div className="grid gap-3">
@@ -187,9 +196,15 @@ function TaskRow({ task }: { task: DesignTask }) {
         >
           {task.post.title ?? "Untitled post"}
         </Link>
-        <Tag tone={POST_STATUS_TONE[task.post.status]} dot>
-          {POST_STATUS_LABEL[task.post.status]}
-        </Tag>
+        {task.status === "completed" ? (
+          <Tag tone="green" dot>
+            Design approved
+          </Tag>
+        ) : (
+          <Tag tone={POST_STATUS_TONE[task.post.status]} dot>
+            {POST_STATUS_LABEL[task.post.status]}
+          </Tag>
+        )}
         <span className="ml-auto text-xs text-muted-foreground">
           {timeOfDay(task.updated_at)}
         </span>

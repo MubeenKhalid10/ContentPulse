@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.images import get_image_provider
@@ -48,11 +48,30 @@ ACTIVE = (B.OPEN, B.ASSIGNED, B.IN_PROGRESS)
 EDITABLE_BRIEF = (B.OPEN, B.ASSIGNED, B.IN_PROGRESS)
 FILTERS: dict[str, list[DesignBriefStatus] | None] = {
     "todo": [B.OPEN, B.ASSIGNED, B.IN_PROGRESS],
+    # Sent back by the approver: active again while its post waits on changes.
+    "changes": [B.OPEN, B.ASSIGNED, B.IN_PROGRESS],
     "submitted": [B.SUBMITTED],
+    # Approval status on the Design page: waiting for design approval, or approved.
+    "approval": [B.SUBMITTED, B.COMPLETED],
     "done": [B.COMPLETED],
     "cancelled": [B.CANCELLED],
     "all": None,
 }
+SENT_BACK = DesignBrief.post_id.in_(
+    select(Post.id).where(Post.status == PostStatus.CHANGES_REQUESTED)
+)
+
+
+def _filter_clause(name: str):
+    statuses = FILTERS[name]
+    clause = DesignBrief.status.in_(statuses) if statuses is not None else true()
+    if name == "todo":
+        return and_(clause, ~SENT_BACK)
+    if name == "changes":
+        return and_(clause, SENT_BACK)
+    return clause
+
+
 # Post statuses in which a designer can still deliver files (Sprint 8 adds
 # CHANGES_REQUESTED → back to design).
 UPLOADABLE = (
@@ -250,25 +269,17 @@ async def list_tasks(
             Post.organization_id == organization_id, Post.title.ilike(pattern)
         )
         filters.append(or_(DesignBrief.post_id.in_(titled), DesignBrief.headline.ilike(pattern)))
-    by_status = dict(
-        (
-            await db.execute(
-                select(DesignBrief.status, func.count())
-                .where(*filters)
-                .group_by(DesignBrief.status)
-            )
-        ).all()
-    )
-    counts = {
-        name: sum(by_status.get(s, 0) for s in statuses) if statuses else sum(by_status.values())
-        for name, statuses in FILTERS.items()
-    }
-    if (statuses := FILTERS[status]) is not None:
-        filters.append(DesignBrief.status.in_(statuses))
+    row = (
+        await db.execute(
+            select(*(func.count().filter(_filter_clause(n)) for n in FILTERS)).where(*filters)
+        )
+    ).one()
+    counts = dict(zip(FILTERS, row, strict=True))
+    filters.append(_filter_clause(status))
     total = await db.scalar(select(func.count()).select_from(DesignBrief).where(*filters))
     order = (
         [DesignBrief.status != B.IN_PROGRESS, DesignBrief.created_at.desc()]
-        if status == "todo"
+        if status in ("todo", "changes")
         else [DesignBrief.updated_at.desc()]
     )
     rows = list(

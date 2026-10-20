@@ -26,6 +26,7 @@ from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.logging import logger
+from app.sources import bookkeeping
 from app.sources.cache_policy import (
     POLICIES,
     CachePolicy,
@@ -34,7 +35,7 @@ from app.sources.cache_policy import (
     source_of,
 )
 
-POLL_SECONDS = 0.25
+POLL_SECONDS = 1.0
 
 
 class CacheStats:
@@ -389,9 +390,13 @@ async def _load(
         if claimed:
             await asyncio.shield(_release_quietly(prepared, owner))
         raise
-    stored = await _store_quietly(prepared, response)
-    if claimed and not stored:
-        await _release_quietly(prepared, owner)
+
+    async def keep() -> None:
+        stored = await _store_quietly(prepared, response)
+        if claimed and not stored:
+            await _release_quietly(prepared, owner)
+
+    await bookkeeping.later(keep)
     return response
 
 

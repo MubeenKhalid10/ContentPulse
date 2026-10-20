@@ -60,9 +60,10 @@ bucket rather than through the API.
    | `S3_ENDPOINT_URL` | `https://<ref>.supabase.co/storage/v1/s3` | Supabase step 2 |
    | `AWS_REGION` | e.g. `eu-central-1` | Supabase step 2 |
    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | the storage access key | Supabase step 2 |
-   | `LLM_PROVIDER` | e.g. `gemini` (or leave empty for rules and templates) | your choice |
-   | `GEMINI_API_KEY` | AI key | <https://aistudio.google.com/apikey> |
-   | `GROQ_API_KEY` | optional fallback model | <https://console.groq.com/keys> |
+   | `LLM_PROVIDER` | `groq` (or leave empty for rules and templates) | Groq is the configured default |
+   | `LLM_MODEL` | `qwen/qwen3.8-27b` | Groq primary model |
+   | `LLM_FALLBACK_MODEL` | `openai/gpt-oss-120b` | Groq same-provider fallback |
+   | `GROQ_API_KEY` | AI key | <https://console.groq.com/keys> |
    | `EMBEDDING_PROVIDER` | `gemini` (or empty) | uses the Gemini key |
    | `IMAGE_PROVIDER` | `kie` (or empty to hide AI images) | your choice |
    | `KIE_AI_API_KEY` | image key | <https://kie.ai/api-key> |

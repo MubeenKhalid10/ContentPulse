@@ -168,6 +168,22 @@ export const useRegenerate = () =>
       }),
   );
 
+/** Delete a post with nothing written (its writing failed). */
+export function useDeletePost() {
+  const orgId = useOrgId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<void>(`/content/${id}`, { method: "DELETE" }),
+    onSuccess: (_, id) => {
+      queryClient.removeQueries({ queryKey: [...root(orgId!), "detail", id] });
+      queryClient.invalidateQueries({ queryKey: root(orgId!) });
+      queryClient.invalidateQueries({ queryKey: ["org", orgId, "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["org", orgId, "topics"] });
+    },
+  });
+}
+
 export const useCreateVariant = () =>
   useContentMutation((id: string) =>
     api<PostDetail>(`/content/${id}/variants`, { method: "POST" }),

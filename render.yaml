@@ -84,7 +84,11 @@ services:
 
       # AI (all optional: without them the app uses rules and templates).
       - key: LLM_PROVIDER
-        sync: false
+        value: groq
+      - key: LLM_MODEL
+        value: qwen/qwen3.8-27b
+      - key: LLM_FALLBACK_MODEL
+        value: openai/gpt-oss-120b
       - key: GEMINI_API_KEY
         sync: false
       - key: GROQ_API_KEY

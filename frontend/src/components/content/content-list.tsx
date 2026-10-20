@@ -3,8 +3,10 @@
 import {
   AlertTriangleIcon,
   LoaderCircleIcon,
+  RefreshCwIcon,
   SendIcon,
   SparklesIcon,
+  Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -14,16 +16,23 @@ import { POST_STATUS_TONE } from "@/lib/tones";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { DayGroups } from "@/components/shared/day-groups";
 import { PageHeader } from "@/components/shared/page-header";
+import {
+  FILTER_SEARCH,
+  FILTER_SELECT,
+  FilterBar,
+} from "@/components/shared/filter-bar";
+import { SearchInput } from "@/components/shared/search-input";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import {
   type ContentFilters,
+  useDeletePost,
   usePosts,
+  useRegenerate,
   useSubmitAllForReview,
 } from "@/hooks/use-content";
 import { errorMessage } from "@/lib/api";
@@ -33,21 +42,23 @@ import { timeAgo, timeOfDay } from "@/lib/format";
 import { PLATFORM_OPTIONS } from "@/lib/options";
 import { PLATFORM_LABEL } from "@/lib/topics";
 import { cn } from "@/lib/utils";
-import type { Post, PostGroup } from "@/types/api";
+import type { Post, PostGroup, PostStatus } from "@/types/api";
 
 const PAGE = 30;
-// Content stages only: posts in design are on the Design page, and approved
-// or rejected posts on the Approvals page. There is no archive.
+// The writer's view: posts to write, posts sent back, and where submitted
+// copy stands (waiting for approval or approved).
 const TABS: { value: PostGroup; label: string }[] = [
   { value: "drafts", label: "Draft posts" },
-  { value: "approval", label: "Waiting for content approval" },
+  { value: "changes", label: "Changes requested" },
+  { value: "approval", label: "Approval status" },
 ];
 const EMPTY: Record<PostGroup, string> = {
   drafts:
     "No drafts. Open a shortlisted topic, plan a post and click Write post.",
+  changes: "Nothing sent back. Posts an approver asks you to change appear here.",
   design: "Nothing in design right now.",
-  approval: "No posts waiting for content approval.",
-  approved: "Nothing ready to publish yet.",
+  approval: "No copy sent for approval yet.",
+  approved: "Nothing ready to post yet.",
   archived: "No archived posts.",
   all: "No posts yet.",
 };
@@ -58,7 +69,7 @@ export function ContentList() {
     platform: "",
     q: "",
   });
-  // A tab saved before "In design", "Ready to publish" and "Archived" were removed.
+  // A tab saved before it was removed (such as "Waiting for content approval").
   const filters = TABS.some((t) => t.value === saved.status)
     ? saved
     : { ...saved, status: "drafts" as const };
@@ -102,7 +113,7 @@ export function ContentList() {
     <>
       <PageHeader
         title="Write posts"
-        description="Write and edit your posts. Posts planned together for one topic stay together here: tick them to send the copy for approval in one go."
+        description="Write and edit your posts. Posts planned together for one topic stay together: tick drafts to send their copy for approval in one go."
       />
       {nothingYet ? (
         <Card>
@@ -127,10 +138,11 @@ export function ContentList() {
         </Card>
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-6">
-          <div className="flex flex-wrap items-center gap-3">
+          <FilterBar>
             <Tabs
               value={filters.status}
               onValueChange={(v) => update({ status: v as PostGroup })}
+              className="shrink-0"
             >
               <TabsList>
                 {TABS.map((tab) => (
@@ -145,12 +157,12 @@ export function ContentList() {
                 ))}
               </TabsList>
             </Tabs>
-            <Input
+            <SearchInput
               aria-label="Search posts"
               placeholder="Search posts"
               value={filters.q}
-              onChange={(e) => update({ q: e.target.value })}
-              className="w-full sm:w-56"
+              onChange={(q) => update({ q })}
+              className={FILTER_SEARCH}
             />
             <SimpleSelect
               aria-label="Platform"
@@ -165,9 +177,9 @@ export function ContentList() {
                 { value: "all", label: "Any platform" },
                 ...PLATFORM_OPTIONS,
               ]}
-              className="w-40 sm:ml-auto"
+              className={FILTER_SELECT}
             />
-          </div>
+          </FilterBar>
 
           {posts.isPending ? (
             <div className="grid gap-3">
@@ -324,7 +336,13 @@ function TopicGroup({
         }
       : undefined;
   if (group.posts.length === 1) {
-    return <PostRow post={group.posts[0]} select={pick(group.posts[0])} />;
+    return (
+      <PostRow
+        post={group.posts[0]}
+        contentView
+        select={pick(group.posts[0])}
+      />
+    );
   }
   const allReady =
     ready.length > 0 && ready.every((p) => selected.includes(p.id));
@@ -368,20 +386,93 @@ function TopicGroup({
         className="grid gap-2"
       >
         {group.posts.map((post) => (
-          <PostRow key={post.id} post={post} select={pick(post)} />
+          <PostRow
+            key={post.id}
+            post={post}
+            contentView
+            select={pick(post)}
+          />
         ))}
       </ul>
     </li>
   );
 }
 
+/** Past content approval: the writer's part is done. */
+const COPY_APPROVED: PostStatus[] = [
+  "design_pending",
+  "design_in_progress",
+  "design_uploaded",
+  "pending_approval",
+  "approved",
+  "final",
+];
+
+/** A post whose writing failed: write it again, or drop it and keep the others. */
+function FailedPostActions({ post }: { post: Post }) {
+  const can = useCan();
+  const regenerate = useRegenerate();
+  const remove = useDeletePost();
+  const busy = regenerate.isPending || remove.isPending;
+  const onError = (e: unknown) => toast.error(errorMessage(e));
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-destructive">
+      <AlertTriangleIcon className="size-4" />
+      <span className="mr-auto">Writing this post failed.</span>
+      {can("content.generate") && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="relative z-10"
+          disabled={busy}
+          onClick={() =>
+            regenerate.mutate(
+              { id: post.id },
+              {
+                onSuccess: () => toast.success("Writing it again…"),
+                onError,
+              },
+            )
+          }
+        >
+          <RefreshCwIcon />
+          Try again
+        </Button>
+      )}
+      {can("content.edit") && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="relative z-10 text-destructive"
+          disabled={busy}
+          onClick={() =>
+            remove.mutate(post.id, {
+              onSuccess: () => toast.success("Failed post deleted"),
+              onError,
+            })
+          }
+        >
+          <Trash2Icon />
+          Delete
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function PostRow({
   post,
   compact = false,
+  href,
+  contentView = false,
   select,
 }: {
   post: Post;
   compact?: boolean;
+  /** Where the row opens; the writing studio by default. */
+  href?: string;
+  /** The writer's view: once the copy is approved, the tag says so. */
+  contentView?: boolean;
   /** Shows a checkbox for sending several posts for approval together. */
   select?: { checked: boolean; onChange: (on: boolean) => void };
 }) {
@@ -401,14 +492,20 @@ export function PostRow({
         )}
         <PlatformTag platform={post.platform} />
         <Link
-          href={`/content/${post.id}`}
+          href={href ?? `/content/${post.id}`}
           className="truncate font-medium after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
         >
           {post.title ?? "Untitled post"}
         </Link>
-        <Tag tone={POST_STATUS_TONE[post.status]} dot>
-          {POST_STATUS_LABEL[post.status]}
-        </Tag>
+        {contentView && COPY_APPROVED.includes(post.status) ? (
+          <Tag tone="green" dot>
+            Content approved
+          </Tag>
+        ) : (
+          <Tag tone={POST_STATUS_TONE[post.status]} dot>
+            {POST_STATUS_LABEL[post.status]}
+          </Tag>
+        )}
         {post.variant_of_id && <Tag tone="neutral">Variant</Tag>}
         <span className="ml-auto text-xs text-muted-foreground">
           {post.current_version ? `v${post.current_version} · ` : ""}
@@ -424,10 +521,7 @@ export function PostRow({
           Writing…
         </p>
       ) : failed ? (
-        <p className="flex items-center gap-2 text-sm text-destructive">
-          <AlertTriangleIcon className="size-4" />
-          Generation failed. Open the post to try again.
-        </p>
+        <FailedPostActions post={post} />
       ) : (
         post.hook && (
           <p

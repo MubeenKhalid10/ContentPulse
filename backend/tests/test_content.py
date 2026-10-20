@@ -401,7 +401,7 @@ async def test_filters(client, internet, content_ai):
         assert (await admin.get(API, params=params)).json()["total"] == expected, params
 
 
-async def test_approval_tab_lists_only_posts_waiting_for_content_approval(client, db):
+async def test_approval_status_tab_lists_submitted_copy(client, db):
     admin = await register(client, "admin@acme.example.com")
     org = await create_org(admin)
     post = Post(
@@ -414,7 +414,8 @@ async def test_approval_tab_lists_only_posts_waiting_for_content_approval(client
     await db.commit()
     for status, expected in [
         (PostStatus.CONTENT_REVIEW, 1),
-        (PostStatus.PENDING_APPROVAL, 0),  # design approval: not on the content page
+        (PostStatus.PENDING_APPROVAL, 1),  # copy approved: still shown, as approved
+        (PostStatus.DRAFT, 0),
     ]:
         await db.execute(update(Post).where(Post.id == post.id).values(status=status))
         await db.commit()

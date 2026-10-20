@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+/** The "Set up your organization" sidebar group stays closed outside its pages. */
+async function openOrgSetup(page: Page) {
+  const group = page.getByRole("button", { name: "Set up your organization" });
+  if ((await group.getAttribute("aria-expanded")) === "false") await group.click();
+}
+
 /**
  * Sprints 3-8, against the real free sources (Google Trends, Google News,
  * Hacker News, Reddit RSS): discover, analyze, shortlist, then plan content
@@ -33,6 +39,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await page.getByRole("button", { name: "Skip tour" }).click();
 
   // Markets + keywords drive what sources search for.
+  await openOrgSetup(page);
   await page.getByRole("link", { name: "Content setup" }).click();
   await page.getByLabel("Target markets").fill("USA");
   await page.getByLabel("Target markets").press("Enter");
@@ -55,7 +62,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Subreddits saved")).toBeVisible();
   const ready = page.getByRole("region", { name: "Ready to use" });
-  await expect(ready.getByRole("heading", { name: "Google Trends" })).toBeVisible();
+  await expect(ready.getByRole("heading", { name: "Google Trends", exact: true })).toBeVisible();
   await expect(ready.getByRole("heading", { name: "Hacker News" })).toBeVisible();
   const setup = page.getByRole("region", { name: "Needs setup" });
   await expect(setup.getByText("X_BEARER_TOKEN", { exact: true })).toBeVisible();
@@ -75,8 +82,6 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   const rows = page.getByRole("list", { name: "Trends" }).getByRole("listitem");
   await expect(rows.first()).toBeVisible({ timeout: 120_000 });
   await expect(page.getByRole("list", { name: "Trends" })).toHaveAttribute("aria-busy", "false");
-  // Per-source results are shown; at least one free source succeeded.
-  await expect(page.getByRole("list", { name: "Source results" })).toContainText("Google Trends");
   await shot(page, "trends-02-list");
 
   // Open the top trend: explained score and linked evidence.
@@ -96,10 +101,6 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   const analyzeNow = page.getByRole("button", { name: "Analyze now" });
   if (await analyzeNow.isVisible()) await analyzeNow.click();
   await expect(page.getByText(/^Rule-based estimate/).first()).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("combobox", { name: /Relevance rating/ }).click();
-  await page.getByRole("option", { name: "Highly relevant", exact: true }).click();
-  await expect(page.getByText("Relevance updated")).toBeVisible();
-  await expect(page.getByText("· set manually").first()).toBeVisible();
   // Evidence starts folded; opening it lists the mentions by source.
   const evidence = page.getByRole("button", { name: /^Evidence \(\d+\)/ });
   await expect(evidence).toHaveAttribute("aria-expanded", "false");
@@ -158,14 +159,18 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   }).toPass();
   await shot(page, "content-01-studio");
   const studioUrl = page.url();
-  // The copy needs an admin's approval before design: approving it opens the design task.
+  // The copy needs an admin's approval before design.
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await page.getByRole("link", { name: "Review & approve" }).click();
-  await page.getByRole("button", { name: "Approve copy" }).click();
+  await page.getByRole("button", { name: "Approve content" }).click();
 
-  // Approving the copy lands on the design task: brief, copy and brand rules,
-  // then the creative goes up through a signed URL.
+  // Approving keeps the reviewer in Approvals; the design task waits on the Design page.
+  await expect(page).toHaveURL(/\/approvals$/);
+  await page.getByRole("link", { name: /Add designs/ }).first().click();
+  await page.getByRole("list", { name: "Design tasks" }).getByRole("link").first().click();
   await expect(page).toHaveURL(/\/design\//);
+  // The design task: brief, copy and brand rules, then the creative goes up
+  // through a signed URL.
   await expect(page.getByText("Design brief", { exact: true })).toBeVisible();
   await expect(page.getByText("Brand guidelines", { exact: true })).toBeVisible();
   // A long file name must not push the card out of its column.
@@ -232,16 +237,12 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
   await expect(page.getByText("Waiting for design approval", { exact: true }).first()).toBeVisible();
   await page.getByRole("link", { name: /Add designs/ }).first().click();
-  await page.getByRole("tab", { name: /^Waiting for design approval/ }).click();
-  await expect(page.getByRole("list", { name: "Design tasks" }).getByRole("link")).toHaveCount(1);
-  // Design approval is not content approval: the post isn't on the content page's tab.
-  await page.getByRole("link", { name: /Write posts/ }).first().click();
-  await page.getByRole("tab", { name: /^Waiting for content approval/ }).click();
-  await expect(page.getByText("No posts waiting for content approval.")).toBeVisible();
+  // A submitted design waits on the Approvals page, not on the designer's list.
+  await expect(page.getByText(/^No open design tasks/)).toBeVisible();
 
   // Review: ask for changes, the creator uploads a new design and resubmits
   // in one click, then one "Approve" makes the post ready to publish.
-  await page.getByRole("link", { name: /^5. Approve$/ }).click();
+  await page.getByRole("link", { name: /^Approve$/ }).click();
   await page.getByRole("tab", { name: /Design approval/ }).click();
   const queue = page.getByRole("list", { name: "Approvals" });
   await expect(queue.getByRole("link")).toHaveCount(1);
@@ -265,15 +266,20 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await page.getByLabel("Choose creative files").setInputFiles("e2e/fixtures/creative-slide-1.png");
   await page.getByRole("button", { name: "Upload & submit for approval" }).click();
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
-  await page.getByRole("link", { name: /^5. Approve$/ }).click();
+  await page.getByRole("link", { name: /^Approve$/ }).click();
   await page.getByRole("tab", { name: /Design approval/ }).click();
   await expect(queue.getByText("Round 2")).toBeVisible();
   await queue.getByRole("link").click();
   await page.getByRole("button", { name: "Approve" }).click();
+  // Back in Approvals: the post is now under Ready to post.
+  await expect(page).toHaveURL(/\/approvals$/);
+  await page.getByRole("tab", { name: "Ready to post" }).click();
+  await queue.getByRole("link").click();
   await expect(page.getByText("Locked and ready to publish. Use Share on the post.")).toBeVisible();
   await shot(page, "approvals-02-final");
 
   // Platform rules live in the database and are editable (spec §22).
+  await openOrgSetup(page);
   await page.getByRole("link", { name: "Platform playbook" }).click();
   await expect(page.getByRole("form", { name: "LinkedIn playbook" })).toBeVisible();
   await page.getByLabel("Tone").fill("Bold and practical");

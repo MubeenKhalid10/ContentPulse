@@ -12,13 +12,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { PlatformTag, Tag } from "@/components/shared/tag";
-import { SimpleSelect } from "@/components/shared/simple-select";
 import { AngleDialog } from "@/components/trends/angle-dialog";
-import {
-  RELEVANCE,
-  RELEVANCE_OPTIONS,
-  RelevanceBadge,
-} from "@/components/trends/relevance";
+import { RelevanceBadge } from "@/components/trends/relevance";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,14 +26,12 @@ import {
 import {
   useAIStatus,
   useAnalyzeTrend,
-  useOverrideRelevance,
 } from "@/hooks/use-trends";
 import { errorMessage } from "@/lib/api";
 import { stripCitations, timeAgo } from "@/lib/format";
 import type {
   ContentAngle,
   Platform,
-  RelevanceLevel,
   TrendDetail,
 } from "@/types/api";
 
@@ -61,7 +54,6 @@ export function AlignmentPanel({
 }) {
   const ai = useAIStatus();
   const analyze = useAnalyzeTrend();
-  const override = useOverrideRelevance();
   const a = trend.alignment;
   const [openAngle, setOpenAngle] = useState<PossibleAngle | null>(null);
   const running =
@@ -83,80 +75,38 @@ export function AlignmentPanel({
 
   return (
     <Card>
-      <CardHeader className="gap-2">
-        <div className="flex flex-wrap items-start gap-2">
-          <div className="grid min-w-0 flex-1 gap-2">
-            <CardTitle className="flex items-center gap-2">
-              <SparklesIcon className="size-4 text-primary" />
-              Does this fit your business?
-            </CardTitle>
-            {analyzed && (
-              <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <RelevanceBadge
-                  level={trend.relevance_level}
-                  overridden={trend.relevance_overridden}
-                />
-                <span>
-                  {a.engine === "ai" ? "AI analysis" : "Rule-based estimate"}
-                  {a.confidence != null &&
-                    ` - ${Math.round(a.confidence * 100)}% confidence`}
-                  {a.analyzed_at && ` · ${timeAgo(a.analyzed_at)}`}
-                </span>
-              </CardDescription>
-            )}
-          </div>
+      <CardHeader className="gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <CardTitle className="flex flex-1 items-center gap-2">
+            <SparklesIcon className="size-4 text-primary" />
+            Does this fit your business?
+          </CardTitle>
           {canReview && analyzed && !running && (
-            <div className="ml-auto grid justify-items-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={runAnalysis}
-                disabled={analyze.isPending}
-              >
-                <RefreshCwIcon />
-                Re-analyze
-              </Button>
-              <div className="grid gap-1">
-                <label
-                  htmlFor="relevance-override"
-                  className="text-xs text-muted-foreground"
-                >
-                  Relevance rating (change it if you disagree)
-                </label>
-                <SimpleSelect
-                  id="relevance-override"
-                  value={
-                    trend.relevance_overridden
-                      ? (trend.relevance_level ?? "auto")
-                      : "auto"
-                  }
-                  onChange={(value) =>
-                    override.mutate(
-                      {
-                        id: trend.id,
-                        level:
-                          value === "auto" ? null : (value as RelevanceLevel),
-                      },
-                      {
-                        onSuccess: () => toast.success("Relevance updated"),
-                        onError: (e) => toast.error(errorMessage(e)),
-                      },
-                    )
-                  }
-                  options={[
-                    {
-                      value: "auto",
-                      label: `Automatic${a.classification ? ` (${RELEVANCE[a.classification].label})` : ""}`,
-                    },
-                    ...RELEVANCE_OPTIONS,
-                  ]}
-                  disabled={override.isPending}
-                  className="w-56"
-                />
-              </div>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={runAnalysis}
+              disabled={analyze.isPending}
+            >
+              <RefreshCwIcon />
+              Re-analyze
+            </Button>
           )}
         </div>
+        {analyzed && (
+        <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <RelevanceBadge
+              level={trend.relevance_level}
+              overridden={trend.relevance_overridden}
+            />
+            <span>
+              {a.engine === "ai" ? "AI analysis" : "Rule-based estimate"}
+              {a.confidence != null &&
+                ` - ${Math.round(a.confidence * 100)}% confidence`}
+              {a.analyzed_at && ` · ${timeAgo(a.analyzed_at)}`}
+            </span>
+          </CardDescription>
+        )}
       </CardHeader>
       <CardContent className="grid gap-5">
         {running && (

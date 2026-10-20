@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowLeftIcon, CheckIcon, DownloadIcon, FlagIcon, MessageSquarePlusIcon, PaletteIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import { CheckIcon, DownloadIcon, FlagIcon, MessageSquarePlusIcon, PaletteIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { APPROVAL_STATUS_TONE } from "@/lib/tones";
+import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { ArticlePreview } from "@/components/content/article-preview";
 import { SocialPostPreview } from "@/components/content/social-preview";
@@ -28,22 +29,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAddComment, useApproval, useApprove, useFinalize, useReject, useRequestChanges } from "@/hooks/use-approvals";
-import { ApiError, errorMessage } from "@/lib/api";
+import { api, ApiError, errorMessage } from "@/lib/api";
 import { approvalStatusLabel, COMMENT_KIND_LABEL } from "@/lib/approvals";
 import { useCan } from "@/lib/auth";
 import { POST_STATUS_LABEL, fullText } from "@/lib/content";
 import { cleanNote, formatDateTime, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { ApprovalDetail } from "@/types/api";
+import type { ApprovalDetail, ApprovalPage } from "@/types/api";
 
 export function ReviewPage({ id }: { id: string }) {
   const approval = useApproval(id);
-  const back = (
-    <Link href="/approvals" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-      <ArrowLeftIcon className="size-4" />
-      Approvals
-    </Link>
-  );
+  const back = <BackLink href="/approvals" label="Approvals" />;
   if (approval.isError) {
     const notFound = approval.error instanceof ApiError && approval.error.status === 404;
     return (
@@ -77,7 +73,6 @@ export function ReviewPage({ id }: { id: string }) {
           <h1 className="text-2xl font-semibold tracking-tight">{a.post.title ?? "Untitled post"}</h1>
           <PlatformTag platform={a.post.platform} />
           <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>{approvalStatusLabel(a.status, a.stage)}</Tag>
-          <Tag tone={a.stage === "copy" ? "sky" : "violet"}>{a.stage === "copy" ? "Copy review" : "Design review"}</Tag>
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
           {a.post.status === "final" && (
             <div className="ml-auto">
@@ -168,6 +163,7 @@ function PreviewCard({ approval: a }: { approval: ApprovalDetail }) {
 }
 
 function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
+  const fromHere = useFromHere();
   const can = useCan()("approval.manage");
   const approve = useApprove();
   const changes = useRequestChanges();
@@ -181,6 +177,15 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
   const router = useRouter();
   const busy = approve.isPending || changes.isPending || reject.isPending;
   const onError = (e: unknown) => toast.error(errorMessage(e));
+  // After approving, stay in Approvals: the next submission waiting at this
+  // stage, or the list when there is none.
+  const openNext = async () => {
+    const waiting = await api<ApprovalPage>(
+      `/approvals?stage=${a.stage}&status=pending&limit=2`,
+    ).catch(() => null);
+    const next = waiting?.items.find((i) => i.id !== a.id);
+    router.push(next ? `/approvals/${next.id}` : "/approvals");
+  };
 
   if (a.status !== "pending") {
     return (
@@ -205,7 +210,7 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
               The design brief and brand guidelines for this post are ready. Open it to check them, or export the brief and send it
               to your designer.
             </p>
-            <Link href={`/design/${a.brief.id}`} className={buttonVariants()}>
+            <Link href={fromHere(`/design/${a.brief.id}`)} className={buttonVariants()}>
               <PaletteIcon />
               Open design brief
             </Link>
@@ -253,7 +258,7 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
         <CardTitle>Your decision</CardTitle>
         <CardDescription>
           {a.stage === "copy"
-            ? "Approving the copy opens the design brief and guidelines, which you can export for a designer. "
+            ? "Approving the content sends it to design, with a brief and guidelines your designer can export. "
             : "Approving makes the post ready to publish. "}
           Checking copy v{a.post_version}
           {a.creative_version != null && ` and design v${a.creative_version}`}.
@@ -266,13 +271,13 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
             approve.mutate(
               { id: a.id, comment: "" },
               {
-                onSuccess: (done) => {
-                  if (a.stage === "copy" && done.brief) {
-                    toast.success("Copy approved. The design brief is ready to export.");
-                    router.push(`/design/${done.brief.id}`);
-                  } else {
-                    toast.success("Approved: ready to publish");
-                  }
+                onSuccess: () => {
+                  toast.success(
+                    a.stage === "copy"
+                      ? "Content approved. Its design brief is ready on the Design page."
+                      : "Approved: the post is in Ready to post.",
+                  );
+                  void openNext();
                 },
                 onError,
               },
@@ -280,7 +285,7 @@ function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
           }
         >
           <CheckIcon />
-          {a.stage === "copy" ? "Approve copy" : "Approve"}
+          {a.stage === "copy" ? "Approve content" : "Approve"}
         </Button>
         <Button variant="outline" disabled={busy} onClick={() => setChangesOpen(true)}>
           <RotateCcwIcon />

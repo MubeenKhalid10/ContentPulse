@@ -6,6 +6,12 @@ import { useState } from "react";
 
 import { Tag } from "@/components/shared/tag";
 import { PageHeader } from "@/components/shared/page-header";
+import {
+  FILTER_SEARCH,
+  FILTER_SELECT,
+  FilterBar,
+} from "@/components/shared/filter-bar";
+import { SearchInput } from "@/components/shared/search-input";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { PlatformBadges } from "@/components/topics/platform-badges";
 import { TopicActions } from "@/components/topics/topic-actions";
@@ -13,7 +19,6 @@ import { RelevanceBadge } from "@/components/trends/relevance";
 import { Score } from "@/components/trends/score";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -100,8 +105,8 @@ export function TopicsExplorer() {
         </Card>
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <Tabs value={filters.status} onValueChange={(v) => update({ status: v as TopicStatusFilter })}>
+          <FilterBar>
+            <Tabs value={filters.status} onValueChange={(v) => update({ status: v as TopicStatusFilter })} className="shrink-0">
               <TabsList>
                 {TABS.map((tab) => (
                   <TabsTrigger key={tab.value} value={tab.value}>
@@ -115,37 +120,35 @@ export function TopicsExplorer() {
                 ))}
               </TabsList>
             </Tabs>
-            <Input
+            <SearchInput
               aria-label="Search topics"
               placeholder="Search topics"
               value={filters.q}
-              onChange={(e) => update({ q: e.target.value })}
-              className="w-full sm:w-56"
+              onChange={(q) => update({ q })}
+              className={FILTER_SEARCH}
             />
-            <div className="flex flex-wrap gap-2 sm:ml-auto">
-              <SimpleSelect
-                aria-label="Relevance"
-                value={filters.relevance || "all"}
-                onChange={(v) => update({ relevance: v === "all" ? "" : (v as TopicFilters["relevance"]) })}
-                options={RELEVANCE_FILTERS}
-                className="w-44"
-              />
-              <SimpleSelect
-                aria-label="Platform"
-                value={filters.platform || "all"}
-                onChange={(v) => update({ platform: v === "all" ? "" : (v as TopicFilters["platform"]) })}
-                options={PLATFORM_FILTERS}
-                className="w-40"
-              />
-              <SimpleSelect
-                aria-label="Sort by"
-                value={filters.sort}
-                onChange={(v) => update({ sort: v })}
-                options={SORTS}
-                className="w-44"
-              />
-            </div>
-          </div>
+            <SimpleSelect
+              aria-label="Relevance"
+              value={filters.relevance || "all"}
+              onChange={(v) => update({ relevance: v === "all" ? "" : (v as TopicFilters["relevance"]) })}
+              options={RELEVANCE_FILTERS}
+              className={FILTER_SELECT}
+            />
+            <SimpleSelect
+              aria-label="Platform"
+              value={filters.platform || "all"}
+              onChange={(v) => update({ platform: v === "all" ? "" : (v as TopicFilters["platform"]) })}
+              options={PLATFORM_FILTERS}
+              className={FILTER_SELECT}
+            />
+            <SimpleSelect
+              aria-label="Sort by"
+              value={filters.sort}
+              onChange={(v) => update({ sort: v })}
+              options={SORTS}
+              className={FILTER_SELECT}
+            />
+          </FilterBar>
 
           {topics.isPending ? (
             <div className="grid gap-3">
@@ -196,7 +199,6 @@ function TopicRow({ topic, canManage }: { topic: Topic; canManage: boolean }) {
           <RelevanceBadge level={topic.relevance_level} />
           {topic.status === "reviewed" && <Tag tone="sky" dot>Reviewed</Tag>}
         </div>
-        {topic.summary && <p className="line-clamp-1 text-sm text-muted-foreground">{topic.summary}</p>}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
           <PlatformBadges platforms={topic.recommended_platforms} />
           {topic.matched_services.length > 0 && <span>Services: {topic.matched_services.join(", ")}</span>}

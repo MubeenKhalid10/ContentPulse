@@ -42,7 +42,8 @@ async def list_tasks(
     ctx: CanRead,
     db: DB,
     status_filter: Annotated[
-        Literal["todo", "submitted", "done", "cancelled", "all"], Query(alias="status")
+        Literal["todo", "changes", "approval", "submitted", "done", "cancelled", "all"],
+        Query(alias="status"),
     ] = "todo",
     mine: bool = False,
     platform: Platform | None = None,

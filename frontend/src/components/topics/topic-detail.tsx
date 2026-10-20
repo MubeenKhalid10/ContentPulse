@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeftIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
   PencilIcon,
@@ -14,6 +13,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { TOPIC_STATUS_TONE } from "@/lib/tones";
+import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { CollapsibleCard } from "@/components/shared/collapsible-card";
 import { Tag } from "@/components/shared/tag";
 import { PostRow } from "@/components/content/content-list";
@@ -54,6 +54,7 @@ import type {
 } from "@/types/api";
 
 export function TopicDetailView({ id }: { id: string }) {
+  const fromHere = useFromHere();
   const topic = useTopic(id);
   const markets = useMarkets();
   const can = useCan();
@@ -70,15 +71,7 @@ export function TopicDetailView({ id }: { id: string }) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [editing, setEditing] = useState(false);
 
-  const back = (
-    <Link
-      href="/topics"
-      className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-    >
-      <ArrowLeftIcon className="size-4" />
-      Topics
-    </Link>
-  );
+  const back = <BackLink href="/topics" label="Topics" />;
 
   if (topic.isError) {
     const notFound =
@@ -139,11 +132,6 @@ export function TopicDetailView({ id }: { id: string }) {
               </Button>
             )}
           </div>
-          {t.summary && (
-            <p className="max-w-3xl text-sm text-muted-foreground">
-              {t.summary}
-            </p>
-          )}
         </div>
         {canManage && <TopicActions topic={t} />}
       </div>
@@ -246,7 +234,7 @@ export function TopicDetailView({ id }: { id: string }) {
                     </section>
                   ))}
                   <Link
-                    href={`/trends/${trend.id}`}
+                    href={fromHere(`/trends/${trend.id}`)}
                     className="text-sm underline-offset-4 hover:underline"
                   >
                     See the full trend
@@ -390,17 +378,12 @@ function StrategiesCard({
   );
   const canGenerate = useCan()("content.generate");
   const writeAll = useWriteAll();
-  const toWrite = strategies.filter(
+  // A plan that already has a post is shown in the Posts card instead.
+  const unwritten = strategies.filter(
     (s) =>
-      s.status !== "archived" &&
       !(posts.data?.items ?? []).some((p) => p.content_strategy_id === s.id),
   );
-  const postFor = (strategyId: string) => {
-    const written = (posts.data?.items ?? []).filter(
-      (p) => p.content_strategy_id === strategyId,
-    );
-    return written.find((p) => !p.variant_of_id) ?? written[0];
-  };
+  const toWrite = unwritten.filter((s) => s.status !== "archived");
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start gap-2">
@@ -450,19 +433,20 @@ function StrategiesCard({
         )}
       </CardHeader>
       <CardContent className="grid gap-3">
-        {strategies.length ? (
-          strategies.map((s) => (
+        {unwritten.length ? (
+          unwritten.map((s) => (
             <StrategyCard
               key={s.id}
               strategy={s}
-              post={postFor(s.id)}
               canManage={canManage && shortlisted}
               onEdit={() => onEdit(s)}
             />
           ))
         ) : (
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            {shortlisted
+            {strategies.length
+              ? "Every plan has a post. Find them under Posts for this topic below."
+              : shortlisted
               ? "No plans yet. Pick a recommended platform on the right, or click New plan."
               : "Plans can be made once the topic is shortlisted."}
           </p>
@@ -473,20 +457,27 @@ function StrategiesCard({
 }
 
 function TopicPosts({ topicId }: { topicId: string }) {
+  const fromHere = useFromHere();
   const posts = usePosts({ status: "all", platform: "", topicId, q: "" }, 50);
   if (!posts.data?.items.length) return null;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Posts</CardTitle>
+        <CardTitle>Posts for this topic</CardTitle>
         <CardDescription>
-          Content written for this topic. Open one to edit it in the studio.
+          Posts already written from your plans, with where each one is in
+          approval. Open one to edit it in the studio.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="grid gap-2" aria-label="Topic posts">
           {posts.data.items.map((p) => (
-            <PostRow key={p.id} post={p} compact />
+            <PostRow
+              key={p.id}
+              post={p}
+              compact
+              href={fromHere(`/posts/${p.id}`)}
+            />
           ))}
         </ul>
       </CardContent>

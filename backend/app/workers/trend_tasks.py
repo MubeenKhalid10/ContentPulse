@@ -24,7 +24,7 @@ from app.models.trend import TrendDiscoveryRun, TrendSource
 from app.services.knowledge.fetcher import Resolver, system_resolver
 from app.services.trends import pipeline
 from app.services.trends.inputs import load_org_inputs
-from app.sources import SOURCES, get_source
+from app.sources import SOURCES, bookkeeping, get_source
 from app.sources.base import (
     SKIPPED_KINDS,
     RawTrendItem,
@@ -234,7 +234,9 @@ async def _discover(run_id: uuid.UUID) -> None:
         )
         return
 
-    async with http_client_factory(settings) as client:
+    # Provider bookkeeping (budgets, cache writes) runs beside the requests
+    # and is finished before the results are recorded (app/sources/bookkeeping.py).
+    async with bookkeeping.deferring(), http_client_factory(settings) as client:
         ctx = SourceContext(
             client=client,
             settings=settings,

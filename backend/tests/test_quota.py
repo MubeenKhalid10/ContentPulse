@@ -11,7 +11,7 @@ from sqlalchemy import func, select, update
 from app.core.config import Settings, get_settings
 from app.models.provider import InstagramHashtagUse, ProviderUsage
 from app.models.trend import TrendSource
-from app.sources import quota
+from app.sources import bookkeeping, quota
 from app.sources.base import SourceError, SourceErrorKind
 from tests.test_provider_cache import ALL_KEYS, run_source
 from tests.test_trends_api import API, discover, internet, setup  # noqa: F401
@@ -226,6 +226,41 @@ async def test_success_resets_the_backoff_streak(db, mode):
     row = await db.scalar(select(TrendSource).where(TrendSource.key == "hacker_news"))
     await db.refresh(row)
     assert row.failure_streak == 0
+
+
+async def test_a_discovery_run_keeps_bookkeeping_off_the_request_path(db, mode, monkeypatch):
+    # Inside a run the outcome writes happen beside the request and are all
+    # recorded by the time the run's bookkeeping is drained; the cooldown is
+    # read once per source rather than once per request.
+    mode("monitor")
+    reads = 0
+    real_cooldown = quota.active_cooldown
+
+    async def counted(source):
+        nonlocal reads
+        reads += 1
+        return await real_cooldown(source)
+
+    monkeypatch.setattr(quota, "active_cooldown", counted)
+    async with bookkeeping.deferring():
+        assert (
+            await asyncio.gather(*(quota.guard("gnews", "org-a", ok) for _ in range(3)))
+            == ["ok"] * 3
+        )
+        assert await quota.guard("gnews", "org-a", ok) == "ok"
+    row = await usage(db, "gnews")
+    assert (row.reserved, row.completed) == (4, 4)
+    assert reads <= 3  # the concurrent first calls may each read; later ones don't
+
+    async def limited():
+        raise SourceError(SourceErrorKind.RATE_LIMITED, "slow down", status=429, retry_after=600)
+
+    async with bookkeeping.deferring():
+        with pytest.raises(SourceError):
+            await quota.guard("gnews", None, limited)
+        with pytest.raises(SourceError) as exc:  # this run sees its own cooldown at once
+            await quota.guard("gnews", None, ok)
+        assert exc.value.kind == SourceErrorKind.COOLING_DOWN
 
 
 async def test_skipped_sources_are_reported_as_such(client, internet, db, mode):  # noqa: F811

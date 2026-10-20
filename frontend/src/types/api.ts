@@ -732,7 +732,7 @@ export interface Post {
   updated_at: string;
 }
 
-export type PostGroup = "drafts" | "design" | "approval" | "approved" | "archived" | "all";
+export type PostGroup = "drafts" | "changes" | "design" | "approval" | "approved" | "archived" | "all";
 
 export interface PostPage {
   items: Post[];
@@ -754,7 +754,7 @@ export interface PostDetail extends Post {
 // --- Design (Sprint 7) -------------------------------------------------------------
 
 export type DesignTaskStatus = "open" | "assigned" | "in_progress" | "submitted" | "completed" | "cancelled";
-export type DesignTaskFilter = "todo" | "submitted" | "done" | "cancelled" | "all";
+export type DesignTaskFilter = "todo" | "changes" | "approval" | "submitted" | "done" | "cancelled" | "all";
 
 export interface Person {
   id: string;

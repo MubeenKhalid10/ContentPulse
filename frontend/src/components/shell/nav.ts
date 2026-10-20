@@ -54,10 +54,10 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    label: "Your 5 steps",
+    label: "Content workflow",
     items: WORKFLOW.map((s) => ({
       href: s.href,
-      label: `${s.n}. ${s.label}`,
+      label: s.label,
       icon: STEP_ICONS[s.href],
       permission: s.permission,
       // Sources fold out under Trends.

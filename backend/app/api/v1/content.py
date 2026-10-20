@@ -42,7 +42,7 @@ async def list_posts(
     ctx: CanRead,
     db: DB,
     status_filter: Annotated[
-        Literal["drafts", "design", "approval", "approved", "archived", "all"],
+        Literal["drafts", "changes", "design", "approval", "approved", "archived", "all"],
         Query(alias="status"),
     ] = "drafts",
     platform: Platform | None = None,
@@ -75,6 +75,11 @@ async def update_post(post_id: uuid.UUID, data: PostUpdate, ctx: CanEdit, db: DB
         if field in changes and changes[field] is None:
             changes[field] = []
     return await service.update_post(db, ctx.organization_id, ctx.user.id, post_id, changes)
+
+
+@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_post(post_id: uuid.UUID, ctx: CanEdit, db: DB):
+    await service.delete_post(db, ctx.organization_id, ctx.user.id, post_id)
 
 
 @router.get("/{post_id}/versions", response_model=list[VersionRead])

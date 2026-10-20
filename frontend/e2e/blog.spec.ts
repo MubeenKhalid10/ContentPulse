@@ -1,5 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
 
+/** The "Set up your organization" sidebar group stays closed outside its pages. */
+async function openOrgSetup(page: Page) {
+  const group = page.getByRole("button", { name: "Set up your organization" });
+  if ((await group.getAttribute("aria-expanded")) === "false") await group.click();
+}
+
 /**
  * Blog as a content platform: the same Trend → Topic → Plan → Content →
  * Design → Approval journey as the social platforms, with an SEO plan,
@@ -32,6 +38,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await page.getByRole("button", { name: "Skip tour" }).click();
 
   // Blog is offered alongside the social platforms; publish only there.
+  await openOrgSetup(page);
   await page.getByRole("link", { name: "Content setup" }).click();
   await page.getByLabel("Target markets").fill("USA");
   await page.getByLabel("Target markets").press("Enter");
@@ -65,9 +72,6 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   const analyzeNow = page.getByRole("button", { name: "Analyze now" });
   if (await analyzeNow.isVisible()) await analyzeNow.click();
   await expect(page.getByText(/^Rule-based estimate/).first()).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("combobox", { name: /Relevance rating/ }).click();
-  await page.getByRole("option", { name: "Highly relevant", exact: true }).click();
-  await expect(page.getByText("Relevance updated")).toBeVisible();
   await page.getByRole("button", { name: `Shortlist ${topic}`, exact: true }).click();
   await expect(page.getByText(`Shortlisted “${topic}”`)).toBeVisible();
 
@@ -82,8 +86,8 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   // Blog plan: the playbook draft includes an SEO plan.
   await page.getByRole("button", { name: "New plan" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("combobox", { name: "Platform" }).click();
-  await page.getByRole("option", { name: "Blog", exact: true }).click();
+  // Blog is the only enabled platform, so it is the one ticked.
+  await expect(dialog.getByRole("checkbox", { name: "Blog", exact: true })).toBeChecked();
   const seoPlan = dialog.getByRole("group", { name: "SEO plan" });
   await expect(seoPlan).toBeVisible();
   await dialog.getByRole("button", { name: "Draft from playbook" }).click();
@@ -121,10 +125,14 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await shot(page, "blog-02-studio");
 
   // Featured image: add it on the design task and submit, then one approval.
-  // The copy needs an admin's approval before design: approving it opens the design task.
+  // The copy needs an admin's approval before design.
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await page.getByRole("link", { name: "Review & approve" }).click();
-  await page.getByRole("button", { name: "Approve copy" }).click();
+  await page.getByRole("button", { name: "Approve content" }).click();
+  // Approving keeps the reviewer in Approvals; the design task waits on the Design page.
+  await expect(page).toHaveURL(/\/approvals$/);
+  await page.getByRole("link", { name: /Add designs/ }).first().click();
+  await page.getByRole("list", { name: "Design tasks" }).getByRole("link").first().click();
   await expect(page).toHaveURL(/\/design\//);
   await expect(page.getByText("Design brief", { exact: true })).toBeVisible();
   await expect(page.getByText(/1200×630/).first()).toBeVisible();
@@ -133,7 +141,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await page.getByRole("button", { name: "Upload & submit for approval" }).click();
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
 
-  await page.getByRole("link", { name: /^5. Approve$/ }).click();
+  await page.getByRole("link", { name: /^Approve$/ }).click();
   await page.getByRole("tab", { name: /Design approval/ }).click();
   const queue = page.getByRole("list", { name: "Approvals" });
   await expect(queue.getByRole("link")).toHaveCount(1);
@@ -149,6 +157,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await shot(page, "blog-03-final");
 
   // The Blog playbook is editable like the others.
+  await openOrgSetup(page);
   await page.getByRole("link", { name: "Platform playbook" }).click();
   await page.getByRole("tab", { name: "Blog" }).click();
   await expect(page.getByRole("form", { name: "Blog playbook" })).toBeVisible();
