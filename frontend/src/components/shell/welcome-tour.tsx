@@ -17,20 +17,25 @@ import { cn } from "@/lib/utils";
 import { WORKFLOW } from "@/lib/workflow";
 import type { Me } from "@/types/api";
 
+// Remembered per person. The old shared flag still counts, so nobody sees the tour twice.
 const SEEN_KEY = "cp_welcome_seen_v1";
+const seenKey = (userId: string) => `${SEEN_KEY}:${userId}`;
 const REPLAY_EVENT = "cp:welcome";
 
-function seen(): boolean {
+function seen(userId: string): boolean {
   try {
-    return window.localStorage.getItem(SEEN_KEY) === "1";
+    return (
+      window.localStorage.getItem(seenKey(userId)) === "1" ||
+      window.localStorage.getItem(SEEN_KEY) === "1"
+    );
   } catch {
     return true; // storage blocked: don't nag on every visit
   }
 }
 
-function markSeen() {
+function markSeen(userId: string) {
   try {
-    window.localStorage.setItem(SEEN_KEY, "1");
+    window.localStorage.setItem(seenKey(userId), "1");
   } catch {
     // Storage unavailable; the tour may show again next time.
   }
@@ -48,7 +53,7 @@ export function replayWelcomeTour() {
 export function WelcomeTour({ me }: { me: Me }) {
   const pathname = usePathname();
   // The shell renders only in the browser (after /auth/me), so storage is readable here.
-  const [firstVisit] = useState(() => !seen());
+  const [firstVisit] = useState(() => !seen(me.id));
   const [dismissed, setDismissed] = useState(false);
   const [replaying, setReplaying] = useState(false);
   const [step, setStep] = useState(0);
@@ -68,7 +73,7 @@ export function WelcomeTour({ me }: { me: Me }) {
   }, []);
 
   const close = () => {
-    markSeen();
+    markSeen(me.id);
     setDismissed(true);
     setReplaying(false);
   };
@@ -103,11 +108,11 @@ export function WelcomeTour({ me }: { me: Me }) {
         ? "Your services, audience and brand voice decide which trends count as relevant and how posts sound. Setting this up takes about 10 minutes, and the dashboard walks you through it."
         : "Your admin describes the organization: its services, audience and brand voice. ContentPulse uses that to pick relevant trends and to write posts that sound like you.",
       body: (
-        <ul className="grid gap-1.5 text-sm text-muted-foreground">
-          <li>• Trends unrelated to what you do are marked “Not relevant”.</li>
-          <li>• Posts only make claims your website and documents back up.</li>
+        <ul className="grid list-disc gap-1.5 pl-5 text-sm text-muted-foreground">
+          <li>Trends unrelated to what you do are marked “Not relevant”.</li>
+          <li>Posts only make claims your website and documents back up.</li>
           <li>
-            • Nothing is published: every post is reviewed and approved by a
+            Nothing is published: every post is reviewed and approved by a
             person.
           </li>
         </ul>
@@ -118,17 +123,17 @@ export function WelcomeTour({ me }: { me: Me }) {
       description:
         "The sidebar lists the steps in order, and the dashboard always shows your next step, so you don't have to guess where to go.",
       body: (
-        <ul className="grid gap-1.5 text-sm text-muted-foreground">
+        <ul className="grid list-disc gap-1.5 pl-5 text-sm text-muted-foreground">
           <li>
-            • Creators shortlist topics and write each post, then submit the
+            Creators shortlist topics and write each post, then submit the
             copy for approval.
           </li>
           <li>
-            • Admins approve the copy first. That opens the design brief, which
+            Admins approve the copy first. That opens the design brief, which
             they can export for a designer. After the design is added, they
             approve it again and the post is ready to publish.
           </li>
-          <li>• Viewers can see everything and share finished posts.</li>
+          <li>Viewers can see everything and share finished posts.</li>
         </ul>
       ),
     },
@@ -148,12 +153,19 @@ export function WelcomeTour({ me }: { me: Me }) {
             {screen.description}
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-36">{screen.body}</div>
+        <div className="min-h-36">
+          {screen.body}
+          {last && (
+            <p className="mt-4 text-xs text-muted-foreground">
+              Reopen this tour any time from the account menu: Show the welcome tour.
+            </p>
+          )}
+        </div>
         <DialogFooter className="items-center sm:justify-between">
           <div
             className="flex items-center gap-1.5"
-            aria-label={`Step ${step + 1} of ${screens.length}`}
             role="img"
+            aria-label={`Step ${step + 1} of ${screens.length}`}
           >
             {screens.map((_, i) => (
               <span
@@ -166,6 +178,9 @@ export function WelcomeTour({ me }: { me: Me }) {
                 )}
               />
             ))}
+            <span className="ml-1 text-xs tabular-nums text-muted-foreground">
+              {step + 1} / {screens.length}
+            </span>
           </div>
           <div className="flex gap-2">
             {step === 0 ? (

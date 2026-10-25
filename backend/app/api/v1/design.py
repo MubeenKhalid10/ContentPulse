@@ -25,6 +25,7 @@ router = APIRouter(prefix="/design/tasks", tags=["design"])
 CanRead = Annotated[OrgContext, Depends(active_org_permission(Permission.DESIGN_READ))]
 CanUpload = Annotated[OrgContext, Depends(active_org_permission(Permission.DESIGN_UPLOAD))]
 CanSubmit = Annotated[OrgContext, Depends(active_org_permission(Permission.DESIGN_SUBMIT))]
+CanAdmin = Annotated[OrgContext, Depends(active_org_permission(Permission.ORGANIZATION_WRITE))]
 # Managers assign anyone; designers can take a task themselves.
 CanAssign = Annotated[
     OrgContext,
@@ -81,6 +82,18 @@ async def update_brief(task_id: uuid.UUID, data: BriefUpdate, ctx: CanEditBrief,
     return await service.update_brief(
         db, ctx.organization_id, ctx.user.id, task_id, data.model_dump(exclude_unset=True)
     )
+
+
+@router.delete("/{task_id}/creatives", response_model=TaskDetail)
+async def delete_design(task_id: uuid.UUID, ctx: CanAdmin, db: DB):
+    """Admins only: remove the uploaded design files so the design can be redone."""
+    return await service.delete_design(db, ctx.organization_id, ctx.user.id, task_id)
+
+
+@router.post("/{task_id}/withdraw", response_model=TaskDetail)
+async def withdraw(task_id: uuid.UUID, ctx: CanUpload, db: DB):
+    """The designer takes a design back before an admin decided, to change it."""
+    return await service.withdraw(db, ctx.organization_id, ctx.user.id, ctx.role, task_id)
 
 
 @router.post("/{task_id}/assign", response_model=TaskDetail)

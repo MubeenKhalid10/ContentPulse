@@ -62,7 +62,7 @@ test("admin builds and searches the knowledge base", async ({ page }) => {
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByRole("heading", { name: "Services | Northwind Labs" })).toBeVisible();
   await expect(sheet.getByText("Copyright Northwind Labs")).toHaveCount(0);
-  await sheet.getByRole("tab", { name: /Chunks/ }).click();
+  await sheet.getByRole("tab", { name: /Passages/ }).click();
   // Short sections are merged into one chunk; each keeps its sub-heading inline.
   const chunks = sheet.getByRole("tabpanel").getByRole("listitem");
   await expect(chunks.getByText(/^AI agents for operations/)).toBeVisible();

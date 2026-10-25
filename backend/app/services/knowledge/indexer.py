@@ -3,7 +3,7 @@
 import hashlib
 from dataclasses import dataclass
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.embeddings import EmbeddingError, EmbeddingProvider, embedding_input, gate
@@ -28,24 +28,57 @@ async def clear_chunks(db: AsyncSession, document: KnowledgeDocument) -> None:
     await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.document_id == document.id))
 
 
+async def _existing_vectors(
+    db: AsyncSession, document: KnowledgeDocument, provider: EmbeddingProvider
+) -> dict[str, list[float]]:
+    """Embedding input -> vector for the document's current chunks embedded
+    by `provider`'s model."""
+    rows = await db.execute(
+        select(
+            KnowledgeChunk.heading,
+            KnowledgeChunk.content,
+            KnowledgeChunk.meta,
+            KnowledgeChunk.embedding,
+        ).where(
+            KnowledgeChunk.document_id == document.id,
+            KnowledgeChunk.embedding_model == provider.model,
+            KnowledgeChunk.embedding.is_not(None),
+        )
+    )
+    return {
+        embedding_input((r.meta or {}).get("title"), r.heading, r.content): list(r.embedding)
+        for r in rows
+    }
+
+
 async def index_document(
     db: AsyncSession,
     document: KnowledgeDocument,
     provider: EmbeddingProvider | None,
 ) -> IndexResult:
-    """Replace the document's chunks. Caller commits."""
+    """Replace the document's chunks. Caller commits.
+
+    Chunks whose text (page title, heading, content) is unchanged keep their
+    vector from the same embedding model: re-indexing an unchanged document
+    makes no embedding request."""
+    reusable = await _existing_vectors(db, document, provider) if provider else {}
     await clear_chunks(db, document)
     pieces = chunk_markdown(document.content or "")
 
     vectors: list[list[float]] | None = None
     error: EmbeddingError | None = None
     if provider and pieces:
+        texts = [embedding_input(document.title, p.heading, p.content) for p in pieces]
+        missing = [t for t in dict.fromkeys(texts) if t not in reusable]
         try:
-            vectors = await gate(provider).embed(
-                [embedding_input(document.title, p.heading, p.content) for p in pieces],
-                organization_id=document.organization_id,
-                workflow="knowledge_embedding",
-            )
+            if missing:
+                fresh = await gate(provider).embed(
+                    missing,
+                    organization_id=document.organization_id,
+                    workflow="knowledge_embedding",
+                )
+                reusable.update(zip(missing, fresh, strict=True))
+            vectors = [reusable[t] for t in texts]
         except EmbeddingError as exc:
             error = exc
 

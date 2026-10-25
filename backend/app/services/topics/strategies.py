@@ -441,11 +441,15 @@ async def suggest_strategy(
                     await _trend_keywords(db, topic) if platform == Platform.BLOG else None,
                 ),
                 schema=strategy_schema(rule),
-                max_tokens=4000,
+                # Blog plans carry an SEO outline: more room.
+                max_tokens=3000 if platform == Platform.BLOG else 1500,
                 workflow=JOB_TYPE,
                 organization_id=organization_id,
                 job_id=job.id,
                 interactive=True,
+                # One suggestion per topic and platform: the same topic,
+                # playbook and profile reuse it instead of a new request.
+                cache=True,
             )
             fields = _clean(rule, raw.data)
         except AIError as exc:
@@ -468,3 +472,25 @@ async def suggest_strategy(
         await db.commit()
     fields = await _rules_draft(db, topic, rule, platform)
     return StrategySuggestion(platform=platform, source="rules", notice=notice, **fields)
+
+
+async def delete_strategy(
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    topic_id: uuid.UUID,
+    strategy_id: uuid.UUID,
+) -> None:
+    """Remove a post plan. Posts already written from it stay (they just lose the link)."""
+    strategy = await _get_strategy(db, organization_id, topic_id, strategy_id)
+    audit.record(
+        db,
+        organization_id=organization_id,
+        user_id=user_id,
+        action=AuditAction.STRATEGY_DELETED,
+        entity_type="content_strategy",
+        entity_id=strategy.id,
+        old_value={"status": strategy.status, "platform": strategy.platform},
+    )
+    await db.delete(strategy)
+    await db.commit()

@@ -16,6 +16,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { toast } from "sonner";
+
+import { PasswordInput } from "@/components/auth/password-input";
 import { Input } from "@/components/ui/input";
 import { api, errorMessage } from "@/lib/api";
 import { type ResetPasswordValues, resetPasswordSchema } from "@/schemas/auth";
@@ -40,6 +43,7 @@ export function LocalResetForm() {
     onSuccess: () => {
       // Drop anything cached from before the new session.
       queryClient.clear();
+      toast.success("Password updated.");
       router.replace("/dashboard");
     },
   });
@@ -102,9 +106,8 @@ export function LocalResetForm() {
             hint="At least 10 characters."
             error={errors.password?.message}
           >
-            <Input
+            <PasswordInput
               {...fieldAria("password", errors.password?.message)}
-              type="password"
               autoComplete="new-password"
               autoFocus
               {...form.register("password")}
@@ -115,9 +118,8 @@ export function LocalResetForm() {
             label="Confirm password"
             error={errors.confirm?.message}
           >
-            <Input
+            <PasswordInput
               {...fieldAria("confirm", errors.confirm?.message)}
-              type="password"
               autoComplete="new-password"
               {...form.register("confirm")}
             />

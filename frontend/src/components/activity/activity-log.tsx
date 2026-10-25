@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronRightIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { PageHeader, ReadOnlyNotice } from "@/components/shared/page-header";
@@ -32,10 +33,19 @@ const LABELS = new Map<string, string>(
 );
 
 function show(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "empty";
-  if (Array.isArray(value)) return value.length ? value.map(show).join(", ") : "none";
-  if (typeof value === "string") return LABELS.get(value) ?? value;
-  if (typeof value === "object") return JSON.stringify(value);
+  if (value === null || value === undefined || value === "") return "Not set";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) return value.length ? value.map(show).join(", ") : "None";
+  if (typeof value === "string") {
+    const label = LABELS.get(value);
+    if (label) return label;
+    // Snake_case enum values (e.g. highly_relevant) read as plain words.
+    return /^[a-z]+(_[a-z]+)+$/.test(value) ? humanize(value) : value;
+  }
+  if (typeof value === "object")
+    return Object.entries(value as Record<string, unknown>)
+      .map(([k, v]) => `${humanize(k)}: ${show(v)}`)
+      .join("; ");
   return String(value);
 }
 
@@ -111,7 +121,7 @@ export function ActivityLog() {
     <>
       <PageHeader
         title="Activity log"
-        description="Every change in this organization: who made it, when, and what changed."
+        description="Every change in this organization: who made it, when, and what changed. Times are shown in your device's time zone."
         actions={
           canView && logs.data?.length ? (
             <SimpleSelect
@@ -128,7 +138,10 @@ export function ActivityLog() {
         }
       />
       {!canView ? (
-        <ReadOnlyNotice>Only admins can view the activity log.</ReadOnlyNotice>
+        <ReadOnlyNotice>
+          Only admins can view the activity log. Ask an admin of this
+          organization if you need to see a change.
+        </ReadOnlyNotice>
       ) : logs.isPending ? (
         <div className="grid gap-3">
           {Array.from({ length: 5 }, (_, i) => (
@@ -138,11 +151,29 @@ export function ActivityLog() {
       ) : !groups.length ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            {area !== "all" ? "No changes in this area yet." : "No activity yet."}
+            {area !== "all" ? (
+              <>
+                No changes in this area yet.{" "}
+                <button
+                  type="button"
+                  onClick={() => setArea("all")}
+                  className="underline underline-offset-4 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  Show everything
+                </button>
+              </>
+            ) : (
+              "No activity yet. Changes to content, trends, team and settings appear here as they happen."
+            )}
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-6">
+          {logs.data?.length === 100 && (
+            <p className="text-xs text-muted-foreground">
+              Only the latest 100 changes are shown; older changes aren&apos;t listed here.
+            </p>
+          )}
           {groups.map((group) => (
             <section key={group.key} aria-labelledby={`day-${group.key}`} className="grid gap-2">
               <h2
@@ -165,9 +196,6 @@ export function ActivityLog() {
               </Card>
             </section>
           ))}
-          {logs.data?.length === 100 && (
-            <p className="text-xs text-muted-foreground">Showing the latest 100 changes.</p>
-          )}
         </div>
       )}
     </>
@@ -182,10 +210,11 @@ function Entry({ entry }: { entry: AuditLogEntry }) {
   const time = new Date(entry.created_at).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
+    timeZoneName: "short",
   });
 
   return (
-    <li className="grid gap-x-4 gap-y-1 px-4 py-3 sm:grid-cols-[4.5rem_minmax(0,1fr)]">
+    <li className="grid gap-x-4 gap-y-1 px-4 py-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
       <time
         dateTime={entry.created_at}
         title={formatDateTime(entry.created_at)}
@@ -203,7 +232,8 @@ function Entry({ entry }: { entry: AuditLogEntry }) {
         </p>
         {changes.length > 0 && (
           <details className="group text-xs">
-            <summary className="w-fit cursor-pointer text-muted-foreground hover:text-foreground">
+            <summary className="flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm text-muted-foreground outline-none marker:hidden hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+              <ChevronRightIcon className="size-3.5 transition-transform group-open:rotate-90" aria-hidden />
               {changes.length === 1
                 ? `Show the change to ${humanize(changes[0]!).toLowerCase()}`
                 : `Show ${changes.length} changes`}
@@ -215,10 +245,12 @@ function Entry({ entry }: { entry: AuditLogEntry }) {
                   <dd className="min-w-0 break-words">
                     {isDiff ? (
                       <>
+                        <span className="sr-only">Was </span>
                         <span className="text-muted-foreground line-through">
                           {show(entry.old_value?.[field])}
                         </span>
-                        {" → "}
+                        <span aria-hidden>{" → "}</span>
+                        <span className="sr-only">, now </span>
                         <span>{show(entry.new_value?.[field])}</span>
                       </>
                     ) : (

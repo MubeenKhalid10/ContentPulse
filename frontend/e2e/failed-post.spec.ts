@@ -63,6 +63,7 @@ test("a failed post offers Try again and Delete", async ({ page }) => {
   await expect(row.getByText("Writing this post failed.")).toBeVisible();
   await expect(row.getByRole("button", { name: "Try again" })).toBeVisible();
   await row.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("Failed post deleted")).toBeVisible();
   expect(deleted).toBe(true);
 });

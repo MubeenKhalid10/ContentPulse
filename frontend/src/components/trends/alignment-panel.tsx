@@ -5,7 +5,6 @@ import {
   ChevronRightIcon,
   LoaderCircleIcon,
   RefreshCwIcon,
-  ShieldAlertIcon,
   SparklesIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -46,9 +45,12 @@ export function AlignmentPanel({
   trend,
   canReview,
   onPlanAngle,
+  mode = "all",
 }: {
   trend: TrendDetail;
   canReview: boolean;
+  /** "fit": why it fits the business. "ideas": the post ideas. Default: both. */
+  mode?: "fit" | "ideas" | "all";
   /** When set, each content angle gets a button to plan a post from it. */
   onPlanAngle?: (angle: PossibleAngle) => void;
 }) {
@@ -61,6 +63,8 @@ export function AlignmentPanel({
   const failed = trend.analysis?.status === "failed";
   const analyzed = !!a.classification;
   const engineIsAI = ai.data?.engine === "ai";
+  const showFit = mode !== "ideas";
+  const showIdeas = mode !== "fit";
 
   const runAnalysis = () =>
     analyze.mutate(trend.id, {
@@ -79,9 +83,9 @@ export function AlignmentPanel({
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="flex flex-1 items-center gap-2">
             <SparklesIcon className="size-4 text-primary" />
-            Does this fit your business?
+            {showFit ? "Why it fits your business" : "Post ideas"}
           </CardTitle>
-          {canReview && analyzed && !running && (
+          {showFit && canReview && analyzed && !running && (
             <Button
               variant="ghost"
               size="sm"
@@ -93,16 +97,20 @@ export function AlignmentPanel({
             </Button>
           )}
         </div>
-        {analyzed && (
+        {analyzed && showFit && (
         <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <RelevanceBadge
               level={trend.relevance_level}
               overridden={trend.relevance_overridden}
             />
-            <span>
+            <span
+              title={
+                a.engine === "ai"
+                  ? "Judged by an AI model against your services and knowledge base."
+                  : "A basic keyword match against your services. Less precise than AI analysis."
+              }
+            >
               {a.engine === "ai" ? "AI analysis" : "Rule-based estimate"}
-              {a.confidence != null &&
-                ` - ${Math.round(a.confidence * 100)}% confidence`}
               {a.analyzed_at && ` · ${timeAgo(a.analyzed_at)}`}
             </span>
           </CardDescription>
@@ -122,7 +130,9 @@ export function AlignmentPanel({
             <AlertTriangleIcon />
             <AlertTitle>The last analysis failed</AlertTitle>
             <AlertDescription className="grid gap-2">
-              <span>{trend.analysis?.error}</span>
+              <span>
+                The analysis couldn&apos;t finish. Details: {trend.analysis?.error}
+              </span>
               {canReview && (
                 <Button
                   size="sm"
@@ -156,18 +166,15 @@ export function AlignmentPanel({
 
         {analyzed && (
           <>
-            {a.reason && (
+            {showFit && a.reason && (
               <div className="grid gap-1.5">
-                <p className="text-sm font-semibold text-foreground">
-                  How this connects to your website and services
-                </p>
                 <p className="text-sm leading-relaxed">
                   <CitedText text={a.reason} />
                 </p>
               </div>
             )}
 
-            {!!a.matched_services?.length && (
+            {showFit && !!a.matched_services?.length && (
               <div className="grid gap-1.5">
                 <p className="text-sm font-semibold text-foreground">
                   Your services it matches
@@ -182,11 +189,11 @@ export function AlignmentPanel({
               </div>
             )}
 
-            {!!a.possible_angles?.length && (
+            {showIdeas && !!a.possible_angles?.length && (
               <div className="grid gap-2">
-                <p className="text-sm font-semibold text-foreground">
-                  Post ideas
-                </p>
+                {showFit && (
+                  <p className="text-sm font-semibold text-foreground">Post ideas</p>
+                )}
                 <ol className="grid gap-2">
                   {a.possible_angles.map((angle, i) => (
                     <li
@@ -201,15 +208,18 @@ export function AlignmentPanel({
                         className="flex items-start gap-2 text-left text-sm font-medium outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-ring"
                       >
                         <span className="flex-1">{angle.title}</span>
-                        <ChevronRightIcon
+                        <span
                           aria-hidden
-                          className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                        />
+                          className="flex shrink-0 items-center gap-0.5 text-xs font-normal text-muted-foreground"
+                        >
+                          View details
+                          <ChevronRightIcon className="size-4" />
+                        </span>
                       </button>
                       <p className="text-sm text-muted-foreground">
                         <CitedText text={angle.angle} />
                       </p>
-                      <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                         {angle.platforms.map((p) => (
                           <PlatformTag key={p} platform={p as Platform} />
                         ))}
@@ -224,7 +234,7 @@ export function AlignmentPanel({
                             Plan a post from this idea
                           </Button>
                         )}
-                      </p>
+                      </div>
                     </li>
                   ))}
                 </ol>
@@ -243,28 +253,7 @@ export function AlignmentPanel({
               </div>
             )}
 
-            {a.engine === "rules" && (
-              <p className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
-                This is a basic estimate from keyword and knowledge-base
-                matches. Ask your administrator to turn on AI analysis for
-                written reasoning and tailored post ideas.
-              </p>
-            )}
 
-            {!!a.unsupported_claims?.length && (
-              <div className="grid gap-1.5 rounded-lg bg-destructive/5 p-3">
-                <p className="flex items-center gap-1.5 text-sm font-semibold text-destructive">
-                  <ShieldAlertIcon className="size-4" />
-                  Avoid saying this (your website and documents don&apos;t back it
-                  up)
-                </p>
-                <ul className="grid list-disc gap-0.5 pl-5 text-sm">
-                  {a.unsupported_claims.map((c) => (
-                    <li key={c}>{c}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </>
         )}
       </CardContent>

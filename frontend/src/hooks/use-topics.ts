@@ -41,11 +41,12 @@ export function useTopics(filters: TopicFilters, limit: number) {
   });
 }
 
-export function useTopic(id: string) {
+/** `withTrend: false` leaves out the full trend (the trend page already has it). */
+export function useTopic(id: string, withTrend = true) {
   const orgId = useOrgId();
   return useQuery({
-    queryKey: [...root(orgId ?? "none"), "detail", id],
-    queryFn: () => api<TopicDetail>(`/topics/${id}`),
+    queryKey: [...root(orgId ?? "none"), "detail", id, ...(withTrend ? [] : ["lean"])],
+    queryFn: () => api<TopicDetail>(`/topics/${id}${withTrend ? "" : "?include_trend=false"}`),
     enabled: !!orgId,
     // Poll while the underlying trend is being (re)analyzed.
     refetchInterval: (query) => {
@@ -74,6 +75,12 @@ export type TopicAction = "shortlist" | "reject" | "review" | "restore" | "archi
 export const useTopicAction = () =>
   useTopicMutation(({ id, action }: { id: string; action: TopicAction }) =>
     api<TopicDetail>(`/topics/${id}/${action}`, { method: "POST" }),
+  );
+
+/** Admin: delete a post plan. Posts already written from it are kept. */
+export const useDeleteStrategy = () =>
+  useTopicMutation(({ topicId, id }: { topicId: string; id: string }) =>
+    api<void>(`/topics/${topicId}/strategies/${id}`, { method: "DELETE" }),
   );
 
 export const useDeleteTopic = () =>

@@ -16,10 +16,10 @@ export interface WorkflowStep {
 
 export const WORKFLOW: WorkflowStep[] = [
   { n: 1, href: "/trends", label: "Find trends", summary: "See what's rising in your market and shortlist what fits", permission: "trends.read" },
-  { n: 2, href: "/topics", label: "Pick topics", summary: "Decide what to post about and plan one post per platform", permission: "topics.read" },
+  { n: 2, href: "/topics", label: "Shortlist & plans", summary: "Plan one post per platform for the trends you shortlisted", permission: "topics.read" },
   { n: 3, href: "/content", label: "Write posts", summary: "Write the copy, then send it to an admin to approve", permission: "content.read" },
   { n: 4, href: "/design", label: "Add designs", summary: "Once the copy is approved: export the design brief for your designer, then add the design", permission: "design.read" },
-  { n: 5, href: "/approvals", label: "Approve", summary: "An admin approves the copy first, then the finished design", permission: "approval.read" },
+  { n: 5, href: "/approvals", label: "Approvals", summary: "An admin approves the copy first, then the finished design", permission: "approval.read" },
 ];
 
 export interface StepCount {
@@ -35,7 +35,6 @@ export function stepCounts(s: DashboardSummary): Record<string, StepCount[]> {
       { value: s.trends_today, label: "new" },
     ],
     "/topics": [
-      { value: s.topics_to_review, label: "to review" },
       { value: s.shortlisted_topics, label: "shortlisted" },
     ],
     "/content": [{ value: s.drafts, label: s.drafts === 1 ? "draft" : "drafts" }],
@@ -78,10 +77,10 @@ export function nextAction(s: DashboardSummary, can: (p: Permission) => boolean)
   }
   if (s.topics_to_review > 0 && can("topics.manage")) {
     return {
-      title: `${s.topics_to_review} ${plural(s.topics_to_review, "topic is", "topics are")} ready for a decision`,
+      title: `${s.topics_to_review} ${plural(s.topics_to_review, "relevant trend is", "relevant trends are")} waiting for a decision`,
       detail: "Shortlist the ones worth posting about; skip the rest.",
-      href: "/topics",
-      cta: "Review topics",
+      href: "/trends",
+      cta: "Review trends",
     };
   }
   if (s.drafts > 0 && can("content.edit")) {
@@ -94,10 +93,10 @@ export function nextAction(s: DashboardSummary, can: (p: Permission) => boolean)
   }
   if (s.shortlisted_topics > 0 && can("topics.manage")) {
     return {
-      title: "Turn your shortlisted topics into posts",
-      detail: "Open a topic, plan a post for a platform, and write it straight from the plan.",
+      title: "Turn your shortlisted trends into posts",
+      detail: "Open a shortlisted trend, plan a post for a platform, and write it straight from the plan.",
       href: "/topics",
-      cta: "Go to topics",
+      cta: "Open Shortlist & plans",
     };
   }
   if (s.relevant_trends > 0) {
@@ -113,7 +112,7 @@ export function nextAction(s: DashboardSummary, can: (p: Permission) => boolean)
     return can("design.upload")
       ? {
           title: "No design tasks right now",
-          detail: "Posts appear in Design as soon as someone sends one to design.",
+          detail: "A design task opens here once an admin approves a post's copy.",
           href: "/design",
           cta: "Open design tasks",
         }

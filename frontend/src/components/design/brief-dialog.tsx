@@ -97,6 +97,7 @@ function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => v
               toast.success("Brief updated");
               onClose();
             },
+            onError: (e) => toast.error(errorMessage(e)),
           },
         ),
       )}
@@ -104,7 +105,7 @@ function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => v
       <DialogHeader>
         <DialogTitle>Edit design brief</DialogTitle>
         <DialogDescription>
-          Typography and logo rules come from your Brand settings and are always attached. Colors can be adjusted for this post under Brand guidelines.
+          Typography and logo rules come from your brand settings and are always attached. Colors can be adjusted for this post under Brand guidelines.
         </DialogDescription>
       </DialogHeader>
       {update.isError && (
@@ -128,7 +129,7 @@ function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => v
       </div>
       {text("headline", "Headline")}
       {text("supporting_text", "Supporting text")}
-      {text("visual_concept", "Visual concept", 3)}
+      {text("visual_concept", "Visual direction", 3)}
       <FormField id="brief-slides" label="Slides or shots" hint="One per line." error={errors.slides?.message}>
         <Textarea {...fieldAria("brief-slides", errors.slides?.message)} rows={5} {...form.register("slides")} />
       </FormField>

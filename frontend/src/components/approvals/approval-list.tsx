@@ -1,20 +1,24 @@
 "use client";
 
 import {
+  AlertTriangleIcon,
   CheckCircle2Icon,
   CheckIcon,
   ImageIcon,
   MessageSquareIcon,
+  RefreshCwIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { APPROVAL_STATUS_TONE } from "@/lib/tones";
+import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { DayGroups } from "@/components/shared/day-groups";
 import { PageHeader } from "@/components/shared/page-header";
 import { SimpleSelect } from "@/components/shared/simple-select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,7 +28,7 @@ import { useApproveAll, useApprovals } from "@/hooks/use-approvals";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { approvalStatusLabel } from "@/lib/approvals";
-import { timeAgo, timeOfDay } from "@/lib/format";
+import { formatDateTime, timeAgo, timeOfDay } from "@/lib/format";
 import { PLATFORM_OPTIONS } from "@/lib/options";
 import { cn } from "@/lib/utils";
 import type {
@@ -40,7 +44,7 @@ type View = ApprovalStage | "ready";
 const VIEWS: { value: View; label: string }[] = [
   { value: "copy", label: "Content approval" },
   { value: "design", label: "Design approval" },
-  { value: "ready", label: "Ready to post" },
+  { value: "ready", label: "Ready to publish" },
 ];
 
 export function ApprovalList() {
@@ -51,7 +55,7 @@ export function ApprovalList() {
   // Older saved filters have no stage.
   const view: View = savedStage ?? "copy";
   const ready = view === "ready";
-  // An approval tab lists what waits for a decision. Ready to post is the
+  // An approval tab lists what waits for a decision. Ready to publish is the
   // approved designs: a design is only approved after its content.
   const stage: ApprovalStage = ready ? "design" : view;
   const shownStatus: ApprovalFilter = ready ? "approved" : "pending";
@@ -64,7 +68,11 @@ export function ApprovalList() {
   const canReview = useCan()("approval.manage");
   const approveAll = useApproveAll();
   // Submissions ticked to be approved together (only while they wait for a decision).
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selectedRaw, setSelected] = useState<string[]>([]);
+  // Approved submissions leave the pending list; the ones that failed stay ticked.
+  const listed = new Set(approvals.data?.items.map((a) => a.id));
+  const selected = selectedRaw.filter((id) => listed.has(id));
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const selectable = canReview && shownStatus === "pending";
   const toggle = (ids: string[], on: boolean) =>
     setSelected((cur) =>
@@ -75,15 +83,15 @@ export function ApprovalList() {
   const approveSelected = () =>
     approveAll.mutate(selected, {
       onSuccess: (r) => {
-        setSelected([]);
+        if (!r.failed) setSelected([]);
         if (r.failed)
           toast.error(
-            `${r.ok} approved, ${r.failed} could not be approved: ${errorMessage(r.error)}`,
+            `${r.ok} approved, ${r.failed} could not be approved and ${r.failed === 1 ? "stays" : "stay"} selected: ${errorMessage(r.error)}`,
           );
         else
           toast.success(
             stage === "copy"
-              ? `${r.ok} ${r.ok === 1 ? "copy" : "copies"} approved. Their design briefs are ready.`
+              ? `${r.ok} ${r.ok === 1 ? "copy" : "copies"} approved. Open Add designs to assign who designs them.`
               : `${r.ok} ${r.ok === 1 ? "post" : "posts"} approved and ready to publish.`,
           );
       },
@@ -92,7 +100,7 @@ export function ApprovalList() {
   return (
     <>
       <PageHeader
-        title="Approve posts"
+        title="Approvals"
         description="Every post is approved twice: first the written copy, then the finished design."
       />
       <div className="grid min-w-0 grid-cols-1 gap-6">
@@ -139,7 +147,7 @@ export function ApprovalList() {
             ? "Posts with both the content and the design approved. Open one to share it."
             : stage === "copy"
               ? "Check the written post. Approving it sends the post to design."
-              : "Check the finished design with the copy. Approving it makes the post ready to publish."}
+              : "Check the finished design with the copy. Approving the design also approves the post: it becomes Ready to publish."}
         </p>
         {(ready ? counts?.approved : counts?.all) === 0 && !platform ? (
           <Card>
@@ -173,6 +181,17 @@ export function ApprovalList() {
                   <Skeleton key={i} className="h-24 w-full rounded-xl" />
                 ))}
               </div>
+            ) : approvals.isError ? (
+              <Alert variant="destructive">
+                <AlertTriangleIcon />
+                <AlertDescription className="grid gap-2">
+                  <span>Couldn&apos;t load approvals. {errorMessage(approvals.error)}</span>
+                  <Button size="sm" variant="outline" className="w-fit" onClick={() => approvals.refetch()}>
+                    <RefreshCwIcon />
+                    Retry
+                  </Button>
+                </AlertDescription>
+              </Alert>
             ) : approvals.data?.items.length ? (
               <>
                 <div
@@ -223,6 +242,19 @@ export function ApprovalList() {
           </>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Approve ${selected.length} ${stage === "copy" ? (selected.length === 1 ? "copy" : "copies") : selected.length === 1 ? "design" : "designs"}?`}
+        description={
+          stage === "copy"
+            ? "The copy is locked and each post moves to design. Afterwards, assign who designs each one from Add designs."
+            : "Each design and its post are approved and locked, and the posts become Ready to publish."
+        }
+        confirmLabel={`Approve ${selected.length}`}
+        pending={approveAll.isPending}
+        onConfirm={approveSelected}
+      />
       {selected.length > 0 && (
         <div
           role="region"
@@ -236,7 +268,7 @@ export function ApprovalList() {
             className="ml-auto"
             size="sm"
             disabled={approveAll.isPending}
-            onClick={approveSelected}
+            onClick={() => setConfirmOpen(true)}
           >
             <CheckIcon />
             {approveAll.isPending
@@ -267,15 +299,18 @@ function ApprovalRow({
   return (
     <li className="relative flex items-center gap-4 rounded-xl bg-card p-3 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
       {select && (
-        <input
-          type="checkbox"
-          aria-label={`Select ${a.post.title ?? "post"}`}
-          checked={select.checked}
-          onChange={(e) => select.onChange(e.target.checked)}
-          className="relative z-10 size-4 shrink-0 cursor-pointer accent-primary"
-        />
+        // The padded wrapper makes a 32px click target around the 16px box.
+        <span className="relative z-10 -m-2 grid shrink-0 cursor-pointer place-items-center p-2">
+          <input
+            type="checkbox"
+            aria-label={`Select ${a.post.title ?? "post"}`}
+            checked={select.checked}
+            onChange={(e) => select.onChange(e.target.checked)}
+            className="size-4 cursor-pointer accent-primary"
+          />
+        </span>
       )}
-      <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
+      <span className="grid size-12 shrink-0 place-items-center sm:size-16 overflow-hidden rounded-lg bg-muted">
         {a.preview_url ? (
           // Signed, short-lived URL; next/image can't optimize it.
           // eslint-disable-next-line @next/next/no-img-element
@@ -312,14 +347,16 @@ function ApprovalRow({
           <span>
             Submitted by{" "}
             {a.submitted_by?.name ?? a.submitted_by?.email ?? "someone"}{" "}
-            {timeAgo(a.created_at)}
+            <time dateTime={a.created_at} title={formatDateTime(a.created_at)}>
+              {timeAgo(a.created_at)}
+            </time>
           </span>
           {a.reviewer && (
             <span>Reviewed by {a.reviewer.name ?? a.reviewer.email}</span>
           )}
           {a.comment_count > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <MessageSquareIcon className="size-3" />
+            <span className="inline-flex items-center gap-1" aria-label={`${a.comment_count} comments`}>
+              <MessageSquareIcon className="size-3" aria-hidden />
               {a.comment_count}
             </span>
           )}
@@ -327,6 +364,7 @@ function ApprovalRow({
       </div>
       <time
         dateTime={eventAt(a)}
+        title={formatDateTime(eventAt(a))}
         className="shrink-0 pr-2 text-sm tabular-nums text-muted-foreground"
       >
         {timeOfDay(eventAt(a))}

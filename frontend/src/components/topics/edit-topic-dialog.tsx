@@ -80,10 +80,10 @@ function EditForm({ topic, onClose }: { topic: TopicDetail; onClose: () => void 
       <FormField id="topic-title" label="Title" error={errors.title?.message}>
         <Input {...fieldAria("topic-title", errors.title?.message)} {...form.register("title")} />
       </FormField>
-      <FormField id="topic-summary" label="Summary" error={errors.summary?.message}>
+      <FormField id="topic-summary" label="Summary (optional)" error={errors.summary?.message}>
         <Textarea {...fieldAria("topic-summary", errors.summary?.message)} rows={4} {...form.register("summary")} />
       </FormField>
-      <FormField id="topic-audience" label="Target audience" error={errors.target_audience?.message}>
+      <FormField id="topic-audience" label="Target audience (optional)" error={errors.target_audience?.message}>
         <Input {...fieldAria("topic-audience", errors.target_audience?.message)} {...form.register("target_audience")} />
       </FormField>
       <DialogFooter>

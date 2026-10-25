@@ -143,8 +143,8 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <SectionHead id="how-title" title="How it works">
             <p>
               Six steps from a trend to a post that&apos;s ready to publish.
-              Here is each screen with an invented client, {EXAMPLE_CLIENT.name}
-              , {EXAMPLE_CLIENT.what}.
+              Here is each screen with an invented client, {EXAMPLE_CLIENT.name},{" "}
+              {EXAMPLE_CLIENT.what}.
             </p>
           </SectionHead>
           <ProductTour />
@@ -174,7 +174,19 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
       <footer className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-8 text-sm text-muted-foreground sm:px-6">
         <Logo className="text-base text-foreground" />
         <span>© {new Date().getFullYear()} ContentPulse</span>
-        <span className="ml-auto flex gap-4">
+        <span className="ml-auto flex flex-wrap gap-x-4 gap-y-2">
+          <a
+            href="#how-it-works"
+            className="underline-offset-4 hover:text-foreground hover:underline"
+          >
+            How it works
+          </a>
+          <a
+            href="#faq"
+            className="underline-offset-4 hover:text-foreground hover:underline"
+          >
+            FAQ
+          </a>
           <Link
             href="/login"
             className="underline-offset-4 hover:text-foreground hover:underline"

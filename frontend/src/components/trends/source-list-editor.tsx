@@ -105,7 +105,10 @@ function ListForm({
           {error}
         </p>
       ) : (
-        <p className="text-xs text-muted-foreground">{copy.hint}</p>
+        <p className="text-xs text-muted-foreground">
+          {copy.hint}
+          {!canEdit && " Only admins can edit this list."}
+        </p>
       )}
       {canEdit && dirty && (
         <div className="flex justify-end gap-2">

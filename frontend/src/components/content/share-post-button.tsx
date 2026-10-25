@@ -48,6 +48,7 @@ function ArticleExport({ title, copy }: { title: string | null; copy: PostVersio
     link.download = `${copy?.meta.blog?.slug || "article"}.md`;
     link.click();
     URL.revokeObjectURL(url);
+    toast.success("Article downloaded as Markdown.");
   };
   return (
     <div className="flex gap-1.5">
@@ -94,7 +95,7 @@ function SocialShareButton({
     const encoded = encodeURIComponent(caption);
     switch (platform) {
       case "x":
-        return `https://twitter.com/intent/post?text=${encoded}`;
+        return `https://x.com/intent/post?text=${encoded}`;
       case "linkedin":
         return "https://www.linkedin.com/feed/?shareActive=true";
       case "facebook":
@@ -127,15 +128,25 @@ function SocialShareButton({
         }
       }
 
-      window.open(platformUrl(), "_blank", "noopener,noreferrer");
+      // Copying can fail (permissions) without stopping the platform from opening.
+      let copied = false;
       if (caption && navigator.clipboard) {
-        await navigator.clipboard.writeText(caption);
+        try {
+          await navigator.clipboard.writeText(caption);
+          copied = true;
+        } catch {
+          copied = false;
+        }
       }
-      toast.success(
-        files.length
-          ? "Caption copied. Attach the approved media in the platform composer."
-          : "Caption copied and platform composer opened.",
-      );
+      const opened = window.open(platformUrl(), "_blank", "noopener,noreferrer");
+      if (!copied && caption) toast.error("Couldn't copy the caption. Copy it from the post and paste it into the composer.");
+      else if (!opened) toast.error("Your browser blocked the new tab. Allow pop-ups for this site and try again.");
+      else
+        toast.success(
+          files.length
+            ? "Caption copied. Attach the approved media in the platform composer."
+            : "Caption copied and platform composer opened.",
+        );
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       toast.error("Could not prepare this post for sharing.");
@@ -145,9 +156,20 @@ function SocialShareButton({
   };
 
   return (
-    <Button size="sm" variant="default" disabled={sharing} onClick={share}>
+    <Button
+      size="sm"
+      variant="default"
+      disabled={sharing}
+      aria-busy={sharing}
+      title={
+        platform === "instagram"
+          ? "Copies the caption and opens Instagram. Instagram can't be posted to from the web: add the media in the app."
+          : "Copies the caption and opens the platform to finish posting"
+      }
+      onClick={share}
+    >
       {sharing ? <LoaderCircleIcon className="animate-spin" /> : <Share2Icon />}
-      Share
+      {sharing ? "Preparing…" : "Share"}
     </Button>
   );
 }

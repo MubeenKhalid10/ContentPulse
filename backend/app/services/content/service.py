@@ -8,9 +8,18 @@ from typing import Any
 from sqlalchemy import and_, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import AppError, Conflict, ErrorCode, InvalidStateTransition, NotFound
+from app.core.errors import (
+    AppError,
+    Conflict,
+    ErrorCode,
+    Forbidden,
+    InvalidStateTransition,
+    NotFound,
+)
+from app.core.logging import logger
 from app.models.ai import AIGenerationJob
 from app.models.approval import ApprovalRequest
+from app.models.design import CreativeAsset
 from app.models.enums import (
     ApprovalStatus,
     JobStatus,
@@ -42,17 +51,20 @@ from app.services.content.copy import check_copy
 from app.services.design import service as design
 from app.services.topics.platforms import PLATFORM_LABELS, get_rules
 from app.services.workflow import transition_post
+from app.storage import get_storage
 
 P = PostStatus
-# Copy can be fixed until the post is submitted for approval (a typo found
-# during design shouldn't send the post back to drafting).
-EDITABLE = (
-    P.DRAFT,
-    P.CONTENT_REVIEW,
-    P.DESIGN_PENDING,
-    P.DESIGN_IN_PROGRESS,
-    P.DESIGN_UPLOADED,
-    P.CHANGES_REQUESTED,
+# Copy can be changed while it is a draft. Once it is sent to an admin it is
+# locked: the writer can withdraw it from review to edit again, or the admin
+# decides. After approval it opens again only when an admin asks for copy
+# changes (request changes with the copy in scope, or "Take back from design").
+EDITABLE = (P.DRAFT,)
+LOCKED_MESSAGE = (
+    "This copy has been approved, so it's locked. An admin can request changes to reopen it."
+)
+IN_REVIEW_MESSAGE = (
+    "This copy is with an admin for approval, so it's locked. "
+    "Withdraw it from review to change it, or wait for the decision."
 )
 STATUS_GROUPS: dict[str, list[PostStatus] | None] = {
     "drafts": [P.DRAFT],
@@ -67,6 +79,15 @@ STATUS_GROUPS: dict[str, list[PostStatus] | None] = {
         P.DESIGN_IN_PROGRESS,
         P.DESIGN_UPLOADED,
         P.PENDING_APPROVAL,
+        P.APPROVED,
+        P.FINAL,
+    ],
+    # "Sent for approval", split: still waiting on an admin / already past that step.
+    "approval_pending": [P.CONTENT_REVIEW, P.PENDING_APPROVAL],
+    "approval_done": [
+        P.DESIGN_PENDING,
+        P.DESIGN_IN_PROGRESS,
+        P.DESIGN_UPLOADED,
         P.APPROVED,
         P.FINAL,
     ],
@@ -271,7 +292,7 @@ async def post_detail(
         strategy=StrategyRead.model_validate(strategy) if strategy else None,
         variants=await _items(db, siblings),
         limits=Limits(max_length=rule.max_length, hashtag_limit=rule.hashtag_limit),
-        editable=post.status in EDITABLE,
+        editable=await copy_editable(db, post),
         design_task=DesignTaskRef(id=brief.id, status=brief.status) if brief else None,
         review=await approvals.latest_review(db, post.id),
         creatives=await design.creative_versions(db, post.id),
@@ -343,12 +364,18 @@ async def generate(
     return await post_detail(db, organization_id, post.id)
 
 
-def _require_editable(post: Post) -> None:
-    if post.status not in EDITABLE:
-        raise InvalidStateTransition(
-            "This post has moved on from drafting. Move it back to draft to change the copy.",
-            details={"status": post.status.value},
-        )
+async def copy_editable(db: AsyncSession, post: Post) -> bool:
+    if post.status in EDITABLE:
+        return True
+    if post.status != P.CHANGES_REQUESTED:
+        return False
+    return await approvals.changes_scope(db, post.id) in ("copy", "both")
+
+
+async def _require_editable(db: AsyncSession, post: Post) -> None:
+    if not await copy_editable(db, post):
+        message = IN_REVIEW_MESSAGE if post.status == P.CONTENT_REVIEW else LOCKED_MESSAGE
+        raise InvalidStateTransition(message, details={"status": post.status.value})
 
 
 async def regenerate(
@@ -359,7 +386,7 @@ async def regenerate(
     instructions: str | None,
 ) -> PostDetail:
     post = await _get_post(db, organization_id, post_id)
-    _require_editable(post)
+    await _require_editable(db, post)
     _record(db, post, user_id, AuditAction.CONTENT_GENERATED, {"kind": "regenerate"})
     await generation.start(db, post, kind="regenerate", instructions=instructions, user_id=user_id)
     return await post_detail(db, organization_id, post.id)
@@ -388,26 +415,48 @@ async def create_variant(
 
 
 async def delete_post(
-    db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, post_id: uuid.UUID
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    post_id: uuid.UUID,
+    *,
+    any_stage: bool = False,
 ) -> None:
-    """Only a post with nothing written (its writing failed) can be deleted.
-    A post with content is archived instead, so its history stays."""
+    """Writers can delete a post with nothing written (its writing failed).
+    An admin (`any_stage`) can delete a post at any stage: its versions,
+    design task, creative files and approvals go with it."""
     post = await _get_post(db, organization_id, post_id)
-    if post.current_version or post.status != P.DRAFT:
+    if not any_stage and (post.current_version or post.status != P.DRAFT):
         raise Conflict(
-            "Only a post whose writing failed, with nothing written yet, can be deleted."
+            "Only a post whose writing failed, with nothing written yet, can be deleted. "
+            "An admin can delete any post."
         )
     if await generation.active_job(db, post.id):
         raise Conflict("This post is still being written.")
+    keys = set(
+        await db.scalars(select(CreativeAsset.storage_key).where(CreativeAsset.post_id == post.id))
+    )
     _record(
         db,
         post,
         user_id,
         AuditAction.CONTENT_DELETED,
-        {"title": post.title, "platform": post.platform.value},
+        {
+            "title": post.title,
+            "platform": post.platform.value,
+            "status": post.status.value,
+            "versions": post.current_version,
+        },
     )
     await db.delete(post)
     await db.commit()
+    # The files are no longer referenced; a missing one is not worth failing for.
+    storage = get_storage()
+    for key in keys:
+        try:
+            await storage.delete(key)
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not remove creative file %s", key)
 
 
 # --- Editing ----------------------------------------------------------------------
@@ -434,7 +483,7 @@ async def update_post(
             ErrorCode.VALIDATION_ERROR, message, details=[{"field": "blog", "message": message}]
         )
     if data:
-        _require_editable(post)
+        await _require_editable(db, post)
         if await generation.active_job(db, post.id):
             raise Conflict("This post is being generated. Wait for it to finish before editing.")
         if base != post.current_version:
@@ -533,7 +582,7 @@ async def restore_version(
     base_version: int,
 ) -> PostDetail:
     post = await _get_post(db, organization_id, post_id)
-    _require_editable(post)
+    await _require_editable(db, post)
     if base_version != post.current_version:
         raise Conflict("The post changed since you opened it. Reload and try again.")
     version = await db.scalar(
@@ -566,9 +615,14 @@ async def transition(
     user_id: uuid.UUID,
     post_id: uuid.UUID,
     action: str,
+    *,
+    can_review: bool = False,
 ) -> PostDetail:
     post = await _get_post(db, organization_id, post_id)
     target = ACTIONS[action]
+    if target == P.DRAFT and post.status not in (*EDITABLE, P.CONTENT_REVIEW) and not can_review:
+        # Back to draft reopens approved copy: an admin's call.
+        raise Forbidden("Only an admin can reopen approved copy.")
     if target == P.CONTENT_REVIEW:
         if not post.current_version:
             raise InvalidStateTransition("Generate or write the post before moving it on.")

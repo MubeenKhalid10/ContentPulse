@@ -63,7 +63,6 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   await expect(page.getByRole("heading", { name: "Welcome back, Ada" })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0); // never shown twice
   await expect(page.getByRole("link", { name: "Start setup" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Content pipeline" })).toBeVisible();
   await expect(page.getByText("0 of 7 done.")).toBeVisible();
   await shot(page, "03-dashboard");
 
@@ -76,16 +75,16 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   // Services.
   await page.getByRole("link", { name: "Services & products" }).first().click();
   await expect(page.getByText("No services yet")).toBeVisible();
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add service", exact: true }).click();
   await page.getByLabel("Name").fill("AI Solutions");
   await page.getByLabel("Category").fill("AI");
   await page.getByLabel("Description").fill("Agents and automation that remove manual work.");
-  await page.getByRole("dialog").getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add service", exact: true }).click();
   await expect(page.getByText("Agents and automation that remove manual work.")).toBeVisible();
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add service", exact: true }).click();
   await pick(page, "Type", "Product");
   await page.getByLabel("Name").fill("Workflow Automator");
-  await page.getByRole("dialog").getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add service", exact: true }).click();
   await expect(page.getByRole("cell", { name: "Product" })).toBeVisible();
   await page.getByRole("switch", { name: "Workflow Automator active" }).click();
   await expect(page.getByRole("switch", { name: "Workflow Automator active" })).not.toBeChecked();
@@ -127,8 +126,8 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   ).toBeChecked();
   await shot(page, "05-brand");
 
-  // Content setup: audience, platforms and discovery on one page, one save.
-  await page.getByRole("link", { name: "Content setup" }).click();
+  // Audience & platforms: audience, platforms and discovery on one page, one save.
+  await page.getByRole("link", { name: "Audience & platforms" }).click();
   await page.getByLabel("Target markets").fill("USA");
   await page.getByLabel("Target markets").press("Enter");
   await page.getByLabel("Target markets").fill("UK");
@@ -137,7 +136,7 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   await page.getByRole("button", { name: "X", exact: true }).click();
   await pick(page, "How Often to Check for New Trends", "Every 6 hours");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText("Content setup saved")).toBeVisible();
+  await expect(page.getByText("Audience & platforms saved")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("button", { name: "LinkedIn" })).toHaveAttribute("aria-pressed", "true");
   await shot(page, "06-settings");
@@ -146,7 +145,7 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   await page.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByLabel("Email")).toHaveValue(ADMIN);
   await page.getByLabel("Name", { exact: true }).fill("Ada Admin-Lovelace");
-  await page.getByRole("button", { name: "Save name" }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Your name was saved")).toBeVisible();
   await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText("Acme Software");
   await page.getByRole("radio", { name: "Dark" }).click();
@@ -159,7 +158,7 @@ test("admin sets up an organization and invites a creator", async ({ page, brows
   await page.getByRole("button", { name: "Invite" }).click();
   await page.getByLabel("Email").fill(DESIGNER);
   await pick(page, "Role", "Creator");
-  await page.getByRole("button", { name: "Send invite" }).click();
+  await page.getByRole("button", { name: "Create invite link" }).click();
   const inviteUrl = await page.getByRole("textbox", { name: "Invite link" }).inputValue();
   expect(inviteUrl).toMatch(/\/invite\//);
   await shot(page, "07-invite");

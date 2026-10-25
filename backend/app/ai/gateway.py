@@ -117,23 +117,58 @@ llm_cache = LLMCache()
 # --- Accounting --------------------------------------------------------------------
 
 
+# Columns added by migration d4f8a2c6e517; left out on a retry so a database
+# that isn't migrated yet still records the request.
+COST_COLUMNS = ("cached_input_tokens", "image_count", "cost_usd")
+
+
+def _cost(row: dict[str, Any]) -> Any:
+    from app.ai.pricing import cost_usd
+
+    if row.get("status") == "cached":
+        return 0
+    if row.get("status") != "succeeded":
+        return None  # no usage reported for failed requests
+    return cost_usd(
+        row["provider"],
+        row["model"],
+        input_tokens=row.get("input_tokens"),
+        output_tokens=row.get("output_tokens"),
+        cached_input_tokens=row.get("cached_input_tokens"),
+        images=row.get("image_count"),
+    )
+
+
 async def record(**row: Any) -> None:
-    """Persist one llm_requests row. Never fails the call it describes."""
+    """Persist one llm_requests row, priced from llm_prices.json. Never fails
+    the call it describes."""
     from app.db.session import SessionLocal
     from app.models.ai import LLMRequest
 
     detail = row.get("error_detail")
     if detail:
         row["error_detail"] = str(detail)[:300]
+    if "cost_usd" not in row:
+        try:
+            row["cost_usd"] = _cost(row)
+        except Exception as exc:
+            logger.warning("Could not price LLM request: %s", exc)
     try:
         async with SessionLocal() as db:
             db.add(LLMRequest(**row))
             await db.commit()
     except Exception as exc:
-        logger.warning("Could not record LLM request: %s", exc)
+        legacy = {k: v for k, v in row.items() if k not in COST_COLUMNS}
+        try:
+            async with SessionLocal() as db:
+                db.add(LLMRequest(**legacy))
+                await db.commit()
+            logger.warning("LLM request recorded without cost columns (migrate the database)")
+        except Exception:
+            logger.warning("Could not record LLM request: %s", exc)
     logger.info(
         "llm_request workflow=%s provider=%s model=%s status=%s error=%s attempt=%s "
-        "wait_ms=%s latency_ms=%s tokens=%s/%s fallback=%s",
+        "wait_ms=%s latency_ms=%s tokens=%s/%s fallback=%s cost_usd=%s",
         row.get("workflow"),
         row.get("provider"),
         row.get("model"),
@@ -145,6 +180,7 @@ async def record(**row: Any) -> None:
         row.get("input_tokens"),
         row.get("output_tokens"),
         row.get("fallback_used"),
+        row.get("cost_usd"),
     )
 
 
@@ -270,6 +306,7 @@ class LLMGateway:
             labels = {"provider": adapter.name, "model": adapter.model, "workflow": workflow}
             cap = self.limiter.catalog.model(adapter.name, adapter.model).max_output_tokens
             output_tokens = min(max_tokens, cap) if cap else max_tokens
+            grown = False  # one retry with a larger allowance after a cut-off answer
             # Reserve the input estimate plus the output allowance (providers
             # count it); corrected to the reported total after the call.
             tokens = input_tokens + output_tokens
@@ -342,6 +379,23 @@ class LLMGateway:
                         usage_unavailable=True,
                     )
                     last_error = exc
+                    limit = cap or max(max_tokens * 4, 16000)
+                    if exc.truncated and not grown and output_tokens < limit:
+                        # Right-sized allowances fit more calls under TPM;
+                        # the rare long answer gets one retry with double.
+                        grown = True
+                        output_tokens = min(output_tokens * 2, limit)
+                        tokens = input_tokens + output_tokens
+                        retries += 1
+                        metrics.inc("llm_retries_total", **labels)
+                        logger.warning(
+                            "%s: %s/%s answer cut off; retrying with %d output tokens",
+                            workflow,
+                            adapter.name,
+                            adapter.model,
+                            output_tokens,
+                        )
+                        continue
                     if exc.retryable:
                         delay = (
                             exc.retry_after + random.uniform(0, 1)
@@ -417,6 +471,7 @@ class LLMGateway:
                     input_tokens=result.input_tokens,
                     output_tokens=result.output_tokens,
                     total_tokens=total,
+                    cached_input_tokens=result.cached_input_tokens,
                     usage_unavailable=total is None,
                 )
                 result.provider = adapter.name

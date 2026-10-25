@@ -125,6 +125,14 @@ class Settings(BaseSettings):
     # {"trend_alignment": ["gemini/gemini-3.5-flash", "groq/llama-4-scout"]}.
     llm_routes: dict[str, list[str]] = {}
     llm_fallback_enabled: bool = True
+    # Gemini is added as the last cross-provider fallback of every default
+    # chain when a Gemini key is set (LLM_ROUTES chains are left as written).
+    # Empty LLM_GEMINI_FALLBACK_MODEL turns it off.
+    llm_gemini_fallback_model: str | None = "gemini-3.5-flash"
+    # Per-model prices for cost_usd on llm_requests (relative to backend/;
+    # "off" disables). LLM_PRICES (JSON) overrides entries.
+    llm_prices_file: str = "llm_prices.json"
+    llm_prices: dict[str, dict] = {}
     # Provider/model limits (RPM, TPM, RPD, TPD, concurrency). Path is relative
     # to backend/; "off" disables the file. LLM_LIMITS (JSON) overrides entries.
     llm_limits_file: str = "llm_limits.json"
@@ -164,6 +172,14 @@ class Settings(BaseSettings):
     # Trends analyzed by AI per discovery run (cost guard). Rule-based analysis
     # covers all recent trends because it is free.
     alignment_ai_batch_size: int = 15
+    # Only send a trend to the LLM when the free rule engine finds a keyword,
+    # service or knowledge signal; the rest keep the rule-based result.
+    alignment_ai_gate: bool = True
+    # Automatic re-analysis after failed AI alignment: wait base x 2^(n-1)
+    # hours after the n-th failure, and stop after the max. A refused or
+    # unusable answer is final until the trend's coverage changes.
+    alignment_failure_backoff_hours: float = 3.0
+    alignment_max_failures: int = 4
     # Drop collected items that share nothing with the organization's keywords,
     # services or industry before they become trends.
     trend_relevance_prefilter: bool = True

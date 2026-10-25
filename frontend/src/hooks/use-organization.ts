@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { meQueryKey, useMe } from "@/lib/auth";
 import type {
+  Attention,
   AuditLogEntry,
   BrandProfile,
   DashboardOverview,
@@ -53,6 +54,12 @@ export const useServices = () =>
   useOrgQuery<OrganizationService[]>(keys.services, (id) => `/organizations/${id}/services`);
 export const useMembers = () => useOrgQuery<Member[]>(keys.members, (id) => `/organizations/${id}/members`);
 export const useDashboard = () => useOrgQuery<DashboardSummary>(keys.dashboard, () => "/dashboard/summary");
+/** Sidebar badge counts: two small queries instead of the whole dashboard summary. */
+export const useAttention = () =>
+  useOrgQuery<Attention>(
+    (id) => [...keys.dashboard(id), "attention"],
+    () => "/dashboard/attention",
+  );
 /** The dashboard page: metrics for the last `days` days (7, 30 or 90). */
 export const useDashboardOverview = (days: number) =>
   useOrgQuery<DashboardOverview>(

@@ -39,7 +39,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
 
   // Blog is offered alongside the social platforms; publish only there.
   await openOrgSetup(page);
-  await page.getByRole("link", { name: "Content setup" }).click();
+  await page.getByRole("link", { name: "Audience & platforms" }).click();
   await page.getByLabel("Target markets").fill("USA");
   await page.getByLabel("Target markets").press("Enter");
   await page.getByLabel("Keywords to track").fill("artificial intelligence");
@@ -53,13 +53,13 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   if ((await blogChip.getAttribute("aria-pressed")) !== "true") await blogChip.click();
   await expect(blogChip).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText("Content setup saved")).toBeVisible();
+  await expect(page.getByText("Audience & platforms saved")).toBeVisible();
 
   // Discover, then shortlist the top trend.
   await page.getByRole("link", { name: /Find trends/ }).first().click();
-  const startFirst = page.getByRole("button", { name: "Discover New Trends now" }).first();
-  const startAgain = page.getByRole("button", { name: "Discover New Trends now" }).last();
-  const inProgress = page.getByRole("button", { name: "Discovering…" });
+  const startFirst = page.getByRole("button", { name: "Check for new trends" }).first();
+  const startAgain = page.getByRole("button", { name: "Check for new trends" }).last();
+  const inProgress = page.getByRole("button", { name: "Checking…" });
   await expect(startFirst.or(startAgain).or(inProgress).first()).toBeVisible();
   if (await startFirst.isVisible()) await startFirst.click();
   else if (await startAgain.isEnabled()) await startAgain.click();
@@ -76,26 +76,25 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await expect(page.getByText(`Shortlisted “${topic}”`)).toBeVisible();
 
   // Topics can be filtered by Blog; open the shortlisted one.
-  await page.getByRole("link", { name: /Pick topics/ }).first().click();
-  await page.getByRole("tab", { name: /^Shortlisted/ }).click();
+  await page.getByRole("link", { name: /Shortlist & plans/ }).first().click();
   const topics = page.getByRole("list", { name: "Topics" });
   await expect(topics).toHaveAttribute("aria-busy", "false");
   await topics.getByRole("link", { name: topic, exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: topic })).toBeVisible();
 
   // Blog plan: the playbook draft includes an SEO plan.
-  await page.getByRole("button", { name: "New plan" }).click();
+  await page.getByRole("button", { name: /Create (your first )?plan/ }).click();
   const dialog = page.getByRole("dialog");
   // Blog is the only enabled platform, so it is the one ticked.
   await expect(dialog.getByRole("checkbox", { name: "Blog", exact: true })).toBeChecked();
   const seoPlan = dialog.getByRole("group", { name: "SEO plan" });
   await expect(seoPlan).toBeVisible();
-  await dialog.getByRole("button", { name: "Draft from playbook" }).click();
+  await dialog.getByRole("button", { name: "Draft Plan from playbook" }).click();
   await expect(dialog.getByLabel("Post idea")).not.toHaveValue("");
   await expect(seoPlan.getByLabel("Primary keyword")).not.toHaveValue("");
   await expect(seoPlan.getByLabel("Outline")).not.toHaveValue("");
   await seoPlan.getByLabel("Target words").fill("1800");
-  await dialog.getByRole("button", { name: "Save plan" }).click();
+  await dialog.getByRole("button", { name: "Save Plan Draft" }).click();
   await expect(page.getByText("Blog plan saved")).toBeVisible();
   const strategy = page.getByRole("article").first();
   await expect(strategy.getByText("About 1,800 words")).toBeVisible();
@@ -127,8 +126,10 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   // Featured image: add it on the design task and submit, then one approval.
   // The copy needs an admin's approval before design.
   await page.getByRole("button", { name: "Submit for approval" }).click();
-  await page.getByRole("link", { name: "Review & approve" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Submit" }).click();
+  await page.getByRole("link", { name: "Review", exact: true }).click();
   await page.getByRole("button", { name: "Approve content" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Approve content" }).click();
   // Approving keeps the reviewer in Approvals; the design task waits on the Design page.
   await expect(page).toHaveURL(/\/approvals$/);
   await page.getByRole("link", { name: /Add designs/ }).first().click();
@@ -138,10 +139,10 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await expect(page.getByText(/1200×630/).first()).toBeVisible();
   await expect(page.getByRole("figure", { name: "Search result preview" })).toHaveCount(0);
   await page.getByLabel("Choose creative files").setInputFiles("e2e/fixtures/creative-slide-1.png");
-  await page.getByRole("button", { name: "Upload & submit for approval" }).click();
+  await page.getByRole("button", { name: "Submit for approval" }).click();
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
 
-  await page.getByRole("link", { name: /^Approve$/ }).click();
+  await page.getByRole("link", { name: /^Approvals$/ }).click();
   await page.getByRole("tab", { name: /Design approval/ }).click();
   const queue = page.getByRole("list", { name: "Approvals" });
   await expect(queue.getByRole("link")).toHaveCount(1);
@@ -149,6 +150,7 @@ test("plan, write, design and approve a blog article", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 }).filter({ hasText: topic }).first()).toBeVisible();
   await expect(page.getByRole("figure", { name: "Search result preview" })).toHaveCount(0);
   await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Approve design and post" }).click();
   await expect(page.getByText("Locked and ready to publish. Use Share on the post.")).toBeVisible();
   // Blog is exported for the website's CMS, never published automatically.
   await expect(page.getByRole("button", { name: "Copy article" })).toBeVisible();

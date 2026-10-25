@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -8,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -93,4 +95,12 @@ class LLMRequest(UUIDPk, CreatedAt, Base):
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     total_tokens: Mapped[int | None] = mapped_column(Integer)
+    # Part of input_tokens the provider served from its prompt cache.
+    cached_input_tokens: Mapped[int | None] = mapped_column(Integer)
+    # Images generated (design_image workflow).
+    image_count: Mapped[int | None] = mapped_column(Integer)
+    # From llm_prices.json; NULL when the model has no price. Cache hits cost 0.
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    # True when the provider reported no usage (token counts are then
+    # estimates or missing).
     usage_unavailable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

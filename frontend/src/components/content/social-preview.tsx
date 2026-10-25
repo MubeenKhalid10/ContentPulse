@@ -1,5 +1,6 @@
 "use client";
 
+import { SignedImage } from "@/components/shared/signed-image";
 import {
   BookmarkIcon,
   ChartNoAxesColumnIcon,
@@ -76,8 +77,13 @@ function Caption({ text, platform, lead }: { text: string; platform: Social; lea
         ),
       )}
       {long && (
-        <button type="button" className="ml-1 text-muted-foreground hover:underline" onClick={() => setOpen(!open)}>
-          {open ? " …less" : "…more"}
+        <button
+          type="button"
+          aria-expanded={open}
+          className="ml-1 text-muted-foreground hover:underline"
+          onClick={() => setOpen(!open)}
+        >
+          {open ? "See less" : "…See more"}
         </button>
       )}
     </p>
@@ -88,11 +94,10 @@ function Caption({ text, platform, lead }: { text: string; platform: Social; lea
 function Media({ files, square = false }: { files: CreativeFile[]; square?: boolean }) {
   const [index, setIndex] = useState(0);
   if (!files.length) return null;
-  const renderFile = (f: CreativeFile) =>
+  const renderFile = (f: CreativeFile, n: number) =>
     f.file_type.startsWith("image/") ? (
       // Signed, short-lived URLs: next/image can't optimize them.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={f.url} alt={f.file_name} className={cn("w-full bg-muted object-cover", square ? "aspect-square" : "max-h-[34rem] object-contain")} />
+      <SignedImage src={f.url} alt={files.length > 1 ? `Design, image ${n + 1} of ${files.length}` : "Design"} className={cn("w-full bg-muted object-cover", square ? "aspect-square" : "max-h-[34rem] object-contain")} />
     ) : f.file_type.startsWith("video/") ? (
       <video src={f.url} controls className="max-h-[34rem] w-full bg-black" aria-label={f.file_name} />
     ) : (
@@ -101,20 +106,28 @@ function Media({ files, square = false }: { files: CreativeFile[]; square?: bool
         {f.file_name}
       </a>
     );
-  if (files.length === 1) return <div className="overflow-hidden bg-muted">{renderFile(files[0])}</div>;
+  if (files.length === 1) return <div className="overflow-hidden bg-muted">{renderFile(files[0], 0)}</div>;
   return (
     <div className="relative">
       <div
-        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none]"
-        aria-label="Carousel"
+        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        role="group"
+        aria-roledescription="carousel"
+        aria-label="Carousel, use the arrow keys to move between images"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+          e.preventDefault();
+          e.currentTarget.scrollBy({ left: (e.key === "ArrowRight" ? 1 : -1) * e.currentTarget.clientWidth, behavior: "smooth" });
+        }}
         onScroll={(e) => {
           const el = e.currentTarget;
           setIndex(Math.round(el.scrollLeft / el.clientWidth));
         }}
       >
-        {files.map((f) => (
+        {files.map((f, n) => (
           <div key={f.id} className="w-full shrink-0 snap-center">
-            {renderFile(f)}
+            {renderFile(f, n)}
           </div>
         ))}
       </div>
@@ -143,7 +156,16 @@ function Action({ icon: Icon, label }: { icon: typeof HeartIcon; label?: string 
  * The post as it will look in the feed, copy and creative in one frame, so
  * reviewers judge what the audience will actually see.
  */
-export function SocialPostPreview({ platform, text, files }: { platform: Social; text: string; files: CreativeFile[] }) {
+export function SocialPostPreview(props: { platform: Social; text: string; files: CreativeFile[] }) {
+  return (
+    <div className="grid gap-2">
+      <p className="text-center text-xs font-medium text-muted-foreground">Preview</p>
+      <SocialPostFrame {...props} />
+    </div>
+  );
+}
+
+function SocialPostFrame({ platform, text, files }: { platform: Social; text: string; files: CreativeFile[] }) {
   const org = useOrganization();
   const name = org.data?.name ?? "Your organization";
   const logo = org.data?.logo_url ?? null;

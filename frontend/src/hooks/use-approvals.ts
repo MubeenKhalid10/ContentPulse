@@ -130,6 +130,24 @@ export const useRequestChanges = () =>
       }),
   );
 
+/** Admin: request changes to already-approved (locked) work. */
+export const useReopen = () =>
+  useApprovalMutation(
+    ({
+      id,
+      comment,
+      scope,
+    }: {
+      id: string;
+      comment: string;
+      scope: "design" | "copy" | "both";
+    }) =>
+      api<ApprovalDetail>(`/approvals/${id}/reopen`, {
+        method: "POST",
+        body: { comment, scope },
+      }),
+  );
+
 export const useReject = () =>
   useApprovalMutation(({ id, comment }: { id: string; comment?: string }) =>
     api<ApprovalDetail>(`/approvals/${id}/reject`, {

@@ -40,11 +40,12 @@ export function ActiveJob({ job, canManage }: { job: KnowledgeJob; canManage: bo
                   ? "Starting…"
                   : isCrawl
                     ? `Reading ${host(job.root_url)}`
-                    : "Re-indexing your knowledge base"}
+                    : "Refreshing your search index"}
             </p>
             <p className="text-sm text-muted-foreground">
               {job.pages_crawled} of {isCrawl ? `up to ${total}` : total} pages processed
               {isCrawl && job.pages_discovered > job.max_pages && ` · ${job.pages_discovered} found`}
+              {canManage && !job.cancel_requested && " · Stopping keeps the pages already indexed."}
             </p>
           </div>
           {canManage && !job.cancel_requested && (
@@ -54,7 +55,7 @@ export function ActiveJob({ job, canManage }: { job: KnowledgeJob; canManage: bo
               disabled={cancel.isPending}
               onClick={() => cancel.mutate(job.id, { onError: (e) => toast.error(errorMessage(e)) })}
             >
-              Stop
+              Stop crawl
             </Button>
           )}
         </div>
@@ -98,7 +99,7 @@ export function LastJobNotice({ job }: { job: KnowledgeJob }) {
     return (
       <Alert variant="destructive">
         <XCircleIcon />
-        <AlertTitle>The last {job.kind === "crawl" ? "crawl" : "re-index"} failed</AlertTitle>
+        <AlertTitle>The last {job.kind === "crawl" ? "crawl" : "search index refresh"} failed</AlertTitle>
         <AlertDescription>{job.error ?? "Something went wrong."}</AlertDescription>
       </Alert>
     );
@@ -125,9 +126,9 @@ export function KnowledgeStats({ summary }: { summary: KnowledgeSummary }) {
   const coverage = summary.chunks ? Math.round((summary.embedded_chunks / summary.chunks) * 100) : 0;
   const stats = [
     { label: "Pages & documents", value: summary.indexed_documents.toLocaleString() },
-    { label: "Knowledge chunks", value: summary.chunks.toLocaleString() },
+    { label: "Searchable passages", value: summary.chunks.toLocaleString() },
     {
-      label: "Semantic coverage",
+      label: "Search readiness",
       value: summary.embeddings_enabled ? `${coverage}%` : "Off",
     },
     {
@@ -139,7 +140,7 @@ export function KnowledgeStats({ summary }: { summary: KnowledgeSummary }) {
   return (
     <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border lg:grid-cols-4">
       {stats.map((s) => (
-        <div key={s.label} className="grid gap-1 bg-card p-4" title={s.title}>
+        <div key={s.label} className="flex flex-col-reverse justify-end gap-1 bg-card p-4" title={s.title}>
           <dd className="font-mono text-2xl font-semibold tabular-nums">{s.value}</dd>
           <dt className="text-xs text-muted-foreground">{s.label}</dt>
         </div>
@@ -155,8 +156,8 @@ export function SemanticSearchNotice({ canManage }: { canManage: boolean }) {
       <span>
         Search is keyword-only right now.{" "}
         {canManage
-          ? "Configure an embedding provider on the server (EMBEDDING_PROVIDER, EMBEDDING_API_KEY), then re-index, to also match by meaning."
-          : "An admin can enable meaning-based search."}
+          ? "Ask your admin to turn on meaning-based search, then refresh the search index."
+          : "Ask your admin to turn on meaning-based search."}
       </span>
     </p>
   );

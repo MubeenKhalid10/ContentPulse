@@ -60,6 +60,9 @@ async def ai_usage(
             func.sum(case((LLMRequest.fallback_used, 1), else_=0)).label("fallbacks"),
             func.coalesce(func.sum(LLMRequest.input_tokens), 0).label("input_tokens"),
             func.coalesce(func.sum(LLMRequest.output_tokens), 0).label("output_tokens"),
+            func.coalesce(func.sum(LLMRequest.cached_input_tokens), 0).label("cached_tokens"),
+            func.coalesce(func.sum(LLMRequest.image_count), 0).label("images"),
+            func.sum(LLMRequest.cost_usd).label("cost"),
             func.avg(LLMRequest.latency_ms).filter(LLMRequest.status != "cached").label("latency"),
             func.avg(LLMRequest.queue_wait_ms).filter(LLMRequest.status != "cached").label("wait"),
             func.max(LLMRequest.queue_wait_ms).label("max_wait"),
@@ -81,6 +84,9 @@ async def ai_usage(
             fallbacks=int(r.fallbacks),
             input_tokens=int(r.input_tokens),
             output_tokens=int(r.output_tokens),
+            cached_input_tokens=int(r.cached_tokens),
+            images=int(r.images),
+            cost_usd=float(r.cost) if r.cost is not None else None,
             avg_latency_ms=round(r.latency) if r.latency is not None else None,
             avg_queue_wait_ms=round(r.wait) if r.wait is not None else None,
             max_queue_wait_ms=int(r.max_wait or 0),
@@ -99,6 +105,11 @@ async def ai_usage(
         since=since,
         requests_total=sum(g.requests for g in groups),
         cached_total=sum(g.cached for g in groups),
+        cost_usd_total=(
+            round(sum(g.cost_usd for g in priced), 6)
+            if (priced := [g for g in groups if g.cost_usd is not None])
+            else None
+        ),
         groups=groups,
         requests=requests,
     )

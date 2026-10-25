@@ -216,6 +216,12 @@ export interface DashboardOverview {
   recent_posts: DashboardPostBrief[];
 }
 
+export interface Attention {
+  to_review: number;
+  design: number;
+  approvals: number;
+}
+
 export interface DashboardSummary {
   trends_today: number;
   relevant_trends: number;
@@ -384,7 +390,7 @@ export interface DiscoveryWindow {
   background: boolean;
   last_discovery_at: string | null;
   next_discovery_at: string | null;
-  /** Whether "Discover New Trends" would collect now. */
+  /** Whether "Check for new trends" would collect now. */
   can_discover: boolean;
   /** Trends the last successful discovery added. */
   new_trends: number;
@@ -732,7 +738,16 @@ export interface Post {
   updated_at: string;
 }
 
-export type PostGroup = "drafts" | "changes" | "design" | "approval" | "approved" | "archived" | "all";
+export type PostGroup =
+  | "drafts"
+  | "changes"
+  | "design"
+  | "approval"
+  | "approval_pending"
+  | "approval_done"
+  | "approved"
+  | "archived"
+  | "all";
 
 export interface PostPage {
   items: Post[];

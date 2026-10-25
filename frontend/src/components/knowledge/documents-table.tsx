@@ -4,6 +4,7 @@ import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-re
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { SearchInput } from "@/components/shared/search-input";
 import { Tag } from "@/components/shared/tag";
 import { SourceLink } from "@/components/knowledge/knowledge-search";
 import {
@@ -24,7 +25,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -91,12 +91,12 @@ export function DocumentsTable({
             <TabsTrigger value="excluded">Excluded</TabsTrigger>
           </TabsList>
         </Tabs>
-        <Input
+        <SearchInput
           aria-label="Filter sources"
           placeholder="Filter by title or URL"
           value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
+          onChange={(value) => {
+            setQ(value);
             setPage(0);
           }}
           className="w-full sm:w-56"
@@ -166,12 +166,21 @@ export function DocumentsTable({
                         {canManage && (
                           <>
                             <DropdownMenuItem
+                              title={
+                                doc.excluded
+                                  ? "Use this source in search and posts again"
+                                  : "Keep this source out of search and posts without deleting it"
+                              }
                               onClick={() =>
                                 update.mutate(
                                   { id: doc.id, excluded: !doc.excluded },
                                   {
                                     onSuccess: () =>
-                                      toast.success(doc.excluded ? "Included again" : "Excluded from knowledge"),
+                                      toast.success(
+                                        doc.excluded
+                                          ? `“${doc.title ?? "Source"}” included again`
+                                          : `“${doc.title ?? "Source"}” excluded from knowledge`,
+                                      ),
                                     onError,
                                   },
                                 )
@@ -246,7 +255,7 @@ function DeleteDocumentDialog({ doc, onClose }: { doc?: KnowledgeDocument; onClo
               doc &&
               remove.mutate(doc.id, {
                 onSuccess: () => {
-                  toast.success("Deleted");
+                  toast.success(`“${doc.title ?? "Source"}” deleted`);
                   onClose();
                 },
                 onError: (e) => toast.error(errorMessage(e)),

@@ -28,14 +28,13 @@ import { useCan } from "@/lib/auth";
 import {
   LANGUAGE_OPTIONS,
   PLATFORM_OPTIONS,
-  timezoneOptions,
 } from "@/lib/options";
 import { cn } from "@/lib/utils";
 import { settingsSchema } from "@/schemas/organization";
 import type { OrganizationSettings } from "@/types/api";
 
 /*
- * Content setup: who you write for, where you publish, and what to listen for,
+ * Audience & platforms: who you write for, where you publish, and what to listen for,
  * on one page with one save. Each section has an anchor (#audience,
  * #platforms, #discovery) so other pages can link straight to it.
  */
@@ -106,7 +105,7 @@ export function ContentSetup() {
   return (
     <>
       <PageHeader
-        title="Content setup"
+        title="Audience & platforms"
         description="Who you write for, where you publish, and what to listen for. Used to score every trend and to write every post."
       />
       {!canEdit && <ReadOnlyNotice />}
@@ -146,13 +145,14 @@ function SetupForm({
   });
   const { errors, isDirty } = form.formState;
   const background = useWatch({ control: form.control, name: "background_discovery" });
+  const platforms = useWatch({ control: form.control, name: "enabled_platforms" });
 
   return (
     <form
       noValidate
       onSubmit={form.handleSubmit((values) =>
         update.mutate(values, {
-          onSuccess: () => toast.success("Content setup saved"),
+          onSuccess: () => toast.success("Audience & platforms saved"),
           onError: (e) => toast.error(errorMessage(e)),
         }),
       )}
@@ -179,7 +179,7 @@ function SetupForm({
                     id="target_markets"
                     value={field.value}
                     onChange={field.onChange}
-                    placeholder="Add a market"
+                    placeholder="Type a market, press Enter"
                     disabled={!canEdit}
                   />
                 )}
@@ -213,7 +213,7 @@ function SetupForm({
                     id="content_goals"
                     value={field.value}
                     onChange={field.onChange}
-                    placeholder="Add a goal"
+                    placeholder="Type a goal, press Enter"
                     disabled={!canEdit}
                   />
                 )}
@@ -251,6 +251,15 @@ function SetupForm({
                 />
               )}
             />
+            {platforms.length === 0 ? (
+              <p role="alert" className="text-sm text-warning">
+                Turn on at least one platform to create posts.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {platforms.length} platform{platforms.length === 1 ? "" : "s"} selected
+              </p>
+            )}
             <div className="grid gap-5 sm:grid-cols-2">
               <FormField id="default_language" label="Content language">
                 <Controller
@@ -262,21 +271,6 @@ function SetupForm({
                       value={field.value}
                       onChange={field.onChange}
                       options={LANGUAGE_OPTIONS}
-                      disabled={!canEdit}
-                    />
-                  )}
-                />
-              </FormField>
-              <FormField id="default_timezone" label="Scheduling timezone">
-                <Controller
-                  control={form.control}
-                  name="default_timezone"
-                  render={({ field }) => (
-                    <SimpleSelect
-                      id="default_timezone"
-                      value={field.value}
-                      onChange={field.onChange}
-                      options={timezoneOptions()}
                       disabled={!canEdit}
                     />
                   )}
@@ -296,7 +290,7 @@ function SetupForm({
                 href="/trends/sources"
                 className="underline underline-offset-4"
               >
-                Trends › Discovery Sources
+                Discovery Sources (under Trends)
               </Link>
               .
             </CardDescription>
@@ -315,7 +309,7 @@ function SetupForm({
                     id="tracked_keywords"
                     value={field.value}
                     onChange={field.onChange}
-                    placeholder="e.g. agentic AI"
+                    placeholder="e.g. agentic AI (press Enter to add)"
                     disabled={!canEdit}
                   />
                 )}
@@ -330,13 +324,18 @@ function SetupForm({
                 control={form.control}
                 name="background_discovery"
                 render={({ field }) => (
-                  <Switch
-                    id="background_discovery"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    aria-describedby="background_discovery-hint"
-                    disabled={!canEdit}
-                  />
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="background_discovery"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      aria-describedby="background_discovery-hint"
+                      disabled={!canEdit}
+                    />
+                    <span className="text-sm text-muted-foreground" aria-hidden>
+                      {field.value ? "On" : "Off"}
+                    </span>
+                  </div>
                 )}
               />
             </FormField>

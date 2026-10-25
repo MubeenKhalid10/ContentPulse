@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRightIcon, RadarIcon, TrendingUpIcon } from "lucide-react";
+import { ArrowRightIcon, RadarIcon, SlidersHorizontalIcon, TrendingUpIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -33,13 +33,14 @@ import {
   useAIStatus,
   useDiscover,
   useDiscoveryRuns,
+  useDiscoveryWindow,
   useMarkets,
   useTrendSources,
   useTrends,
 } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { timeOfDay, timeUntil } from "@/lib/format";
+import { formatDateTime, timeOfDay, timeUntil } from "@/lib/format";
 import type { RunStarted, TrendSourceInfo } from "@/types/api";
 import { sourceName } from "@/lib/trends";
 import { cn } from "@/lib/utils";
@@ -55,16 +56,16 @@ const RELEVANCE_FILTERS = [
 ];
 const SORTS = [
   { value: "score", label: "Best opportunity" },
-  { value: "recent", label: "Most recent" },
+  { value: "recent", label: "Latest activity" },
   { value: "mentions", label: "Most mentioned" },
-  { value: "new", label: "Newest trends" },
+  { value: "new", label: "First seen" },
 ] as const;
 
 export function TrendsExplorer() {
   const can = useCan();
   const canDiscover = can("trends.manage");
   const canReview = can("trends.manage") || can("topics.manage");
-  const [filters, setFilters] = usePersistedState<TrendFilters>("trends", {
+  const [saved, setFilters] = usePersistedState<TrendFilters>("trends", {
     status: "active",
     // Only trends tied to the organization's website by default.
     relevance: "relevant",
@@ -73,6 +74,9 @@ export function TrendsExplorer() {
     location: "",
     q: "",
   });
+  // The Rejected tab is gone: rejected trends are in All trends, with Restore.
+  const filters: TrendFilters =
+    saved.status === ("rejected" as string) ? { ...saved, status: "all" } : saved;
   const [limit, setLimit] = useState(PAGE);
   const trends = useTrends(filters, limit);
   const runs = useDiscoveryRuns();
@@ -106,6 +110,32 @@ export function TrendsExplorer() {
     })),
   ];
 
+  const [showFilters, setShowFilters] = useState(false);
+  // Only what differs from the default view counts as an active filter.
+  const activeFilters = [
+    ...(filters.relevance !== "relevant"
+      ? [
+          {
+            key: "relevance",
+            label: RELEVANCE_FILTERS.find((o) => o.value === (filters.relevance || "all"))?.label ?? "Relevance",
+            clear: () => update({ relevance: "relevant" }),
+          },
+        ]
+      : []),
+    ...(filters.source
+      ? [{ key: "source", label: sourceName(filters.source), clear: () => update({ source: "" }) }]
+      : []),
+    ...(filters.location
+      ? [
+          {
+            key: "location",
+            label: marketNames.get(filters.location) ?? (filters.location === "GLOBAL" ? "Global" : filters.location),
+            clear: () => update({ location: "" }),
+          },
+        ]
+      : []),
+  ];
+
   const update = (patch: Partial<TrendFilters>) => {
     setFilters((f) => ({ ...f, ...patch }));
     setLimit(PAGE);
@@ -124,6 +154,7 @@ export function TrendsExplorer() {
 
   const noRunsYet = runs.data && runs.data.length === 0;
   const enabledCount = settings.data?.enabled_sources.length ?? 0;
+  const showAnyRelevance = () => update({ relevance: "" });
 
   return (
     <>
@@ -140,28 +171,52 @@ export function TrendsExplorer() {
               <span className="sm:whitespace-nowrap">
                 {ai.data.engine === "ai"
                   ? "Relevance is checked by AI."
-                  : "Relevance is a keyword-based estimate (no AI model set up)."}
+                  : "Relevance is a basic keyword match. AI analysis isn't switched on for this workspace."}
               </span>
             )}
           </>
         }
         actions={
-          <>
-            <BackgroundDiscoveryToggle />
-            {canDiscover && (
-              <Button
-                disabled={running || discover.isPending || enabledCount === 0}
-                onClick={runDiscovery}
-              >
-                <RadarIcon />
-                {running ? "Discovering…" : "Discover New Trends now"}
-              </Button>
-            )}
-          </>
+          canDiscover && (
+            <Button
+              disabled={running || discover.isPending || enabledCount === 0}
+              title={
+                enabledCount === 0
+                  ? "Turn on at least one source in Discovery Sources first."
+                  : running
+                    ? "A check is already running."
+                    : undefined
+              }
+              onClick={runDiscovery}
+            >
+              <RadarIcon />
+              {running ? "Checking…" : "Check for new trends"}
+            </Button>
+          )
         }
       />
 
       <div className="grid min-w-0 grid-cols-1 gap-6">
+        {canDiscover && (enabledCount === 0 || running) && (
+          <p className="text-sm text-muted-foreground" role="status">
+            {enabledCount === 0 ? (
+              <>
+                &ldquo;Check for new trends&rdquo; is off because no sources are
+                turned on.{" "}
+                <Link href="/trends/sources" className="font-medium text-foreground underline underline-offset-2">
+                  Turn on a source in Discovery Sources
+                </Link>
+                .
+              </>
+            ) : (
+              "A check is already running. The button is back when it finishes."
+            )}
+          </p>
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <DiscoveryStatus />
+          <BackgroundDiscoveryToggle className="ml-auto" />
+        </div>
         {can("trends.export") && <TrendsExport />}
         {sources.data && <SourcesStrip sources={sources.data} />}
 
@@ -185,7 +240,7 @@ export function TrendsExplorer() {
                   disabled={discover.isPending}
                 >
                   <RadarIcon />
-                  Discover New Trends now
+                  Check for new trends
                 </Button>
               ) : (
                 <Link
@@ -199,62 +254,149 @@ export function TrendsExplorer() {
           </Card>
         ) : (
           <>
-            <FilterBar>
-              <Tabs
-                value={filters.status}
-                onValueChange={(v) =>
-                  update({ status: v as TrendFilters["status"] })
-                }
-                className="shrink-0"
-              >
-                <TabsList>
-                  <TabsTrigger value="active">Active</TabsTrigger>
-                  <TabsTrigger value="shortlisted">Shortlisted</TabsTrigger>
-                  <TabsTrigger value="rejected">Rejected</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <SearchInput
-                aria-label="Search trends"
-                placeholder="Search topics and keywords"
-                value={filters.q}
-                onChange={(q) => update({ q })}
-                className={FILTER_SEARCH}
-              />
-              <SimpleSelect
-                aria-label="Relevance"
-                value={filters.relevance || "all"}
-                onChange={(v) =>
-                  update({
-                    relevance: v === "all" ? "" : (v as RelevanceFilter),
-                  })
-                }
-                options={RELEVANCE_FILTERS}
-                className={FILTER_SELECT}
-              />
-              <SimpleSelect
-                aria-label="Source"
-                value={filters.source || "all"}
-                onChange={(v) => update({ source: v === "all" ? "" : v })}
-                options={sourceOptions}
-                className={FILTER_SELECT}
-              />
-              <SimpleSelect
-                aria-label="Location"
-                value={filters.location || "all"}
-                onChange={(v) => update({ location: v === "all" ? "" : v })}
-                options={locationOptions}
-                className={FILTER_SELECT}
-              />
-              <SimpleSelect
-                aria-label="Sort by"
-                value={filters.sort}
-                onChange={(v) => update({ sort: v })}
-                options={SORTS}
-                className={FILTER_SELECT}
-              />
-            </FilterBar>
+            <div className="grid gap-3">
+              <FilterBar>
+                <Tabs
+                  value={filters.status}
+                  onValueChange={(v) =>
+                    update({ status: v as TrendFilters["status"] })
+                  }
+                  className="shrink-0"
+                >
+                  <TabsList>
+                    <TabsTrigger value="all">All trends</TabsTrigger>
+                    <TabsTrigger value="active">To review</TabsTrigger>
+                    <TabsTrigger value="shortlisted">Shortlisted</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <SearchInput
+                  aria-label="Search trends"
+                  placeholder="Search trends"
+                  value={filters.q}
+                  onChange={(q) => update({ q })}
+                  className={FILTER_SEARCH}
+                />
+                <SimpleSelect
+                  aria-label="Sort by"
+                  value={filters.sort}
+                  onChange={(v) => update({ sort: v })}
+                  options={SORTS}
+                  className={FILTER_SELECT}
+                />
+                <Button
+                  variant="outline"
+                  aria-expanded={showFilters}
+                  aria-controls="trend-filters"
+                  aria-label={
+                    activeFilters.length > 0
+                      ? `Filters, ${activeFilters.length} active`
+                      : "Filters"
+                  }
+                  onClick={() => setShowFilters((v) => !v)}
+                >
+                  <SlidersHorizontalIcon />
+                  Filters
+                  {activeFilters.length > 0 && (
+                    <span className="ml-0.5 rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
+                      {activeFilters.length}
+                    </span>
+                  )}
+                </Button>
+              </FilterBar>
+              <p className="text-xs text-muted-foreground" id="trend-tabs-hint">
+                To review: trends you haven&apos;t decided on. Rejected trends
+                appear under All trends, where you can restore them.
+              </p>
+              {showFilters && (
+                <div
+                  id="trend-filters"
+                  className="grid gap-3 rounded-lg border bg-card p-3 sm:grid-cols-3"
+                >
+                  <FilterField id="trend-relevance" label="How well it fits you">
+                    <SimpleSelect
+                      id="trend-relevance"
+                      value={filters.relevance || "all"}
+                      onChange={(v) =>
+                        update({
+                          relevance: v === "all" ? "" : (v as RelevanceFilter),
+                        })
+                      }
+                      options={RELEVANCE_FILTERS}
+                    />
+                  </FilterField>
+                  <FilterField id="trend-source" label="Source">
+                    <SimpleSelect
+                      id="trend-source"
+                      value={filters.source || "all"}
+                      onChange={(v) => update({ source: v === "all" ? "" : v })}
+                      options={sourceOptions}
+                    />
+                  </FilterField>
+                  <FilterField id="trend-location" label="Location">
+                    <SimpleSelect
+                      id="trend-location"
+                      value={filters.location || "all"}
+                      onChange={(v) => update({ location: v === "all" ? "" : v })}
+                      options={locationOptions}
+                    />
+                  </FilterField>
+                </div>
+              )}
+              {(activeFilters.length > 0 || filters.relevance === "relevant") && (
+                <ul className="flex flex-wrap items-center gap-1.5" aria-label="Active filters">
+                  {filters.relevance === "relevant" && (
+                    <li>
+                      <span
+                        className="inline-flex h-6 items-center rounded-full bg-muted px-2.5 text-xs font-medium"
+                        title="Default view. Change it under Filters."
+                      >
+                        Relevant to us
+                      </span>
+                    </li>
+                  )}
+                  {activeFilters.map((f) => (
+                    <li key={f.key}>
+                      <button
+                        type="button"
+                        onClick={f.clear}
+                        aria-label={`Remove filter: ${f.label}`}
+                        className="inline-flex h-6 items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium hover:bg-muted/70"
+                      >
+                        {f.label}
+                        <XIcon className="size-3" aria-hidden />
+                      </button>
+                    </li>
+                  ))}
+                  {activeFilters.length > 0 && (
+                  <li>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() =>
+                        update({ relevance: "relevant", source: "", location: "" })
+                      }
+                    >
+                      Reset filters
+                    </Button>
+                  </li>
+                  )}
+                </ul>
+              )}
+            </div>
 
-            {trends.isPending ? (
+            {trends.isError ? (
+              <div
+                role="alert"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/40 p-4 text-sm"
+              >
+                <span className="text-destructive">
+                  Couldn&apos;t load trends. {errorMessage(trends.error)}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => trends.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            ) : trends.isPending ? (
               <div className="grid gap-3">
                 {Array.from({ length: 5 }, (_, i) => (
                   <Skeleton key={i} className="h-20 w-full rounded-xl" />
@@ -263,8 +405,9 @@ export function TrendsExplorer() {
             ) : trends.data?.items.length ? (
               <>
                 <p className="text-sm text-muted-foreground">
-                  {trends.data.total} trend{trends.data.total === 1 ? "" : "s"} seen in the last{" "}
-                  {TREND_WINDOW_DAYS} days. Older trends are hidden automatically.
+                  {trends.data.total} trend{trends.data.total === 1 ? "" : "s"} from the last{" "}
+                  {TREND_WINDOW_DAYS} days
+                  {filters.relevance === "relevant" && ", the ones that fit your business"}.
                 </p>
                 <ul
                   className={cn(
@@ -295,19 +438,28 @@ export function TrendsExplorer() {
                 )}
               </>
             ) : (
-              <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                {filters.q ||
-                filters.source ||
-                filters.location ||
-                filters.relevance
-                  ? "No trends match these filters."
-                  : filters.status === "active"
-                    ? running
-                      ? "Collecting… trends will appear here shortly."
-                      : `No active trends in the last ${TREND_WINDOW_DAYS} days.`
-                    : `No ${filters.status} trends in the last ${TREND_WINDOW_DAYS} days.`}
-                {filters.source && ` (${sourceName(filters.source)})`}
-              </p>
+              <div className="grid justify-items-center gap-3 rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                <p>
+                  {filters.q ||
+                  filters.source ||
+                  filters.location ||
+                  (filters.relevance && filters.relevance !== "relevant")
+                    ? `No trends match these filters${filters.source ? ` (${sourceName(filters.source)})` : ""}.`
+                    : filters.relevance === "relevant"
+                      ? "No trends match the “Relevant to us” filter."
+                      : filters.status === "shortlisted"
+                        ? "Nothing shortlisted yet. Shortlist a trend to plan posts for it."
+                        : running
+                          ? "Collecting… trends will appear here shortly."
+                          : `No trends in the last ${TREND_WINDOW_DAYS} days.`}
+                </p>
+                {filters.relevance === "relevant" &&
+                  !(filters.q || filters.source || filters.location) && (
+                    <Button variant="outline" size="sm" onClick={showAnyRelevance}>
+                      Show any relevance
+                    </Button>
+                  )}
+              </div>
             )}
           </>
         )}
@@ -375,6 +527,59 @@ function useRunCompletion(
       );
     }
   }, [runId, status, queryClient, orgId]);
+}
+
+const isFuture = (iso: string) => Date.parse(iso) > Date.now();
+
+/** Time of day for today, date and time otherwise. */
+function stamp(iso: string): string {
+  const d = new Date(iso);
+  return d.toDateString() === new Date().toDateString() ? timeOfDay(iso) : formatDateTime(iso);
+}
+
+/** When the stored trends were last refreshed and roughly when the next
+ * refresh is due. Reads the discovery window the page already loads; shows
+ * only the times the server returned. The next time is an estimate. */
+function DiscoveryStatus() {
+  const info = useDiscoveryWindow().data;
+  const last = info?.last_discovery_at;
+  if (!info || !last) return null;
+  const next = info.next_discovery_at;
+  const upcoming = !!next && isFuture(next);
+  return (
+    <p className="text-sm text-muted-foreground">
+      <span title={formatDateTime(last)}>Last updated {stamp(last)}</span>
+      {upcoming && next && (
+        <>
+          {" · "}
+          <span title={formatDateTime(next)}>
+            {info.background
+              ? `Next update about ${stamp(next)}`
+              : `You can check again after ${stamp(next)}`}
+          </span>
+        </>
+      )}
+    </p>
+  );
+}
+
+function FilterField({
+  id,
+  label,
+  children,
+}: {
+  id: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
 }
 
 /** Which sources are being watched, one click from managing them. */

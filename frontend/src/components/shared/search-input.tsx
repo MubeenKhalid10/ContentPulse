@@ -38,7 +38,7 @@ export function SearchInput({
           type="button"
           aria-label="Clear search"
           onClick={() => onChange("")}
-          className="absolute top-1/2 right-1.5 grid size-5 -translate-y-1/2 place-items-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="absolute top-1/2 right-0.5 grid size-8 -translate-y-1/2 place-items-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <XIcon className="size-3.5" />
         </button>

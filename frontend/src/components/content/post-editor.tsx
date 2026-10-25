@@ -1,16 +1,19 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SaveIcon, WandSparklesIcon } from "lucide-react";
+import { AlertTriangleIcon, SaveIcon, WandSparklesIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { TagInput } from "@/components/shared/tag-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useUpdatePost } from "@/hooks/use-content";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -80,6 +83,15 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
   const max = post.limits.max_length;
   const over = max != null && length > max;
   const locked = !canEdit || !post.editable;
+  const [discardOpen, setDiscardOpen] = useState(false);
+
+  // Warn before closing the tab with edits that were not saved.
+  useEffect(() => {
+    if (!isDirty || locked) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty, locked]);
 
   const onSubmit = form.handleSubmit((values) =>
     update.mutate(
@@ -106,7 +118,9 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
       {
         onSuccess: (saved) =>
           toast.success(
-            saved.current_version > post.current_version ? `Saved as version ${saved.current_version}` : "No changes to save",
+            saved.current_version > post.current_version
+              ? `Saved as version ${saved.current_version}`
+              : "Nothing changed, so no new version was created",
           ),
         onError: (e) => {
           if (e instanceof ApiError) {
@@ -128,9 +142,17 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
           <CardHeader>
             <CardTitle>{isBlog ? "Blog article" : `${PLATFORM_LABEL[post.platform]} post`}</CardTitle>
             <CardDescription>
-              {post.editable
-                ? "Edit freely: saving keeps the previous version in the history."
-                : "This post has moved on from drafting, so the copy is read-only."}
+              {!post.editable
+                ? post.status === "content_review"
+                  ? "The copy is with an admin for approval, so it's read-only. Withdraw it from review to edit."
+                  : post.status === "draft"
+                    ? "The copy can't be edited right now."
+                    : ["rejected", "archived"].includes(post.status)
+                      ? `This post is ${post.status}, so the copy is read-only.`
+                      : "The copy is approved, so it's read-only."
+                : !canEdit
+                  ? "You can read this copy but don't have permission to edit it."
+                  : "Edit freely: saving keeps the previous version in the history."}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5">
@@ -173,10 +195,12 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
                 />
               </FormField>
             )}
-            <p className={cn("text-xs tabular-nums", over ? "font-medium text-destructive" : "text-muted-foreground")} aria-live="polite">
+            <p className={cn("flex flex-wrap items-center gap-1.5 text-xs tabular-nums", over ? "font-medium text-destructive" : "text-muted-foreground")} aria-live="polite">
+              {over && <AlertTriangleIcon className="size-3.5" aria-hidden />}
               {isBlog && `${words.toLocaleString()} words · `}
               {length.toLocaleString()}
               {max != null && ` / ${max.toLocaleString()}`} characters
+              {over && max != null && ` · ${(length - max).toLocaleString()} characters over the ${PLATFORM_LABEL[post.platform]} limit`}
             </p>
           </CardContent>
         </Card>
@@ -191,11 +215,11 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
               <FormField id="post-seo-title" label="SEO title" hint="The article headline (H1)." error={errors.seo_title?.message}>
                 <Input {...fieldAria("post-seo-title", errors.seo_title?.message)} {...form.register("seo_title")} />
               </FormField>
-              <FormField id="post-meta-title" label="Meta title" error={errors.meta_title?.message}>
+              <FormField id="post-meta-title" label="Meta title" hint="The clickable title in search results. Keep it under 60 characters." error={errors.meta_title?.message}>
                 <Input {...fieldAria("post-meta-title", errors.meta_title?.message)} {...form.register("meta_title")} />
                 <Counter value={metaTitle.length} max={META_TITLE_MAX} />
               </FormField>
-              <FormField id="post-meta-description" label="Meta description" error={errors.meta_description?.message}>
+              <FormField id="post-meta-description" label="Meta description" hint="The short summary under the title in search results. Keep it under 160 characters." error={errors.meta_description?.message}>
                 <Textarea
                   {...fieldAria("post-meta-description", errors.meta_description?.message)}
                   rows={2}
@@ -204,7 +228,7 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
                 <Counter value={metaDescription.length} max={META_DESCRIPTION_MAX} />
               </FormField>
               <div className="grid gap-5 sm:grid-cols-2">
-                <FormField id="post-slug" label="Slug" error={errors.slug?.message}>
+                <FormField id="post-slug" label="Slug" hint="The last part of the article URL, e.g. my-article." error={errors.slug?.message}>
                   <div className="flex gap-2">
                     <Input {...fieldAria("post-slug", errors.slug?.message)} placeholder="article-url-slug" {...form.register("slug")} />
                     <Button
@@ -212,7 +236,7 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
                       variant="outline"
                       size="icon"
                       aria-label="Slug from SEO title"
-                      title="Slug from SEO title"
+                      title={seoTitle.trim() ? "Slug from SEO title" : "Add an SEO title first to generate a slug"}
                       disabled={!seoTitle.trim()}
                       onClick={() => form.setValue("slug", slugify(seoTitle), { shouldDirty: true, shouldValidate: true })}
                     >
@@ -220,7 +244,7 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
                     </Button>
                   </div>
                 </FormField>
-                <FormField id="post-keywords" label="Keywords" hint="Primary keyword first." error={errors.keywords?.message}>
+                <FormField id="post-keywords" label="Keywords" hint="Words people search for. Put the main keyword first." error={errors.keywords?.message}>
                   <Controller
                     control={form.control}
                     name="keywords"
@@ -244,19 +268,46 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
 
       {!locked && (
         <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 rounded-xl border bg-background/95 p-3 shadow-sm backdrop-blur">
-          <Input
-            aria-label="Change note"
-            placeholder="What changed? (optional)"
-            className="min-w-48 flex-1"
-            {...form.register("change_note")}
-          />
-          <Button type="button" variant="outline" disabled={!isDirty || update.isPending} onClick={() => form.reset()}>
+          <div className="flex min-w-48 flex-1 items-center gap-2">
+            <Label htmlFor="post-change-note" className="shrink-0">
+              Change note
+            </Label>
+            <Input
+              id="post-change-note"
+              placeholder="What changed? (optional)"
+              maxLength={300}
+              className="flex-1"
+              {...form.register("change_note")}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground" aria-live="polite">
+            {over && max != null ? (
+              <span className="inline-flex items-center gap-1 font-medium text-destructive">
+                <AlertTriangleIcon className="size-3.5" aria-hidden />
+                {(length - max).toLocaleString()} characters over the {PLATFORM_LABEL[post.platform]} limit
+              </span>
+            ) : isDirty ? (
+              <span className="font-medium text-foreground">Unsaved changes</span>
+            ) : (
+              "No changes to save"
+            )}
+          </span>
+          <Button type="button" variant="outline" disabled={!isDirty || update.isPending} onClick={() => setDiscardOpen(true)}>
             Discard
           </Button>
           <Button type="submit" disabled={!isDirty || update.isPending}>
             <SaveIcon />
             {update.isPending ? "Saving…" : "Save version"}
           </Button>
+          <ConfirmDialog
+            open={discardOpen}
+            onOpenChange={setDiscardOpen}
+            title="Discard your changes?"
+            description="Your edits since the last saved version are lost. The saved version is not affected."
+            confirmLabel="Discard changes"
+            destructive
+            onConfirm={() => form.reset()}
+          />
         </div>
       )}
     </form>
@@ -267,6 +318,7 @@ function Counter({ value, max }: { value: number; max: number }) {
   return (
     <p className={cn("text-xs tabular-nums", value > max ? "font-medium text-destructive" : "text-muted-foreground")}>
       {value} / {max} characters
+      {value > max && ` · ${value - max} over the recommended length`}
     </p>
   );
 }

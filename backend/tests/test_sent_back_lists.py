@@ -6,7 +6,7 @@ from app.models.approval import ApprovalRequest
 from app.models.design import DesignBrief
 from app.models.enums import ApprovalStatus, DesignBriefStatus, Platform, PostStatus
 from app.models.post import Post
-from tests.conftest import create_org, register
+from tests.conftest import add_member, create_org, register
 
 
 async def test_changes_requested_are_listed_apart(client, db):
@@ -78,9 +78,11 @@ async def test_changes_requested_are_listed_apart(client, db):
     assert counts["todo"] == 1 and counts["changes"] == 1
 
 
-async def test_only_a_post_with_nothing_written_can_be_deleted(client, db):
+async def test_only_a_post_with_nothing_written_can_be_deleted_by_a_writer(client, db):
     admin = await register(client, "admin@acme.example.com")
-    org_id = uuid.UUID((await create_org(admin))["id"])
+    org = await create_org(admin)
+    org_id = uuid.UUID(org["id"])
+    creator = await add_member(client, admin, org["id"], "cy@acme.example.com", "creator")
     failed = Post(
         organization_id=org_id, platform=Platform.X, title="Failed", status=PostStatus.DRAFT
     )
@@ -94,10 +96,14 @@ async def test_only_a_post_with_nothing_written_can_be_deleted(client, db):
     db.add_all([failed, written])
     await db.commit()
 
-    assert (await admin.delete(f"/api/v1/content/{written.id}")).status_code == 409
-    assert (await admin.delete(f"/api/v1/content/{failed.id}")).status_code == 204
+    # A writer can only delete a post whose writing failed ...
+    assert (await creator.delete(f"/api/v1/content/{written.id}")).status_code == 409
+    assert (await creator.delete(f"/api/v1/content/{failed.id}")).status_code == 204
     assert (await admin.get(f"/api/v1/content/{failed.id}")).status_code == 404
     assert (await admin.get(f"/api/v1/content/{written.id}")).status_code == 200
+    # ... an admin can delete any post.
+    assert (await admin.delete(f"/api/v1/content/{written.id}")).status_code == 204
+    assert (await admin.get(f"/api/v1/content/{written.id}")).status_code == 404
 
 
 async def test_design_approval_status_lists_submitted_and_approved(client, db):

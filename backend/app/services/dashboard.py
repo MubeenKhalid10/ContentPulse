@@ -21,6 +21,7 @@ from app.models.trend import Trend
 from app.models.user import User
 from app.schemas.dashboard import (
     ActivityItem,
+    Attention,
     DashboardOverview,
     DashboardSummary,
     Metric,
@@ -29,6 +30,39 @@ from app.schemas.dashboard import (
     TrendingTopic,
 )
 from app.services.trends import visibility
+
+
+async def attention(db: AsyncSession, organization_id: uuid.UUID) -> Attention:
+    """The counts behind the sidebar badges, without the rest of the summary."""
+    to_review = await db.scalar(
+        select(func.count()).where(
+            TopicCandidate.organization_id == organization_id,
+            TopicCandidate.status.in_([TopicStatus.NEW, TopicStatus.REVIEWED]),
+        )
+    )
+    post_counts: dict[PostStatus, int] = dict(
+        (
+            await db.execute(
+                select(Post.status, func.count())
+                .where(Post.organization_id == organization_id)
+                .group_by(Post.status)
+            )
+        ).all()
+    )
+    return Attention(
+        to_review=to_review or 0,
+        design=sum(
+            post_counts.get(s, 0)
+            for s in (
+                PostStatus.DESIGN_PENDING,
+                PostStatus.DESIGN_IN_PROGRESS,
+                PostStatus.DESIGN_UPLOADED,
+                PostStatus.CHANGES_REQUESTED,
+            )
+        ),
+        approvals=post_counts.get(PostStatus.PENDING_APPROVAL, 0)
+        + post_counts.get(PostStatus.CONTENT_REVIEW, 0),
+    )
 
 
 async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSummary:

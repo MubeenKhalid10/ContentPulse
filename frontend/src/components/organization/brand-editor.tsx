@@ -115,13 +115,29 @@ function BrandForm({
         control={form.control}
         name={name}
         render={({ field }) => (
-          <TagInput
-            id={name}
-            value={field.value}
-            onChange={field.onChange}
-            placeholder={placeholder}
-            disabled={!canEdit}
-          />
+          <>
+            <TagInput
+              id={name}
+              value={field.value}
+              onChange={field.onChange}
+              placeholder={placeholder}
+              disabled={!canEdit}
+            />
+            {name === "brand_colors" && field.value.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5" aria-label="Color preview">
+                {field.value.map((c) => (
+                  <li
+                    key={c}
+                    title={c}
+                    className="size-5 rounded ring-1 ring-foreground/15"
+                    style={{ background: c }}
+                  >
+                    <span className="sr-only">{c}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       />
     </FormField>
@@ -226,7 +242,7 @@ function BrandForm({
             {list(
               "brand_colors",
               "Brand colors",
-              "Hex codes or names.",
+              "Hex codes like #0F766E, or color names. Press Enter after each.",
               "e.g. #0F766E",
             )}
             {text(

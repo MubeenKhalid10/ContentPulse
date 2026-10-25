@@ -27,3 +27,9 @@ export const STRATEGY_SOURCE_LABEL = {
   rules: "Drafted from your playbook",
   manual: "Written by your team",
 } as const;
+
+/** A shortlisted topic lives on its trend's page (plans and posts are there). */
+export function topicHref(topic: { id: string; trend_id: string | null }, plan = false) {
+  const base = topic.trend_id ? `/trends/${topic.trend_id}` : `/topics/${topic.id}`;
+  return plan ? `${base}?plan=1` : base;
+}

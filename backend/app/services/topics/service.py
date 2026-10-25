@@ -156,8 +156,14 @@ async def list_strategies(
 
 
 async def topic_detail(
-    db: AsyncSession, organization_id: uuid.UUID, topic_id: uuid.UUID
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    topic_id: uuid.UUID,
+    *,
+    include_trend: bool = True,
 ) -> TopicDetail:
+    """`include_trend=False` skips the full trend (mentions, analysis): the trend
+    page already has it and only needs the topic's plans."""
     topic = await get_topic(db, organization_id, topic_id)
     trend = await db.get(Trend, topic.trend_id) if topic.trend_id else None
     strategies = await list_strategies(db, organization_id, topic.id)
@@ -171,7 +177,9 @@ async def topic_detail(
             "opportunity_score": trend.opportunity_score if trend else None,
             "strategy_count": len(live),
             "approved_strategy_count": sum(s.status == StrategyStatus.APPROVED for s in live),
-            "trend": await trend_detail(db, organization_id, trend.id) if trend else None,
+            "trend": await trend_detail(db, organization_id, trend.id)
+            if trend and include_trend
+            else None,
             "strategies": strategies,
         }
     )

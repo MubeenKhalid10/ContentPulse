@@ -14,10 +14,13 @@ export function CheckEmail({
   title,
   email,
   body,
+  onUseDifferentEmail,
 }: {
   title: string;
   email: string;
   body: string;
+  /** When given, offers a way back to the form to enter another address. */
+  onUseDifferentEmail?: () => void;
 }) {
   return (
     <Card>
@@ -41,6 +44,18 @@ export function CheckEmail({
           go back to sign in
         </Link>
         .
+        {onUseDifferentEmail && (
+          <p className="mt-3">
+            Wrong address?{" "}
+            <button
+              type="button"
+              onClick={onUseDifferentEmail}
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Use a different email
+            </button>
+          </p>
+        )}
       </CardContent>
     </Card>
   );

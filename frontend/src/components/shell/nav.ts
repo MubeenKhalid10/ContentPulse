@@ -80,7 +80,7 @@ export const NAV: NavSection[] = [
       { href: "/organization/profile", label: "Profile", icon: Building2Icon },
       {
         href: "/organization/content-setup",
-        label: "Content setup",
+        label: "Audience & platforms",
         icon: TargetIcon,
       },
       {

@@ -5,12 +5,8 @@ import {
   ChevronsUpDownIcon,
   CircleHelpIcon,
   LogOutIcon,
-  MonitorIcon,
-  MoonIcon,
   PlusIcon,
-  SunIcon,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -39,12 +35,6 @@ function initials(value: string) {
   );
 }
 
-const THEMES = [
-  { value: "light", label: "Light", icon: SunIcon },
-  { value: "dark", label: "Dark", icon: MoonIcon },
-  { value: "system", label: "Match my device", icon: MonitorIcon },
-] as const;
-
 export function UserMenu({ me }: { me: Me }) {
   const router = useRouter();
   const logout = useLogout();
@@ -52,11 +42,10 @@ export function UserMenu({ me }: { me: Me }) {
   const active = me.memberships.find(
     (m) => m.organization_id === me.organization_id,
   );
-  const { theme, setTheme } = useTheme();
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-md p-2 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-ring/50 data-popup-open:bg-sidebar-accent">
+      <DropdownMenuTrigger aria-label="Account and organizations" className="flex w-full items-center gap-2.5 rounded-md p-2 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-ring/50 data-popup-open:bg-sidebar-accent">
         <Avatar className="size-8">
           <AvatarFallback className="bg-muted text-xs font-medium text-foreground">
             {initials(me.name ?? me.email)}
@@ -70,7 +59,7 @@ export function UserMenu({ me }: { me: Me }) {
             {me.name ?? me.email} · {me.role && roleLabel(me.role)}
           </span>
         </span>
-        <ChevronsUpDownIcon className="size-4 text-muted-foreground" />
+        <ChevronsUpDownIcon className="size-4 text-muted-foreground" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-60">
         <DropdownMenuGroup>
@@ -85,7 +74,12 @@ export function UserMenu({ me }: { me: Me }) {
                 }
               }}
             >
-              <span className="flex-1 truncate">{m.organization_name}</span>
+              <span className="grid min-w-0 flex-1 leading-tight">
+                <span className="truncate">{m.organization_name}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {roleLabel(m.role)}
+                </span>
+              </span>
               {m.organization_id === me.organization_id && (
                 <CheckIcon className="text-primary" />
               )}
@@ -93,19 +87,8 @@ export function UserMenu({ me }: { me: Me }) {
           ))}
           <DropdownMenuItem onClick={() => router.push("/onboarding")}>
             <PlusIcon />
-            New organization
+            Create new organization…
           </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Theme</DropdownMenuLabel>
-          {THEMES.map(({ value, label, icon: Icon }) => (
-            <DropdownMenuItem key={value} onClick={() => setTheme(value)}>
-              <Icon />
-              <span className="flex-1">{label}</span>
-              {theme === value && <CheckIcon className="text-primary" />}
-            </DropdownMenuItem>
-          ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
@@ -119,9 +102,15 @@ export function UserMenu({ me }: { me: Me }) {
             <CircleHelpIcon />
             Show the welcome tour
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => logout.mutate()}>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem
+            disabled={logout.isPending}
+            onClick={() => logout.mutate()}
+          >
             <LogOutIcon />
-            Sign out
+            {logout.isPending ? "Signing out…" : "Sign out"}
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

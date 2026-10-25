@@ -87,7 +87,7 @@ export function useRegister() {
         password: body.password,
         options: {
           data: { full_name: body.full_name },
-          emailRedirectTo: authRedirect("/auth/callback", "/onboarding"),
+          emailRedirectTo: authRedirect("/auth/confirmed", "/onboarding"),
           captchaToken: body.captchaToken,
         },
       });

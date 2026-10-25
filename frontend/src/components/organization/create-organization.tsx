@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -10,7 +11,7 @@ import { z } from "zod";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -73,14 +74,22 @@ export function CreateOrganization() {
 
   return (
     <div className="grid gap-4">
+      {me.data?.organization_id && (
+        <Link
+          href="/dashboard"
+          className={buttonVariants({ variant: "ghost", className: "justify-self-start" })}
+        >
+          Back to dashboard
+        </Link>
+      )}
       {existing.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Already have an organization?
+              Continue with an organization you already have
             </CardTitle>
             <CardDescription>
-              Go back to one of yours instead of creating a new one.
+              Skip this form and open one of yours instead.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2">
@@ -138,7 +147,7 @@ export function CreateOrganization() {
             <FormField
               id="website_url"
               label="Website"
-              hint="We'll build your knowledge base from it."
+              hint="Optional. You can add it to your knowledge base next, so posts only use facts it backs up."
               error={errors.website_url?.message}
             >
               <Input
@@ -151,6 +160,7 @@ export function CreateOrganization() {
             <FormField
               id="industry"
               label="Industry"
+              hint="Optional."
               error={errors.industry?.message}
             >
               <Input
@@ -162,7 +172,7 @@ export function CreateOrganization() {
             <FormField
               id="description"
               label="What you do"
-              hint="One or two sentences. Used to judge which trends fit you."
+              hint="Optional. One or two sentences, used to judge which trends fit you."
               error={errors.description?.message}
             >
               <Textarea
@@ -193,16 +203,20 @@ export function CreateOrganization() {
             <Button type="submit" size="lg" disabled={create.isPending}>
               {create.isPending ? "Creating…" : "Create organization"}
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => logout.mutate()}
-            >
-              Sign out
-            </Button>
           </form>
         </CardContent>
       </Card>
+      <p className="text-center text-sm text-muted-foreground">
+        {me.data?.email ? `Signed in as ${me.data.email}. Not you? ` : "Not you? "}
+        <button
+          type="button"
+          disabled={logout.isPending}
+          onClick={() => logout.mutate()}
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          {logout.isPending ? "Signing out…" : "Sign out"}
+        </button>
+      </p>
     </div>
   );
 }

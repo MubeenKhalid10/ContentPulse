@@ -23,7 +23,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useDeleteOrganization } from "@/hooks/use-organization";
+import { Input } from "@/components/ui/input";
+import { useDeleteOrganization, useOrganization } from "@/hooks/use-organization";
 import { api, errorMessage, setActiveOrgId } from "@/lib/api";
 import { meQueryKey } from "@/lib/auth";
 import type { Me } from "@/types/api";
@@ -33,15 +34,20 @@ export function DangerZone() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const remove = useDeleteOrganization();
+  const org = useOrganization();
   const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const orgName = org.data?.name ?? "";
+  const confirmed = !!orgName && typed.trim() === orgName;
 
   return (
-    <Card className="border-destructive/30">
+    <Card className="border-destructive/50">
       <CardHeader>
-        <CardTitle>Danger zone</CardTitle>
+        <CardTitle className="text-destructive">Danger zone</CardTitle>
         <CardDescription>
           Permanently remove this workspace and all of its trends, content,
-          members, and settings.
+          members, and settings. Only admins can do this, and it cannot be
+          undone.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -55,23 +61,44 @@ export function DangerZone() {
       </CardContent>
       <AlertDialog
         open={open}
-        onOpenChange={(next) => !remove.isPending && setOpen(next)}
+        onOpenChange={(next) => {
+          if (remove.isPending) return;
+          setOpen(next);
+          if (!next) setTyped("");
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this workspace?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes the workspace, its trends, gathered data,
-              content, files, and team access. This action cannot be undone.
+              content, files, and team access. Every member loses access
+              immediately. This action cannot be undone, so download anything
+              you need first.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {orgName && (
+            <div className="grid gap-1.5">
+              <label htmlFor="confirm-delete-name" className="text-sm">
+                Type <span className="font-semibold">{orgName}</span> to
+                confirm.
+              </label>
+              <Input
+                id="confirm-delete-name"
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                autoComplete="off"
+                disabled={remove.isPending}
+              />
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={remove.isPending}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              disabled={remove.isPending}
+              disabled={remove.isPending || !confirmed}
               onClick={() =>
                 remove.mutate(undefined, {
                   onSuccess: async () => {

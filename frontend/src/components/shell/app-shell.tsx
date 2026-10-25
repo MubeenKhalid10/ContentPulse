@@ -63,6 +63,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-svh">
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:ring-3 focus:ring-ring/50"
+      >
+        Skip to main content
+      </a>
       <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col border-r bg-sidebar lg:flex">
         <div className="flex h-14 items-center px-4">
           <Logo />
@@ -93,6 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <SheetHeader className="h-14 justify-center px-4">
                 <SheetTitle>
+                  <span className="sr-only">Navigation</span>
                   <Logo />
                 </SheetTitle>
               </SheetHeader>
@@ -107,7 +114,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Sheet>
           <Logo />
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-10">
+        <main id="main" tabIndex={-1} className="mx-auto outline-none w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-10">
           {children}
         </main>
         <WelcomeTour me={me.data} />
@@ -118,7 +125,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function ShellSkeleton() {
   return (
-    <div className="flex min-h-svh" aria-busy="true" aria-label="Loading">
+    <div className="flex min-h-svh" aria-busy="true" role="status">
+      <span className="sr-only">Loading your workspace…</span>
       <div className="hidden w-64 border-r bg-sidebar p-4 lg:block">
         <Skeleton className="h-7 w-36" />
         <div className="mt-8 grid gap-2">
@@ -128,6 +136,9 @@ function ShellSkeleton() {
         </div>
       </div>
       <div className="flex-1 p-10">
+        <p className="mb-4 text-sm text-muted-foreground" aria-hidden>
+          Loading your workspace…
+        </p>
         <Skeleton className="h-8 w-56" />
         <Skeleton className="mt-3 h-4 w-96 max-w-full" />
       </div>
@@ -136,6 +147,8 @@ function ShellSkeleton() {
 }
 
 function ShellError({ onRetry }: { onRetry: () => void }) {
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
   return (
     <div className="grid min-h-svh place-items-center p-6 text-center">
       <div className="grid max-w-sm gap-3">
@@ -143,11 +156,22 @@ function ShellError({ onRetry }: { onRetry: () => void }) {
           We couldn&apos;t load your workspace
         </h1>
         <p className="text-sm text-muted-foreground">
-          The server didn&apos;t respond. Check that the API is running, then
-          try again.
+          ContentPulse didn&apos;t respond. Check your connection and try
+          again. If it keeps happening, sign out and back in.
         </p>
         <Button onClick={onRetry} className="justify-self-center">
           Try again
+        </Button>
+        <Button
+          variant="ghost"
+          disabled={leaving}
+          onClick={() => {
+            setLeaving(true);
+            signOutEverywhere().finally(() => router.replace("/login"));
+          }}
+          className="justify-self-center"
+        >
+          {leaving ? "Signing out…" : "Sign out"}
         </Button>
       </div>
     </div>

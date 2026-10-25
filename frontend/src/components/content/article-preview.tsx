@@ -87,10 +87,11 @@ export function ArticlePreview({
   const headline = seo?.seo_title || title;
   return (
     <article className="grid gap-3 rounded-lg bg-muted/50 p-4 text-sm leading-relaxed">
-      {headline && <h1 className="text-xl font-semibold text-balance">{headline}</h1>}
+      {headline && <h2 className="text-xl font-semibold text-balance">{headline}</h2>}
       {intro && <Markdown text={intro} />}
       {body && <Markdown text={body} />}
       {cta && <p className="border-l-2 border-primary pl-3 font-medium">{cta}</p>}
+      <p className="text-xs text-muted-foreground">Simplified preview: fonts and spacing differ on your site.</p>
     </article>
   );
 }

@@ -95,6 +95,12 @@ def _storage(provider: str) -> Storage:
         return S3Storage(settings)
     from app.storage.local import LocalStorage
 
+    if settings.app_env == "production":
+        logger.warning(
+            "Design files are stored on this server's own disk, which is erased on restart or "
+            "redeploy: uploaded and AI-generated images will disappear. Set S3_BUCKET (and the "
+            "S3 credentials) to keep them. See docs/deploy-vercel.md."
+        )
     return LocalStorage(settings)
 
 

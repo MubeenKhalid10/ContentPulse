@@ -2,6 +2,10 @@ import { cn } from "@/lib/utils";
 import { SIGNALS, scoreTone } from "@/lib/trends";
 import type { Signal, SignalKey } from "@/types/api";
 
+/** One definition of the score, used wherever it is explained. */
+export const SCORE_HELP =
+  "Opportunity score: how strongly this trend is rising across your sources.";
+
 const SIZES = {
   sm: "size-10 text-sm",
   md: "size-12 text-base",
@@ -37,13 +41,21 @@ export function Score({
       aria-label={
         value == null ? "Not scored yet" : `Opportunity score ${value} of 100`
       }
-      title="Opportunity score, out of 100"
+      title={
+        value == null
+          ? "Not scored yet"
+          : `${SCORE_HELP} ${value} out of 100.`
+      }
     >
       <span
         aria-hidden
-        className={cn("font-semibold tabular-nums", scoreTone(score))}
+        className={cn(
+          "font-semibold tabular-nums",
+          value == null && "text-xs font-medium",
+          scoreTone(score),
+        )}
       >
-        {value ?? "—"}
+        {value ?? "N/A"}
       </span>
     </div>
   );

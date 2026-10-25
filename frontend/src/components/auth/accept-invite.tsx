@@ -12,7 +12,7 @@ import { CheckEmail } from "@/components/auth/check-email";
 import { AuthCaptcha } from "@/components/auth/captcha";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PasswordInput } from "@/components/auth/password-input";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError, errorMessage, setActiveOrgId } from "@/lib/api";
@@ -60,22 +61,23 @@ export function AcceptInvite({ token }: { token: string }) {
     const expired =
       preview.error instanceof ApiError && preview.error.status === 410;
     return (
-      <Alert variant="destructive">
-        <AlertTitle>
-          {expired ? "This invitation has expired" : "Invitation not found"}
-        </AlertTitle>
-        <AlertDescription>
-          {expired
-            ? "Ask an admin of the organization to send you a new invitation."
-            : "The link may have already been used. Ask an admin to invite you again, or "}
-          {!expired && (
-            <Link href="/login" className="underline underline-offset-4">
-              sign in
-            </Link>
-          )}
-          {!expired && "."}
-        </AlertDescription>
-      </Alert>
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={1} className="text-xl">
+            {expired ? "This invitation has expired" : "Invitation not found"}
+          </CardTitle>
+          <CardDescription role="alert">
+            {expired
+              ? "Ask an admin of the organization to send you a new invitation."
+              : "The link may have already been used. Ask an admin to invite you again, or sign in if you already joined."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link href="/login" className={buttonVariants({ size: "lg" })}>
+            Go to sign in
+          </Link>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -144,8 +146,21 @@ function SupabaseAcceptForm({
   });
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: SESSION_EMAIL_KEY });
+  const [signingOut, setSigningOut] = useState(false);
 
-  if (session.isPending) return null;
+  if (session.isPending)
+    return (
+      <Card aria-busy="true">
+        <CardHeader>
+          <Skeleton className="h-6 w-2/3" />
+          <Skeleton className="h-4 w-full" />
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </CardContent>
+      </Card>
+    );
   const signedInAs = session.data ?? null;
   if (signedInAs === invite.email.toLowerCase())
     return <ConfirmJoin token={token} invite={invite} />;
@@ -159,23 +174,31 @@ function SupabaseAcceptForm({
     );
 
   const signOut = async () => {
-    const supabase = await getSupabase();
-    await supabase?.auth.signOut();
-    await refresh();
+    setSigningOut(true);
+    try {
+      const supabase = await getSupabase();
+      await supabase?.auth.signOut();
+      await refresh();
+    } finally {
+      setSigningOut(false);
+    }
   };
   return (
     <Alert>
       <AlertTitle>You&apos;re signed in as {signedInAs}</AlertTitle>
       <AlertDescription>
         This invitation to {invite.organization_name} is for {invite.email}.{" "}
-        <button
+        Sign out to continue with that address.
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={signOut}
-          className="font-medium text-foreground underline underline-offset-4"
+          disabled={signingOut}
+          className="mt-3 block"
         >
-          Sign out
-        </button>{" "}
-        to continue with that address.
+          {signingOut ? "Signing out…" : "Sign out"}
+        </Button>
       </AlertDescription>
     </Alert>
   );
@@ -189,23 +212,38 @@ function ConfirmJoin({
   invite: InvitePreview;
 }) {
   const accept = useAcceptInvite(token);
-  const form = useForm<z.infer<typeof nameOnlySchema>>({
-    resolver: zodResolver(nameOnlySchema),
-    defaultValues: { full_name: "" },
+  // Signed in as the invitee but with no ContentPulse account yet (for example
+  // they came through a sign-in link): they have no password to come back with,
+  // so ask for one now. Someone who signed up here already chose theirs.
+  const needsPassword = !invite.has_account;
+  const schema = needsPassword ? acceptInviteSchema(false) : nameOnlySchema;
+  const form = useForm<{ full_name: string; password?: string }>({
+    resolver: zodResolver(schema),
+    defaultValues: { full_name: "", password: "" },
   });
   const { errors } = form.formState;
+  const join = useMutation({
+    mutationFn: async (values: { full_name: string; password?: string }) => {
+      if (needsPassword && values.password) {
+        const supabase = await getSupabase();
+        const { error } = await supabase!.auth.updateUser({ password: values.password });
+        if (error) throw new Error(supabaseErrorMessage(error.message));
+      }
+      return accept.mutateAsync({ full_name: values.full_name });
+    },
+  });
   return (
     <Card>
       <InviteHeader invite={invite} />
       <CardContent>
         <form
-          onSubmit={form.handleSubmit((v) => accept.mutate(v))}
+          onSubmit={form.handleSubmit((v) => join.mutate(v))}
           noValidate
           className="grid gap-4"
         >
-          {accept.isError && (
+          {join.isError && (
             <Alert variant="destructive">
-              <AlertDescription>{errorMessage(accept.error)}</AlertDescription>
+              <AlertDescription>{errorMessage(join.error)}</AlertDescription>
             </Alert>
           )}
           <FormField
@@ -220,8 +258,22 @@ function ConfirmJoin({
               {...form.register("full_name")}
             />
           </FormField>
-          <Button type="submit" size="lg" disabled={accept.isPending}>
-            {accept.isPending ? "Joining…" : `Join ${invite.organization_name}`}
+          {needsPassword && (
+            <FormField
+              id="password"
+              label="Choose a password"
+              hint="At least 10 characters. You will use it to sign in next time."
+              error={errors.password?.message}
+            >
+              <PasswordInput
+                {...fieldAria("password", errors.password?.message)}
+                autoComplete="new-password"
+                {...form.register("password")}
+              />
+            </FormField>
+          )}
+          <Button type="submit" size="lg" disabled={join.isPending}>
+            {join.isPending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>
         </form>
       </CardContent>
@@ -241,6 +293,8 @@ function SupabaseIdentityForm({
   const [hasAccount, setHasAccount] = useState(invite.has_account);
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // A CAPTCHA token works once: show a fresh challenge after each attempt.
+  const [captchaKey, setCaptchaKey] = useState(0);
   const accept = useAcceptInvite(token);
   const schema = acceptInviteSchema(hasAccount);
   const form = useForm<z.infer<typeof schema>>({
@@ -269,7 +323,7 @@ function SupabaseIdentityForm({
         options: {
           data: { full_name },
           emailRedirectTo: authRedirect(
-            "/auth/callback",
+            "/auth/confirmed",
             `/invite/${encodeURIComponent(token)}`,
           ),
           captchaToken,
@@ -277,6 +331,10 @@ function SupabaseIdentityForm({
       });
       if (error) throw new Error(supabaseErrorMessage(error.message));
       return { full_name, signedIn: Boolean(data.session) };
+    },
+    onSettled: () => {
+      setCaptchaToken(null);
+      setCaptchaKey((k) => k + 1);
     },
     onSuccess: ({ full_name, signedIn }) => {
       if (!signedIn) return setConfirmationSent(true);
@@ -326,21 +384,30 @@ function SupabaseIdentityForm({
           <FormField
             id="password"
             label={hasAccount ? "Your password" : "Choose a password"}
+            action={
+              hasAccount ? (
+                <Link
+                  href="/forgot-password"
+                  className="inline-flex min-h-6 items-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              ) : undefined
+            }
             hint={
               hasAccount
                 ? `Sign in as ${invite.email}.`
-                : "At least 10 characters."
+                : "At least 10 characters. You will use it to sign in next time."
             }
             error={errors.password?.message}
           >
-            <Input
+            <PasswordInput
               {...fieldAria("password", errors.password?.message)}
-              type="password"
               autoComplete={hasAccount ? "current-password" : "new-password"}
               {...form.register("password")}
             />
           </FormField>
-          <AuthCaptcha onToken={setCaptchaToken} />
+          <AuthCaptcha key={captchaKey} onToken={setCaptchaToken} />
           <Button type="submit" size="lg" disabled={pending}>
             {pending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>
@@ -355,7 +422,7 @@ function SupabaseIdentityForm({
               }}
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
-              {hasAccount ? "Create a password instead" : "Sign in instead"}
+              {hasAccount ? "Create an account instead" : "Sign in instead"}
             </button>
           </p>
         </form>
@@ -414,13 +481,12 @@ function AcceptForm({
             hint={
               invite.has_account
                 ? "You already have an account. Confirm it's you."
-                : "At least 10 characters."
+                : "At least 10 characters. You will use it to sign in next time."
             }
             error={errors.password?.message}
           >
-            <Input
+            <PasswordInput
               {...fieldAria("password", errors.password?.message)}
-              type="password"
               autoComplete={
                 invite.has_account ? "current-password" : "new-password"
               }

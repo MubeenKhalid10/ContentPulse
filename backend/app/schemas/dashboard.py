@@ -21,6 +21,14 @@ class TopTrend(BaseModel):
     mention_count: int
 
 
+class Attention(BaseModel):
+    """What is waiting for someone, for the badges in the sidebar (cheap: two queries)."""
+
+    to_review: int
+    design: int
+    approvals: int
+
+
 class DashboardSummary(BaseModel):
     trends_today: int
     relevant_trends: int

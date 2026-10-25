@@ -51,12 +51,14 @@ export function DeleteButton({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
+              className="bg-destructive text-white hover:bg-destructive/90 dark:bg-destructive dark:hover:bg-destructive/90"
               onClick={() => {
                 setOpen(false);
                 onConfirm();
               }}
             >
-              Delete
+              {label}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

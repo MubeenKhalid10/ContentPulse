@@ -15,6 +15,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import Link from "next/link";
+import { toast } from "sonner";
+
+import { PasswordInput } from "@/components/auth/password-input";
 import { Input } from "@/components/ui/input";
 import { errorMessage } from "@/lib/api";
 import { getSupabase, supabaseErrorMessage } from "@/lib/supabase";
@@ -39,7 +43,10 @@ export default function ResetPasswordPage() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw new Error(supabaseErrorMessage(error.message));
     },
-    onSuccess: () => router.replace("/dashboard"),
+    onSuccess: () => {
+      toast.success("Password updated.");
+      router.replace("/dashboard");
+    },
   });
 
   return (
@@ -60,7 +67,15 @@ export default function ResetPasswordPage() {
         >
           {update.isError && (
             <Alert variant="destructive">
-              <AlertDescription>{errorMessage(update.error)}</AlertDescription>
+              <AlertDescription>
+                {errorMessage(update.error)}{" "}
+                <Link
+                  href="/forgot-password"
+                  className="font-medium underline underline-offset-4"
+                >
+                  Get a new link
+                </Link>
+              </AlertDescription>
             </Alert>
           )}
           <FormField
@@ -69,9 +84,8 @@ export default function ResetPasswordPage() {
             hint="At least 10 characters."
             error={errors.password?.message}
           >
-            <Input
+            <PasswordInput
               {...fieldAria("password", errors.password?.message)}
-              type="password"
               autoComplete="new-password"
               autoFocus
               {...form.register("password")}
@@ -82,9 +96,8 @@ export default function ResetPasswordPage() {
             label="Confirm password"
             error={errors.confirm?.message}
           >
-            <Input
+            <PasswordInput
               {...fieldAria("confirm", errors.confirm?.message)}
-              type="password"
               autoComplete="new-password"
               {...form.register("confirm")}
             />

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangleIcon,
   DownloadIcon,
   FileTextIcon,
   FilmIcon,
@@ -15,10 +16,11 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
+import { SignedImage } from "@/components/shared/signed-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useGenerateImage, useSubmitTask, useUploadCreatives, useUseCreativeVersion } from "@/hooks/use-design";
 import { errorMessage } from "@/lib/api";
 import { formatBytes } from "@/lib/design";
@@ -26,7 +28,22 @@ import { cleanNote, formatDateTime, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CreativeFile, DesignTaskDetail } from "@/types/api";
 
-const ACCEPT_LABEL = "PNG, JPG, WebP, GIF, SVG, PDF, MP4, MOV or WebM";
+const MAX_FILES = 20;
+const TYPE_NAMES: Record<string, string> = {
+  "image/png": "PNG",
+  "image/jpeg": "JPG",
+  "image/webp": "WebP",
+  "image/gif": "GIF",
+  "image/svg+xml": "SVG",
+  "application/pdf": "PDF",
+  "video/mp4": "MP4",
+  "video/quicktime": "MOV",
+  "video/webm": "WebM",
+};
+const acceptLabel = (types: string[]) => {
+  const names = types.map((t) => TYPE_NAMES[t] ?? t.split("/")[1]?.toUpperCase() ?? t);
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}` : names.join("");
+};
 
 /** Add the design and send the post for approval in one step. "Upload only"
  * keeps a work-in-progress version without submitting it. */
@@ -38,23 +55,29 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
   const [note, setNote] = useState("");
   const [progress, setProgress] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const accept = acceptLabel(task.allowed_types);
   const maxBytes = task.max_upload_mb * 1_000_000;
   const nextVersion = (task.creatives[0]?.version ?? 0) + 1;
 
   const add = (incoming: FileList | null) => {
     if (!incoming) return;
     const accepted: File[] = [];
+    const problems: string[] = [];
     for (const file of Array.from(incoming)) {
-      if (!task.allowed_types.includes(file.type)) toast.error(`“${file.name}” isn't a supported file (${ACCEPT_LABEL}).`);
-      else if (file.size > maxBytes) toast.error(`“${file.name}” is larger than ${task.max_upload_mb} MB.`);
+      if (!task.allowed_types.includes(file.type)) problems.push(`“${file.name}” isn't a supported file type`);
+      else if (file.size > maxBytes) problems.push(`“${file.name}” is larger than ${task.max_upload_mb} MB`);
       else accepted.push(file);
     }
-    setFiles((current) => [...current, ...accepted].slice(0, 20));
+    const combined = [...files, ...accepted];
+    if (combined.length > MAX_FILES) problems.push(`Only ${MAX_FILES} files can go in one upload. ${combined.length - MAX_FILES} not added`);
+    if (problems.length) toast.error(`${problems.join(". ")}.`, { description: `Allowed: ${accept}.` });
+    setFiles(combined.slice(0, MAX_FILES));
   };
 
   // The latest design can be (re)submitted as is, e.g. after copy-only changes.
   const canResubmitCurrent =
-    task.creatives.length > 0 && (task.post.status === "design_uploaded" || task.post.status === "changes_requested");
+    task.creatives.length > 0 &&
+    ["design_pending", "design_in_progress", "design_uploaded", "changes_requested"].includes(task.post.status);
   const busy = upload.isPending || submit.isPending;
 
   const send = async (andSubmit: boolean) => {
@@ -109,7 +132,7 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
           <UploadCloudIcon className="size-6 text-muted-foreground" />
           <span className="font-medium">Drop files here or choose files</span>
           <span className="text-xs text-muted-foreground">
-            {ACCEPT_LABEL}, up to {task.max_upload_mb} MB each
+            {accept}, up to {task.max_upload_mb} MB each, {MAX_FILES} files at a time
           </span>
         </button>
         <input
@@ -118,7 +141,7 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
           multiple
           accept={task.allowed_types.join(",")}
           className="sr-only"
-          aria-label="Choose creative files"
+          aria-label="Choose design files"
           onChange={(e) => {
             add(e.target.files);
             e.target.value = "";
@@ -147,10 +170,19 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
         <Input aria-label="Note for this version" placeholder="Note for reviewers (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
         {upload.isPending && (
           <div className="grid gap-1" role="status">
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-1.5 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-label="Upload progress"
+              aria-valuenow={Math.round(progress * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
               <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${Math.round(progress * 100)}%` }} />
             </div>
-            <span className="text-xs text-muted-foreground">Uploading… {Math.round(progress * 100)}%</span>
+            <span className="text-xs text-muted-foreground">
+              {progress >= 1 ? "Finishing up…" : `Uploading… ${Math.round(progress * 100)}%`}
+            </span>
           </div>
         )}
         {canSubmit ? (
@@ -161,12 +193,14 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
                 ? "Uploading…"
                 : submit.isPending
                   ? "Submitting…"
-                  : files.length
-                    ? "Upload & submit for approval"
-                    : canResubmitCurrent
-                      ? "Submit current design for approval"
-                      : "Choose files to submit"}
+                  : "Submit for approval"}
             </Button>
+            {!files.length && !canResubmitCurrent && (
+              <p className="text-xs text-muted-foreground">Add at least one file to submit.</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Submitting locks the design until an admin approves it or asks for changes.
+            </p>
             {files.length > 0 && (
               <Button variant="ghost" size="sm" onClick={() => send(false)} disabled={busy}>
                 <UploadCloudIcon />
@@ -180,11 +214,31 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
             {upload.isPending ? "Uploading…" : "Upload"}
           </Button>
         )}
-        {task.storage === "local" && (
-          <p className="text-xs text-muted-foreground">Stored on the ContentPulse server. Configure S3 for production storage.</p>
-        )}
+        {task.storage === "local" && <LocalStorageNote />}
       </CardContent>
     </Card>
+  );
+}
+
+/** Local storage keeps files on the server's own disk: fine on a laptop, lost on a hosted server. */
+function LocalStorageNote() {
+  const hosted =
+    typeof window !== "undefined" && !["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+  if (!hosted)
+    return (
+      <p className="text-xs text-muted-foreground">
+        Files are stored on this ContentPulse server.
+      </p>
+    );
+  return (
+    <Alert>
+      <AlertTriangleIcon />
+      <AlertTitle>Files may disappear</AlertTitle>
+      <AlertDescription>
+        This site keeps design files on the server&apos;s own disk, which is erased whenever it restarts or
+        redeploys. Ask your admin to set up permanent file storage so images stay available.
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -234,7 +288,7 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Creative versions</CardTitle>
+        <CardTitle>Design versions</CardTitle>
         <CardDescription>
           Every upload is kept. The newest version is the one reviewers see
           {canUse && task.creatives.length > 1 ? ": use an older one to make it the newest again." : "."}
@@ -258,7 +312,6 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
                 variant="outline"
                 className="w-fit"
                 disabled={use.isPending}
-                aria-label={`Use version ${v.version}`}
                 onClick={() =>
                   use.mutate(
                     { id: task.id, version: v.version },
@@ -273,7 +326,7 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
                 }
               >
                 <RotateCcwIcon />
-                Use this version
+                Use version {v.version} as newest
               </Button>
             )}
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -293,24 +346,28 @@ export function CreativeTile({ file }: { file: CreativeFile }) {
   const isVideo = file.file_type.startsWith("video/");
   return (
     <li className="grid gap-1 overflow-hidden rounded-lg border">
-      <a href={file.url} target="_blank" rel="noopener noreferrer" className="block aspect-square bg-muted/50">
+      <a
+        href={file.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Open ${file.file_name} in a new tab`}
+        className="block aspect-square bg-muted/50"
+      >
         {isImage ? (
-          // Signed, short-lived URLs from S3 or the API: next/image can't optimize them.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={file.url} alt={file.file_name} className="size-full object-contain" loading="lazy" />
+          <SignedImage src={file.url} alt={file.file_name} className="size-full object-contain" />
         ) : (
           <span className="grid size-full place-items-center text-muted-foreground">
             {isVideo ? <FilmIcon className="size-8" /> : <FileTextIcon className="size-8" />}
           </span>
         )}
       </a>
-      <div className="flex items-center gap-1 px-2 pb-1.5">
+      <div className="flex items-center gap-1 pl-2">
         <span className="min-w-0 flex-1 truncate text-xs" title={file.file_name}>
           {file.file_name}
         </span>
         <a
           href={file.download_url}
-          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="grid size-8 shrink-0 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label={`Download ${file.file_name}`}
           title={`Download (${formatBytes(file.file_size)})`}
         >

@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PasswordInput } from "@/components/auth/password-input";
 import { Input } from "@/components/ui/input";
 import { errorMessage } from "@/lib/api";
 import { useAuthConfig, useLogin } from "@/lib/auth";
@@ -28,8 +29,11 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const login = useLogin();
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // A CAPTCHA token works once: show a fresh challenge after a failed attempt.
+  const [captchaKey, setCaptchaKey] = useState(0);
   // Supabase sends its own reset emails; local mode needs SMTP on the server.
-  const canReset = useAuthConfig().data?.password_reset === true;
+  const authConfig = useAuthConfig();
+  const canReset = authConfig.data?.password_reset === true;
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -38,6 +42,10 @@ export function LoginForm() {
 
   const onSubmit = form.handleSubmit((values) =>
     login.mutate({ ...values, captchaToken: captchaToken ?? undefined }, {
+      onError: () => {
+        setCaptchaToken(null);
+        setCaptchaKey((k) => k + 1);
+      },
       onSuccess: ({ user }) => {
         router.replace(
           user.organization_id
@@ -82,21 +90,25 @@ export function LoginForm() {
               canReset ? (
                 <Link
                   href="/forgot-password"
-                  className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  className="inline-flex min-h-8 items-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                 >
                   Forgot password?
                 </Link>
               ) : undefined
             }
+            hint={
+              authConfig.data && !canReset
+                ? "Password reset by email is not set up for this workspace."
+                : undefined
+            }
           >
-            <Input
+            <PasswordInput
               {...fieldAria("password", errors.password?.message)}
-              type="password"
               autoComplete="current-password"
               {...form.register("password")}
             />
           </FormField>
-          <AuthCaptcha onToken={setCaptchaToken} />
+          <AuthCaptcha key={captchaKey} onToken={setCaptchaToken} />
           <Button type="submit" size="lg" disabled={login.isPending}>
             {login.isPending ? "Signing in…" : "Sign in"}
           </Button>

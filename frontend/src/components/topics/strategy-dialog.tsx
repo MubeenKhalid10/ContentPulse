@@ -196,6 +196,12 @@ function StrategyForm({
   const update = useUpdateStrategy();
   const [source, setSource] = useState<"ai" | "rules" | "manual">(editing?.source ?? "manual");
   const [notice, setNotice] = useState<string | null>(null);
+  // Multi-platform save is several requests. What already went through is kept
+  // here so a retry after a failure doesn't create the same plans or posts twice.
+  const [progress] = useState(() => ({
+    plans: {} as Partial<Record<Platform, Strategy>>,
+    written: new Set<string>(),
+  }));
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: toValues(
@@ -292,22 +298,34 @@ function StrategyForm({
       },
     );
 
-  // "Save & write post": save the plan, then write the post from it right away.
+  // "Write post": save the plan, then write the post from it right away.
   const submitWith = (write: boolean) => form.handleSubmit(async (values) => {
     if (multi) {
+      const saved: Strategy[] = [];
+      const all = { ...drafts, [platform]: values };
+      let failed: Platform | null = null;
       try {
-        const saved: Strategy[] = [];
-        const all = { ...drafts, [platform]: values };
         for (const p of selected) {
-          const defaultType = rules.data?.find((r) => r.platform === p)?.post_types[0] ?? "Post";
-          const draft = all[p];
-          const v: Values = draft
-            ? { ...draft, platform: p, post_type: draft.post_type === AUTO_POST_TYPE ? defaultType : draft.post_type }
-            : { ...values, platform: p, post_type: defaultType, objective: "" };
-          saved.push(await create.mutateAsync({ topicId: topic.id, source, ...toBody(v) }));
+          failed = p;
+          let plan = progress.plans[p];
+          if (!plan) {
+            const defaultType = rules.data?.find((r) => r.platform === p)?.post_types[0] ?? "Post";
+            const draft = all[p];
+            const v: Values = draft
+              ? { ...draft, platform: p, post_type: draft.post_type === AUTO_POST_TYPE ? defaultType : draft.post_type }
+              : { ...values, platform: p, post_type: defaultType, objective: "" };
+            plan = await create.mutateAsync({ topicId: topic.id, source, ...toBody(v) });
+            progress.plans[p] = plan;
+          }
+          saved.push(plan);
         }
         if (write && canGenerate) {
-          for (const strategy of saved) await generate.mutateAsync(strategy.id);
+          for (const strategy of saved) {
+            failed = strategy.platform;
+            if (progress.written.has(strategy.id)) continue;
+            await generate.mutateAsync(strategy.id);
+            progress.written.add(strategy.id);
+          }
           toast.success(`Writing ${saved.length} posts`);
           onClose();
           router.push("/content");
@@ -316,7 +334,16 @@ function StrategyForm({
         toast.success(`${saved.length} plans saved`);
         onClose();
       } catch (e) {
-        toast.error(errorMessage(e));
+        const plans = Object.keys(progress.plans).length;
+        const posts = progress.written.size;
+        toast.error(
+          `${failed ? `${PLATFORM_LABEL[failed]} failed: ` : ""}${errorMessage(e)}`,
+          {
+            description: plans
+              ? `${plans} of ${selected.length} plans saved${posts ? `, ${posts} ${posts === 1 ? "post" : "posts"} started` : ""}. Try again to finish the rest; saved items won't be repeated.`
+              : undefined,
+          },
+        );
       }
       return;
     }
@@ -365,12 +392,12 @@ function StrategyForm({
             <legend className="mb-1 text-sm font-medium">Platforms</legend>
             <div className="flex flex-wrap gap-x-5 gap-y-2">
               <label className="flex items-center gap-2 text-sm font-medium">
-                <input type="checkbox" className="size-4" checked={allSelected} onChange={toggleAll} />
+                <input type="checkbox" className="size-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" checked={allSelected} onChange={toggleAll} />
                 All platforms
               </label>
               {platforms.map((p) => (
                 <label key={p} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" className="size-4" checked={selected.includes(p)} onChange={() => toggle(p)} />
+                  <input type="checkbox" className="size-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" checked={selected.includes(p)} onChange={() => toggle(p)} />
                   {PLATFORM_LABEL[p]}
                 </label>
               ))}
@@ -403,9 +430,12 @@ function StrategyForm({
           {suggest.isPending
             ? "Drafting…"
             : ai.data?.engine === "ai"
-              ? "Draft with AI"
-              : "Draft from playbook"}
+              ? "Draft Plan with AI"
+              : "Draft Plan from playbook"}
         </Button>
+        <p className="basis-full text-xs text-muted-foreground">
+          Drafting replaces what you&apos;ve entered below.
+        </p>
       </div>
 
       {notEnabled.length > 0 && (
@@ -413,7 +443,7 @@ function StrategyForm({
           {notEnabled.map((p) => PLATFORM_LABEL[p]).join(", ")} {notEnabled.length === 1 ? "isn't" : "aren't"} enabled
           for your organization.{" "}
           <Link href="/organization/content-setup#platforms" className="underline underline-offset-4">
-            Turn on platforms in Content setup
+            Turn on platforms in Audience & platforms
           </Link>
           .
         </p>
@@ -437,14 +467,13 @@ function StrategyForm({
         </p>
       )}
       {hasDrafts && (
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Platform drafts">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Platform drafts">
           {selected.map((p) => (
             <Button
               key={p}
               type="button"
               size="sm"
-              role="tab"
-              aria-selected={p === platform}
+              aria-pressed={p === platform}
               variant={p === platform ? "default" : "outline"}
               onClick={() => p !== platform && viewDraft(p)}
             >
@@ -454,7 +483,7 @@ function StrategyForm({
         </div>
       )}
       {!multi && <div className="grid gap-4 sm:grid-cols-2">
-        <FormField id="strategy-post-type" label="Post type" error={errors.post_type?.message}>
+        <FormField id="strategy-post-type" label="Post type (required)" error={errors.post_type?.message}>
           <Controller
             control={form.control}
             name="post_type"
@@ -488,7 +517,7 @@ function StrategyForm({
         </FormField>
       </div>}
 
-      <FormField id="strategy-angle" label="Post idea" hint="The main point or story this post tells." error={errors.content_angle?.message}>
+      <FormField id="strategy-angle" label="Post idea (required)" hint="The main point or story this post tells." error={errors.content_angle?.message}>
         <Textarea {...fieldAria("strategy-angle", errors.content_angle?.message)} rows={3} {...form.register("content_angle")} />
       </FormField>
       <FormField id="strategy-audience" label="Target audience" error={errors.target_audience?.message}>
@@ -531,10 +560,10 @@ function StrategyForm({
             <Input {...fieldAria("strategy-seo-title", errors.seo_title?.message)} {...form.register("seo_title")} />
           </FormField>
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField id="strategy-keyword" label="Primary keyword" error={errors.primary_keyword?.message}>
+            <FormField id="strategy-keyword" label="Primary keyword" hint="The main phrase people search for." error={errors.primary_keyword?.message}>
               <Input {...fieldAria("strategy-keyword", errors.primary_keyword?.message)} {...form.register("primary_keyword")} />
             </FormField>
-            <FormField id="strategy-intent" label="Search intent">
+            <FormField id="strategy-intent" label="Search intent" hint="What the reader wants when they search it.">
               <Controller
                 control={form.control}
                 name="search_intent"
@@ -563,7 +592,7 @@ function StrategyForm({
             <Textarea {...fieldAria("strategy-outline", errors.outline?.message)} rows={5} {...form.register("outline")} />
           </FormField>
           <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
-            <FormField id="strategy-words" label="Target words" error={errors.target_word_count?.message}>
+            <FormField id="strategy-words" label="Target words" hint="Typically 800 to 2,500." error={errors.target_word_count?.message}>
               <Input
                 {...fieldAria("strategy-words", errors.target_word_count?.message)}
                 inputMode="numeric"
@@ -592,16 +621,16 @@ function StrategyForm({
         {canGenerate && !hasPost ? (
           <>
             <Button type="button" variant="outline" disabled={saving} onClick={submitWith(false)}>
-              {editing ? "Save changes" : multi ? "Save plans" : "Save plan"}
+              {editing ? "Save changes" : multi ? "Save Plan Drafts" : "Save Plan Draft"}
             </Button>
             <Button type="submit" disabled={saving}>
               <SparklesIcon />
-              {generate.isPending ? "Starting…" : saving ? "Saving…" : multi ? `Save & write ${selected.length} posts` : isBlog ? "Save & write article" : "Save & write post"}
+              {generate.isPending ? "Starting…" : saving ? "Saving…" : multi ? `Write ${selected.length} posts` : isBlog ? "Write article" : "Write post"}
             </Button>
           </>
         ) : (
           <Button type="submit" disabled={saving}>
-            {saving ? "Saving…" : editing ? "Save changes" : "Save plan"}
+            {saving ? "Saving…" : editing ? "Save changes" : "Save Plan Draft"}
           </Button>
         )}
       </DialogFooter>

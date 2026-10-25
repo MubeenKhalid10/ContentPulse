@@ -2,14 +2,15 @@
 
 import {
   AlertTriangleIcon,
-  CheckCircle2Icon,
   CopyPlusIcon,
   EllipsisIcon,
+  EyeIcon,
   LoaderCircleIcon,
+  LockIcon,
   PaletteIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
   SendIcon,
-  Trash2Icon,
   Undo2Icon,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,10 +22,12 @@ import { POST_STATUS_TONE } from "@/lib/tones";
 import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { ReviewBanner } from "@/components/approvals/review-banner";
+import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { PostEditor } from "@/components/content/post-editor";
 import { SharePostButton } from "@/components/content/share-post-button";
+import { DeleteButton } from "@/components/shared/delete-button";
+import { PostProgress } from "@/components/shared/post-progress";
 import {
-  ChecksPanel,
   PreviewPanel,
   VariantsPanel,
 } from "@/components/content/studio-panels";
@@ -45,6 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useResubmitPost } from "@/hooks/use-approvals";
 import { type PostAction, useCreateVariant, useDeletePost, usePost, usePostAction, useRegenerate } from "@/hooks/use-content";
@@ -69,7 +73,15 @@ export function ContentStudio({ id }: { id: string }) {
       <>
         {back}
         <Alert variant="destructive">
-          <AlertDescription>{notFound ? "This post doesn't exist or isn't in your organization." : errorMessage(post.error)}</AlertDescription>
+          <AlertDescription className="grid gap-2">
+            <span>{notFound ? "This post doesn't exist or isn't in your organization." : errorMessage(post.error)}</span>
+            {!notFound && (
+              <Button size="sm" variant="outline" className="w-fit" onClick={() => post.refetch()}>
+                <RefreshCwIcon />
+                Retry
+              </Button>
+            )}
+          </AlertDescription>
         </Alert>
       </>
     );
@@ -130,7 +142,10 @@ export function ContentStudio({ id }: { id: string }) {
         />
       </div>
 
+      <PostProgress status={p.status} />
+
       <GenerationBanner post={p} canGenerate={canGenerate} generating={generating} />
+      <LockedNotice post={p} />
       <ReviewBanner review={p.review}>
         {p.status === "changes_requested" && canEdit && <ResubmitControl postId={p.id} />}
       </ReviewBanner>
@@ -142,7 +157,6 @@ export function ContentStudio({ id }: { id: string }) {
             <PostEditor key={`${p.id}:${p.current_version}`} post={p} canEdit={canEdit && !generating} />
           </div>
           <div className="grid content-start gap-6">
-            <ChecksPanel post={p} />
             <PreviewPanel post={p} />
             <VariantsPanel post={p} />
           </div>
@@ -159,35 +173,99 @@ export function ContentStudio({ id }: { id: string }) {
   );
 }
 
+// Statuses after the copy was approved, where it's locked unless reopened.
+const APPROVED_COPY = [
+  "design_pending",
+  "design_in_progress",
+  "design_uploaded",
+  "pending_approval",
+  "changes_requested",
+  "approved",
+  "final",
+];
+
+/** Approved copy is read-only until an admin requests changes to it. */
+function LockedNotice({ post }: { post: PostDetail }) {
+  const fromHere = useFromHere();
+  const canReview = useCan()("approval.manage");
+  if (!post.editable && post.status === "content_review") {
+    return (
+      <Alert className="mb-6">
+        <LockIcon />
+        <AlertTitle>With an admin for approval</AlertTitle>
+        <AlertDescription>
+          The copy is locked while an admin reviews it. To change it, withdraw it from review (the ⋯ More actions
+          menu at the top) and send it again when you are done.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  if (post.editable || !APPROVED_COPY.includes(post.status)) return null;
+  const reopenHref = post.review?.status === "approved" ? `/approvals/${post.review.request_id}` : null;
+  return (
+    <Alert className="mb-6">
+      <LockIcon />
+      <AlertTitle>Approved copy is locked</AlertTitle>
+      <AlertDescription className="grid gap-2">
+        <span>
+          {post.status === "changes_requested"
+            ? "The admin asked for design changes only, so the copy stays as approved."
+            : canReview
+              ? "Request changes to let the creator edit it again."
+              : "An admin can request changes to reopen it."}
+        </span>
+        {canReview && reopenHref && (
+          <Link href={fromHere(reopenHref)} className={buttonVariants({ size: "sm", variant: "outline" }) + " w-fit"}>
+            <RotateCcwIcon />
+            Request changes
+          </Link>
+        )}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 function ResubmitControl({ postId }: { postId: string }) {
   const resubmit = useResubmitPost();
   const [note, setNote] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
   return (
     <form
       className="flex flex-wrap items-center gap-2"
       onSubmit={(e) => {
         e.preventDefault();
-        resubmit.mutate(
-          { id: postId, note: note.trim() },
-          { onSuccess: () => toast.success("Resubmitted for approval"), onError: (err) => toast.error(errorMessage(err)) },
-        );
+        setConfirmOpen(true);
       }}
     >
-      <input
+      <Input
         aria-label="Note for the reviewer"
         placeholder="What did you change? (optional)"
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        className="h-8 min-w-48 flex-1 rounded-lg border border-input bg-background px-2.5 text-sm"
+        className="min-w-48 flex-1 bg-background"
       />
       <Button type="submit" size="sm" disabled={resubmit.isPending}>
         <SendIcon />
-        Resubmit for approval
+        {resubmit.isPending ? "Resubmitting…" : "Resubmit for approval"}
       </Button>
       <span className="w-full text-xs text-muted-foreground">
-        Fixed the copy? Save it, then resubmit with the current design. Need a new design? Use “Update design &
-        resubmit” at the top.
+        Save your edits first: unsaved changes are not sent. Fixed the copy? Resubmit with the current design. Need
+        a new design? Use “Update design” at the top.
       </span>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Resubmit for approval?"
+        description="The admin is notified and will review your saved copy with the current design again. Unsaved edits are not included."
+        confirmLabel="Resubmit"
+        pending={resubmit.isPending}
+        onConfirm={() =>
+          resubmit.mutate(
+            { id: postId, note: note.trim() },
+            { onSuccess: () => toast.success("Resubmitted for approval"), onError: (err) => toast.error(errorMessage(err)) },
+          )
+        }
+      />
     </form>
   );
 }
@@ -208,7 +286,7 @@ function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail;
         </AlertTitle>
         <AlertDescription>
           {g.engine === "ai"
-            ? "Using your plan, brand rules, playbook and knowledge base. This usually takes under a minute."
+            ? "Using your plan, brand rules, playbook and knowledge base. This page updates by itself when the draft is ready."
             : "Building a template draft from your plan (AI writing isn't switched on)."}
         </AlertDescription>
       </Alert>
@@ -238,11 +316,12 @@ function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail;
             )}
             {/* Nothing written yet: the post can go, without touching the others. */}
             {canEdit && !post.current && post.status === "draft" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={regenerate.isPending || remove.isPending}
-                onClick={() =>
+              <DeleteButton
+                label="Delete post"
+                title="Delete this failed post?"
+                description="Nothing was written, so only this empty post is removed. Your plan and other posts are not affected. This can't be undone."
+                pending={regenerate.isPending || remove.isPending}
+                onConfirm={() =>
                   remove.mutate(post.id, {
                     onSuccess: () => {
                       toast.success("Failed post deleted");
@@ -251,10 +330,7 @@ function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail;
                     onError: (e) => toast.error(errorMessage(e)),
                   })
                 }
-              >
-                <Trash2Icon />
-                Delete post
-              </Button>
+              />
             )}
           </div>
         </AlertDescription>
@@ -299,9 +375,12 @@ function StudioActions({
   const fromHere = useFromHere();
   const router = useRouter();
   const canReview = useCan()("approval.manage");
+  const isAdmin = useCan()("organization.write");
+  const removePost = useDeletePost();
   const action = usePostAction();
   const variant = useCreateVariant();
   const [regenOpen, setRegenOpen] = useState(false);
+  const [confirm, setConfirm] = useState<"submit" | "back" | null>(null);
   const onError = (e: unknown) => toast.error(errorMessage(e));
   const run = (kind: PostAction) =>
     action.mutate({ id: post.id, action: kind }, { onSuccess: () => toast.success(ACTION_COPY[kind]), onError });
@@ -309,8 +388,11 @@ function StudioActions({
   const hasCopy = post.current_version > 0;
   const s = post.status;
   const canVariant = canGenerate && post.editable && !!post.content_strategy_id;
-  // A post waiting for a decision can't be archived; withdraw nothing mid-review.
-  const canBackToDraft = canEdit && (s === "design_pending" || s === "content_review");
+  // Withdrawing from review is the writer's call; taking a post back from
+  // design reopens approved copy, so only an admin can.
+  const canBackToDraft =
+    (canEdit && s === "content_review") ||
+    (canReview && ["design_pending", "design_in_progress", "design_uploaded"].includes(s));
   const hasMore = canVariant || canBackToDraft;
 
   return (
@@ -334,21 +416,24 @@ function StudioActions({
         </Button>
       )}
       {canEdit && s === "draft" && (
-        <Button size="sm" disabled={busy || !hasCopy} onClick={() => run("submit-for-review")}>
+        <Button size="sm" disabled={busy || !hasCopy} onClick={() => setConfirm("submit")}>
           <SendIcon />
           Submit for approval
         </Button>
       )}
+      {canEdit && s === "draft" && !hasCopy && (
+        <span className="w-full text-right text-xs text-muted-foreground">Write the copy first to submit it for approval.</span>
+      )}
       {s === "content_review" && canReview && post.review && (
         <Link href={fromHere(`/approvals/${post.review.request_id}`)} className={buttonVariants({ size: "sm" })}>
-          <CheckCircle2Icon />
-          Review &amp; approve
+          <EyeIcon />
+          Review
         </Link>
       )}
       {DESIGN_STEP.includes(s) && post.design_task && (
         <Link href={fromHere(`/design/${post.design_task.id}`)} className={buttonVariants({ size: "sm" })}>
           <PaletteIcon />
-          {s === "changes_requested" ? "Update design & resubmit" : "Add design & submit"}
+          {s === "changes_requested" ? "Update design" : s === "design_pending" ? "Add design" : "Continue design"}
         </Link>
       )}
       {hasMore && (
@@ -378,14 +463,53 @@ function StudioActions({
               </DropdownMenuItem>
             )}
             {canBackToDraft && (
-              <DropdownMenuItem onClick={() => run("back-to-draft")}>
+              <DropdownMenuItem onClick={() => setConfirm("back")}>
                 <Undo2Icon />
-                {s === "content_review" ? "Withdraw from review" : "Take back from design"}
+                {s === "content_review" ? "Withdraw from review" : "Reopen copy"}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+      {isAdmin && <span className="mx-1 hidden h-5 w-px bg-border sm:block" aria-hidden />}
+      {isAdmin && (
+        <DeleteButton
+          title={`Delete “${post.title ?? "this post"}”?`}
+          description="This permanently deletes the post and everything attached to it: every version of the copy, its design task and files, and its approvals. The plan it came from is kept. This can't be undone."
+          pending={removePost.isPending || generating}
+          onConfirm={() =>
+            removePost.mutate(post.id, {
+              onSuccess: () => {
+                toast.success("Post deleted");
+                router.push("/content");
+              },
+              onError,
+            })
+          }
+        />
+      )}
+      <ConfirmDialog
+        open={confirm === "submit"}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        title="Submit for approval?"
+        description="An admin will review this copy. While it is in review the copy is locked; you can withdraw it from review if you need to edit."
+        confirmLabel="Submit"
+        pending={action.isPending}
+        onConfirm={() => run("submit-for-review")}
+      />
+      <ConfirmDialog
+        open={confirm === "back"}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        title={s === "content_review" ? "Withdraw from review?" : "Reopen the copy?"}
+        description={
+          s === "content_review"
+            ? "The admin's review is cancelled and the post goes back to draft so you can edit it. Submit it again when you are done."
+            : "The approved copy becomes editable again and the post goes back to draft. It will need content approval again."
+        }
+        confirmLabel={s === "content_review" ? "Withdraw" : "Reopen copy"}
+        pending={action.isPending}
+        onConfirm={() => run("back-to-draft")}
+      />
       <RegenerateDialog post={post} open={regenOpen} onClose={() => setRegenOpen(false)} />
     </div>
   );
@@ -395,12 +519,19 @@ function RegenerateDialog({ post, open, onClose }: { post: PostDetail; open: boo
   const regenerate = useRegenerate();
   const [instructions, setInstructions] = useState("");
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next || regenerate.isPending) return;
+        setInstructions("");
+        onClose();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Rewrite with AI</DialogTitle>
           <DialogDescription>
-            Writes a new version from the same plan. The current version stays in the history.
+            Writes a new version from the same plan. The current version stays in the history. Edits you have not saved in the editor will be lost.
           </DialogDescription>
         </DialogHeader>
         <label htmlFor="regen-instructions" className="grid gap-1.5 text-sm font-medium">
@@ -415,7 +546,14 @@ function RegenerateDialog({ post, open, onClose }: { post: PostDetail; open: boo
           />
         </label>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button
+            variant="outline"
+            disabled={regenerate.isPending}
+            onClick={() => {
+              setInstructions("");
+              onClose();
+            }}
+          >
             Cancel
           </Button>
           <Button
@@ -426,6 +564,7 @@ function RegenerateDialog({ post, open, onClose }: { post: PostDetail; open: boo
                 {
                   onSuccess: () => {
                     setInstructions("");
+                    toast.success("Rewriting your post…");
                     onClose();
                   },
                   onError: (e) => toast.error(errorMessage(e)),
@@ -434,7 +573,7 @@ function RegenerateDialog({ post, open, onClose }: { post: PostDetail; open: boo
             }
           >
             <RefreshCwIcon />
-            Rewrite
+            {regenerate.isPending ? "Starting…" : "Rewrite"}
           </Button>
         </DialogFooter>
       </DialogContent>

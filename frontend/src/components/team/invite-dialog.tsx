@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -70,11 +71,11 @@ function InviteFlow({
       onSubmit={form.handleSubmit((values) => invite.mutate(values, { onSuccess: setResult }))}
     >
       <DialogHeader>
-        <DialogTitle>{initial ? "New invite link" : "Invite a teammate"}</DialogTitle>
+        <DialogTitle>{initial ? "Replace invite link" : "Invite a teammate"}</DialogTitle>
         <DialogDescription>
           {initial
             ? "This replaces their previous link, which stops working."
-            : "You'll get a link to send them. It works once and expires in 3 days."}
+            : "You'll get a link to send them. It can be used once and expires in 3 days."}
         </DialogDescription>
       </DialogHeader>
       {invite.isError && (
@@ -105,7 +106,7 @@ function InviteFlow({
           Cancel
         </Button>
         <Button type="submit" disabled={invite.isPending}>
-          {invite.isPending ? "Inviting…" : "Send invite"}
+          {invite.isPending ? "Creating…" : initial ? "Create new link" : "Create invite link"}
         </Button>
       </DialogFooter>
     </form>
@@ -114,14 +115,18 @@ function InviteFlow({
 
 function InviteLink({ result, onClose }: { result: InviteResponse; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(result.invite_url);
+      setCopyFailed(false);
       setCopied(true);
+      toast.success("Invite link copied");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard blocked: the link stays selectable in the field.
+      setCopyFailed(true);
     }
   }
 
@@ -142,6 +147,11 @@ function InviteLink({ result, onClose }: { result: InviteResponse; onClose: () =
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>
+      <p role="status" className="text-sm text-muted-foreground">
+        {copyFailed
+          ? "Couldn't copy. Select the link above and copy it manually."
+          : "Copy the link now: it is shown only once and can't be retrieved after you close this window."}
+      </p>
       <DialogFooter>
         <Button onClick={onClose}>Done</Button>
       </DialogFooter>

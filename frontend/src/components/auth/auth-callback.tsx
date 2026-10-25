@@ -5,8 +5,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorMessage, setActiveOrgId } from "@/lib/api";
 import { meQueryKey } from "@/lib/auth";
@@ -56,21 +62,26 @@ export function AuthCallback() {
 
   if (error) {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>We couldn&apos;t sign you in</AlertTitle>
-        <AlertDescription>
-          {error} Links only work once and in the browser where you started.{" "}
-          <Link href="/login" className="underline underline-offset-4">
-            Sign in
-          </Link>{" "}
-          to try again.
-        </AlertDescription>
-      </Alert>
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={1} className="text-xl">
+            We couldn&apos;t sign you in
+          </CardTitle>
+          <CardDescription role="alert">
+            {error} Links only work once and in the browser where you started.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link href="/login" className={buttonVariants({ size: "lg" })}>
+            Go to sign in
+          </Link>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <Card aria-busy="true">
+    <Card aria-busy="true" role="status">
       <CardHeader>
         <CardTitle role="heading" aria-level={1} className="text-xl">
           Signing you in…

@@ -35,7 +35,7 @@ export function TagInput({
     <div
       className={cn(
         "flex min-h-8 flex-wrap items-center gap-1.5 rounded-lg border border-input bg-transparent px-2 py-1 text-sm transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30",
-        disabled && "pointer-events-none opacity-50",
+        disabled && "pointer-events-none bg-muted/40 [&_button]:hidden",
       )}
     >
       {value.map((tag) => (
@@ -47,7 +47,7 @@ export function TagInput({
           <button
             type="button"
             onClick={() => onChange(value.filter((v) => v !== tag))}
-            className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            className="-m-1 rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
             aria-label={`Remove ${tag}`}
           >
             <XIcon className="size-3" />
@@ -68,9 +68,13 @@ export function TagInput({
           }
         }}
         onBlur={commit}
-        placeholder={value.length ? undefined : placeholder}
+        placeholder={value.length ? undefined : (placeholder ?? "Type and press Enter to add")}
+        aria-describedby={`${id}-tip`}
         className="min-w-24 flex-1 bg-transparent py-0.5 outline-none placeholder:text-muted-foreground"
       />
+      <span id={`${id}-tip`} className="sr-only">
+        Press Enter or comma to add.
+      </span>
     </div>
   );
 }

@@ -27,8 +27,8 @@ function inZone(iso: string, timeZone: string): string {
 
 function exportError(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 401) return "Your session has ended. Sign in again to download trends.";
-    if (error.status === 403) return "Only organization admins can download trends.";
+    if (error.status === 401) return "Your session has ended. Sign in again to download.";
+    if (error.status === 403) return "Only admins can download trends.";
     if (error.status === 404) return "This organization isn't available. Switch organization and try again.";
   }
   return `The export failed: ${errorMessage(error)}`;
@@ -40,7 +40,7 @@ function save({ blob, filename }: TrendsExport) {
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 /**
@@ -79,8 +79,7 @@ export function TrendsExport() {
           {info ? (
             <p className="text-muted-foreground" data-testid="export-range">
               Trends last seen from <span className="text-foreground">{inZone(info.start, info.timezone)}</span> up to{" "}
-              <span className="text-foreground">{inZone(info.end, info.timezone)}</span>, {info.timezone} time. The exact
-              range is fixed when you download.
+              <span className="text-foreground">{inZone(info.end, info.timezone)}</span>, {info.timezone} time. The exact range is set when you download.
             </p>
           ) : range.isError ? (
             <p className="text-destructive">{exportError(range.error)}</p>
@@ -96,11 +95,11 @@ export function TrendsExport() {
             </p>
           )}
         </div>
-        {/* Green: a safe, read-only action (download). */}
         <Button
+          variant="success"
           onClick={run}
           disabled={download.isPending || !info}
-          className="shrink-0 self-start bg-success text-background hover:bg-success/85 sm:self-center"
+          className="shrink-0 self-start sm:self-center"
         >
           <DownloadIcon />
           {download.isPending ? "Preparing CSV…" : "Download Trends — Last 7 Days"}

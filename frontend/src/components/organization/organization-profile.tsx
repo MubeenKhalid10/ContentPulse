@@ -106,7 +106,7 @@ function ProfileForm({
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5 sm:grid-cols-2">
-            <FormField id="name" label="Name" error={errors.name?.message}>
+            <FormField id="name" label="Organization name" error={errors.name?.message}>
               <Input
                 {...fieldAria("name", errors.name?.message)}
                 {...form.register("name")}
@@ -138,6 +138,7 @@ function ProfileForm({
             <FormField
               id="timezone"
               label="Timezone"
+              hint="Used for scheduling and when dates and times are shown."
               error={errors.timezone?.message}
             >
               <Controller

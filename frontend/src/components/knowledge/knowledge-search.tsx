@@ -57,13 +57,13 @@ export function KnowledgeSearch({ onOpenDocument }: { onOpenDocument: (id: strin
         >
           <Input
             aria-label="Search the knowledge base"
-            placeholder="e.g. What AI services do we offer?"
+            placeholder="e.g. What do we offer, and who is it for?"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           <Button type="submit" variant="outline" disabled={!query.trim() || search.isPending}>
             <SearchIcon />
-            Search
+            {search.isPending ? "Searching…" : "Search"}
           </Button>
         </form>
 
@@ -74,7 +74,7 @@ export function KnowledgeSearch({ onOpenDocument }: { onOpenDocument: (id: strin
             ))}
           </div>
         )}
-        {search.isError && <p className="text-sm text-destructive">{errorMessage(search.error)}</p>}
+        {search.isError && <p role="alert" className="text-sm text-destructive">{errorMessage(search.error)}</p>}
         {search.data && (
           <div aria-live="polite" className="grid gap-1">
             {search.data.results.length === 0 ? (

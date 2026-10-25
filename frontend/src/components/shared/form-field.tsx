@@ -48,6 +48,7 @@ export function fieldAria(id: string, error?: string) {
   return {
     id,
     "aria-invalid": error ? true : undefined,
-    "aria-describedby": error ? `${id}-error` : undefined,
+    // The hint (when there is one and no error) is announced too; a missing id is ignored.
+    "aria-describedby": error ? `${id}-error` : `${id}-hint`,
   } as const;
 }

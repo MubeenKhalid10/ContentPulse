@@ -2,21 +2,25 @@
 
 import {
   CheckCircle2Icon,
-  ChevronDownIcon,
+  ChevronRightIcon,
+  ClipboardListIcon,
+  CopyIcon,
+  type LucideIcon,
+  SquarePenIcon,
+  LoaderCircleIcon,
   PencilIcon,
   PlusIcon,
-  ShieldAlertIcon,
   SparklesIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { TOPIC_STATUS_TONE } from "@/lib/tones";
+import { POST_STATUS_TONE, TOPIC_STATUS_TONE } from "@/lib/tones";
 import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { CollapsibleCard } from "@/components/shared/collapsible-card";
-import { Tag } from "@/components/shared/tag";
-import { PostRow } from "@/components/content/content-list";
+import { DeleteButton } from "@/components/shared/delete-button";
+import { PlatformTag, Tag } from "@/components/shared/tag";
 import { EditTopicDialog } from "@/components/topics/edit-topic-dialog";
 import { StrategyCard } from "@/components/topics/strategy-card";
 import { StrategyDialog } from "@/components/topics/strategy-dialog";
@@ -24,9 +28,8 @@ import { TopicActions } from "@/components/topics/topic-actions";
 import { AlignmentPanel } from "@/components/trends/alignment-panel";
 import { RelevanceBadge } from "@/components/trends/relevance";
 import { Score, SignalBreakdown } from "@/components/trends/score";
-import { groupBySource, MentionItem } from "@/components/trends/trend-detail";
+import { groupBySource, MentionItem } from "@/components/trends/mentions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,19 +39,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePosts, useWriteAll } from "@/hooks/use-content";
+import { useDeletePost, usePosts, useWriteAll } from "@/hooks/use-content";
 import { useTopic } from "@/hooks/use-topics";
 import { useMarkets } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
+import { POST_STATUS_LABEL } from "@/lib/content";
 import { formatDateTime, stripCitations, timeAgo } from "@/lib/format";
 import { PLATFORM_LABEL, TOPIC_STATUS_LABEL } from "@/lib/topics";
-import { marketLabel, sourceName } from "@/lib/trends";
+import { sourceName } from "@/lib/trends";
 import { cn } from "@/lib/utils";
 import type {
   ContentAngle,
   Platform,
   PlatformFit,
+  Post,
   Strategy,
   TopicDetail,
 } from "@/types/api";
@@ -68,10 +73,12 @@ export function TopicDetailView({ id }: { id: string }) {
     editing: Strategy | null;
     angle?: ContentAngle;
   } | null>(null);
-  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [autoPlan, setAutoPlan] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("plan") === "1",
+  );
   const [editing, setEditing] = useState(false);
 
-  const back = <BackLink href="/topics" label="Topics" />;
+  const back = <BackLink href="/topics" label="Shortlist & plans" />;
 
   if (topic.isError) {
     const notFound =
@@ -80,10 +87,17 @@ export function TopicDetailView({ id }: { id: string }) {
       <>
         {back}
         <Alert variant="destructive">
-          <AlertDescription>
-            {notFound
-              ? "This topic doesn't exist or isn't in your organization."
-              : errorMessage(topic.error)}
+          <AlertDescription className="flex flex-wrap items-center gap-3">
+            <span>
+              {notFound
+                ? "This trend doesn't exist or isn't in your organization."
+                : errorMessage(topic.error)}
+            </span>
+            {!notFound && (
+              <Button size="sm" variant="outline" onClick={() => topic.refetch()}>
+                Try again
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       </>
@@ -185,31 +199,14 @@ export function TopicDetailView({ id }: { id: string }) {
             </CollapsibleCard>
           )}
           {trend && trend.mentions.length > 0 && (
-            <Card>
-              <CardHeader>
-                <button
-                  type="button"
-                  aria-expanded={sourcesOpen}
-                  aria-controls="topic-sources"
-                  onClick={() => setSourcesOpen((o) => !o)}
-                  className="flex w-full items-start gap-2 text-left"
-                >
-                  <span className="grid flex-1 gap-1">
-                    <CardTitle>Sources ({trend.mentions.length})</CardTitle>
-                    <CardDescription>
-                      Where this topic is being discussed.
-                    </CardDescription>
-                  </span>
-                  <ChevronDownIcon
-                    className={cn(
-                      "mt-1 size-4 shrink-0 text-muted-foreground transition-transform",
-                      sourcesOpen && "rotate-180",
-                    )}
-                  />
-                </button>
-              </CardHeader>
-              {sourcesOpen && (
-                <CardContent id="topic-sources" className="grid gap-6">
+            <CollapsibleCard
+              title="Sources"
+              count={trend.mentions.length}
+              description="Where this trend is being discussed."
+              contentClassName="grid gap-6"
+            >
+              {(
+                <>
                   {groupBySource(trend.mentions).map(([source, mentions]) => (
                     <section
                       key={source}
@@ -231,6 +228,11 @@ export function TopicDetailView({ id }: { id: string }) {
                           />
                         ))}
                       </ul>
+                      {mentions.length > 4 && (
+                        <p className="text-xs text-muted-foreground">
+                          Showing 4 of {mentions.length}
+                        </p>
+                      )}
                     </section>
                   ))}
                   <Link
@@ -239,9 +241,9 @@ export function TopicDetailView({ id }: { id: string }) {
                   >
                     See the full trend
                   </Link>
-                </CardContent>
+                </>
               )}
-            </Card>
+            </CollapsibleCard>
           )}
         </div>
 
@@ -252,100 +254,22 @@ export function TopicDetailView({ id }: { id: string }) {
             canPlan={canManage && shortlisted}
             onPlan={plan}
           />
-          {/* With a trend, the alignment panel already lists these. */}
-          {!trend && t.unsupported_claims.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldAlertIcon className="size-4 text-amber-600 dark:text-amber-400" />
-                  Claims to avoid
-                </CardTitle>
-                <CardDescription>
-                  Your knowledge base doesn&apos;t support these. Keep them out
-                  of the content.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="grid list-disc gap-1 pl-5 text-sm">
-                  {t.unsupported_claims.map((c) => (
-                    <li key={c}>{c}</li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-          <Card>
-            <CardHeader>
-              <CardTitle>Details</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <dl className="grid gap-3 text-sm">
-                {t.target_audience && (
-                  <Detail label="Audience" value={t.target_audience} />
-                )}
-                {trend && (
-                  <Detail
-                    label="Locations"
-                    value={trend.locations
-                      .map((c) => marketLabel(c, marketNames))
-                      .join(", ")}
-                  />
-                )}
-                {trend && (
-                  <Detail
-                    label="Last seen"
-                    value={
-                      <time title={formatDateTime(trend.last_seen_at)}>
-                        {timeAgo(trend.last_seen_at)}
-                      </time>
-                    }
-                  />
-                )}
-                <Detail
-                  label="Added"
-                  value={
-                    <time title={formatDateTime(t.created_at)}>
-                      {timeAgo(t.created_at)}
-                    </time>
-                  }
-                />
-                {t.reviewed_at && (
-                  <Detail
-                    label="Last decision"
-                    value={
-                      <time title={formatDateTime(t.reviewed_at)}>
-                        {timeAgo(t.reviewed_at)}
-                      </time>
-                    }
-                  />
-                )}
-              </dl>
-              {trend && trend.keywords.length > 0 && (
-                <div className="grid gap-2">
-                  <p className="text-xs text-muted-foreground">
-                    Related keywords
-                  </p>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {trend.keywords.map((k) => (
-                      <li key={k}>
-                        <Badge variant="outline">{k}</Badge>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
 
       <StrategyDialog
         topic={t}
-        open={!!dialog}
+        open={!!dialog || (autoPlan && canManage && shortlisted)}
         platform={dialog?.platform ?? null}
         editing={dialog?.editing ?? null}
         angle={dialog?.angle ?? null}
-        onClose={() => setDialog(null)}
+        onClose={() => {
+          setDialog(null);
+          if (autoPlan) {
+            setAutoPlan(false);
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+        }}
       />
       <EditTopicDialog
         topic={t}
@@ -356,7 +280,7 @@ export function TopicDetailView({ id }: { id: string }) {
   );
 }
 
-function StrategiesCard({
+export function StrategiesCard({
   topic,
   canManage,
   onPlan,
@@ -384,53 +308,56 @@ function StrategiesCard({
       !(posts.data?.items ?? []).some((p) => p.content_strategy_id === s.id),
   );
   const toWrite = unwritten.filter((s) => s.status !== "archived");
+  const hasPlans = strategies.length > 0;
+  const canCreate = canManage && shortlisted;
   return (
     <Card>
-      <CardHeader className="flex flex-row flex-wrap items-start gap-2">
-        <div className="grid flex-1 gap-1">
-          <CardTitle>Your post plans</CardTitle>
-          <CardDescription>
-            {shortlisted
-              ? "One plan per platform: what to say, to whom and how. Write the post straight from the plan."
-              : "Shortlist this topic to plan posts for it."}
-          </CardDescription>
-        </div>
-        {canManage && shortlisted && canGenerate && toWrite.length > 1 && (
-          <Button
-            size="sm"
-            disabled={writeAll.isPending}
-            onClick={() =>
-              writeAll.mutate(
-                toWrite.map((s) => s.id),
-                {
-                  onSuccess: (r) =>
-                    r.failed
-                      ? toast.error(
-                          `Started ${r.ok}, but ${r.failed} failed: ${errorMessage(r.error)}`,
-                        )
-                      : toast.success(
-                          `Writing ${r.ok} posts, one per platform. They stay together in Write posts.`,
-                        ),
-                },
-              )
-            }
-          >
-            <SparklesIcon />
-            {writeAll.isPending
-              ? "Starting…"
-              : `Write all ${toWrite.length} posts`}
-          </Button>
-        )}
-        {canManage && shortlisted && (
-          <Button
-            size="sm"
-            variant={toWrite.length > 1 && canGenerate ? "outline" : "default"}
-            onClick={() => onPlan(null)}
-          >
-            <PlusIcon />
-            New plan
-          </Button>
-        )}
+      <CardHeader>
+        <SectionHeader
+          icon={ClipboardListIcon}
+          title="Post plans"
+          description="Each plan sets the platform, audience, message and goal of one post."
+          badge={`${strategies.length} ${strategies.length === 1 ? "plan" : "plans"}`}
+          actions={
+            hasPlans && canCreate && unwritten.length > 0 ? (
+              <>
+                {canGenerate && toWrite.length > 1 && (
+                  <Button
+                    size="sm"
+                    disabled={writeAll.isPending}
+                    onClick={() =>
+                      writeAll.mutate(
+                        toWrite.map((s) => s.id),
+                        {
+                          onError: (e) => toast.error(errorMessage(e)),
+                          onSuccess: (r) =>
+                            r.failed
+                              ? toast.error(
+                                  `Started ${r.ok}, but ${r.failed} failed: ${errorMessage(r.error)}`,
+                                )
+                              : toast.success(
+                                  `Writing ${r.ok} posts, one per platform. They stay together in Write posts.`,
+                                ),
+                        },
+                      )
+                    }
+                  >
+                    <SparklesIcon />
+                    {writeAll.isPending ? "Starting…" : `Write all ${toWrite.length} posts`}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant={toWrite.length > 1 && canGenerate ? "outline" : "default"}
+                  onClick={() => onPlan(null)}
+                >
+                  <PlusIcon />
+                  Create plan
+                </Button>
+              </>
+            ) : null
+          }
+        />
       </CardHeader>
       <CardContent className="grid gap-3">
         {unwritten.length ? (
@@ -442,13 +369,34 @@ function StrategiesCard({
               onEdit={() => onEdit(s)}
             />
           ))
+        ) : hasPlans ? (
+          <div className="grid justify-items-center gap-3 rounded-lg border border-dashed p-5 text-center">
+            <p className="text-sm text-muted-foreground">
+              Every plan has a post. Review them under Generated posts below.
+            </p>
+            {canCreate && (
+              <Button size="sm" onClick={() => onPlan(null)}>
+                <PlusIcon />
+                Create plan
+              </Button>
+            )}
+          </div>
+        ) : shortlisted ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-3">
+            <p className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
+              <SquarePenIcon aria-hidden className="size-4 shrink-0" />
+              Choose where to publish, who you&apos;re targeting, and what the post should achieve.
+            </p>
+            {canCreate && (
+              <Button size="sm" onClick={() => onPlan(null)}>
+                <PlusIcon />
+                Create your first plan
+              </Button>
+            )}
+          </div>
         ) : (
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            {strategies.length
-              ? "Every plan has a post. Find them under Posts for this topic below."
-              : shortlisted
-              ? "No plans yet. Pick a recommended platform on the right, or click New plan."
-              : "Plans can be made once the topic is shortlisted."}
+          <p className="text-sm text-muted-foreground">
+            Plans can be made once the trend is shortlisted.
           </p>
         )}
       </CardContent>
@@ -456,32 +404,134 @@ function StrategiesCard({
   );
 }
 
-function TopicPosts({ topicId }: { topicId: string }) {
+const POST_DESCRIPTION =
+  "This permanently deletes the post and everything attached to it: every version of the copy, its design task and files, and its approvals. The plan it came from is kept. This can't be undone.";
+
+export function TopicPosts({ topicId }: { topicId: string }) {
   const fromHere = useFromHere();
   const posts = usePosts({ status: "all", platform: "", topicId, q: "" }, 50);
-  if (!posts.data?.items.length) return null;
+  if (!posts.data) return null;
+  const items = posts.data.items;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Posts for this topic</CardTitle>
-        <CardDescription>
-          Posts already written from your plans, with where each one is in
-          approval. Open one to edit it in the studio.
-        </CardDescription>
+        <SectionHeader
+          icon={CopyIcon}
+          title="Generated posts"
+          description="Posts created from your plans, with their current review status."
+          badge={`${items.length} ${items.length === 1 ? "post" : "posts"}`}
+        />
       </CardHeader>
-      <CardContent>
-        <ul className="grid gap-2" aria-label="Topic posts">
-          {posts.data.items.map((p) => (
-            <PostRow
-              key={p.id}
-              post={p}
-              compact
-              href={fromHere(`/posts/${p.id}`)}
-            />
-          ))}
-        </ul>
+      <CardContent className="grid gap-3">
+        {items.length ? (
+          <>
+            <ul className="grid gap-2" aria-label="Generated posts">
+              {items.map((p) => (
+                <GeneratedPost key={p.id} post={p} href={fromHere(`/posts/${p.id}`)} />
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              Select a post to open it in the studio, review its content, and continue the workflow
+              according to its current status.
+            </p>
+          </>
+        ) : (
+          <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+            No posts yet. Posts appear here once you generate one from a plan.
+          </p>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+/** One generated post: platform and title, a preview, then its status, version and date. */
+function GeneratedPost({ post, href }: { post: Post; href: string }) {
+  const isAdmin = useCan()("organization.write");
+  const remove = useDeletePost();
+  const busy = post.generation?.status === "queued" || post.generation?.status === "running";
+  const failed = post.generation?.status === "failed" && !post.current_version;
+  return (
+    <li className="relative grid gap-1.5 rounded-lg border p-3 transition-colors hover:bg-muted/40">
+      <div className="flex items-center gap-2">
+        <PlatformTag platform={post.platform} />
+        <Link
+          href={href}
+          className="min-w-0 flex-1 truncate font-medium after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-ring"
+        >
+          {post.title ?? "Untitled post"}
+        </Link>
+        {post.variant_of_id && <Tag tone="neutral">Variant</Tag>}
+        <ChevronRightIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      </div>
+      {busy ? (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+          <LoaderCircleIcon className="size-4 animate-spin text-primary" />
+          Writing…
+        </p>
+      ) : failed ? (
+        <p className="text-sm text-destructive">Writing failed. Open the post to try again.</p>
+      ) : (
+        post.hook && <p className="line-clamp-1 text-sm text-muted-foreground">{post.hook}</p>
+      )}
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <Tag tone={POST_STATUS_TONE[post.status]} dot className="h-6 px-2.5 text-xs font-semibold">
+          {POST_STATUS_LABEL[post.status]}
+        </Tag>
+        <span>
+          {post.current_version ? `Version ${post.current_version} · ` : ""}
+          <time dateTime={post.updated_at} title={formatDateTime(post.updated_at)}>
+            Updated {timeAgo(post.updated_at)}
+          </time>
+        </span>
+        {isAdmin && (
+          <span className="relative z-10 ml-auto">
+            <DeleteButton
+              title={`Delete “${post.title ?? "this post"}”?`}
+              description={POST_DESCRIPTION}
+              pending={remove.isPending}
+              onConfirm={() =>
+                remove.mutate(post.id, {
+                  onSuccess: () => toast.success("Post deleted"),
+                  onError: (e) => toast.error(errorMessage(e)),
+                })
+              }
+            />
+          </span>
+        )}
+      </p>
+    </li>
+  );
+}
+
+/** Icon tile, title, one-line purpose and a count: the header of the plan and post cards. */
+function SectionHeader({
+  icon: Icon,
+  title,
+  description,
+  badge,
+  actions,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  badge: string;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-start gap-3">
+      <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted" aria-hidden>
+        <Icon className="size-5 text-foreground" />
+      </span>
+      <div className="grid min-w-0 flex-1 gap-0.5">
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </div>
+      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{badge}</span>
+      {actions && (
+        <div className="flex basis-full flex-wrap justify-end gap-2 sm:basis-auto">{actions}</div>
+      )}
+    </div>
   );
 }
 
@@ -524,7 +574,10 @@ function PlatformFitCard({
                   {PLATFORM_LABEL[f.platform]}
                 </h3>
                 {isRecommended && (
-                  <span className="inline-flex items-center gap-1 text-xs text-primary-strong">
+                  <span
+                    className="inline-flex items-center gap-1 text-xs text-primary-strong"
+                    title="One of the best-scoring platforms for this trend."
+                  >
                     <CheckCircle2Icon className="size-3.5" />
                     Recommended
                   </span>
@@ -535,7 +588,11 @@ function PlatformFitCard({
               </div>
               <div
                 className="h-1.5 overflow-hidden rounded-full bg-muted"
-                aria-hidden
+                role="meter"
+                aria-label={`${PLATFORM_LABEL[f.platform]} fit`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={f.score}
               >
                 <div
                   className={cn(
@@ -576,11 +633,3 @@ function PlatformFitCard({
   );
 }
 
-function Detail({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right">{value}</dd>
-    </div>
-  );
-}

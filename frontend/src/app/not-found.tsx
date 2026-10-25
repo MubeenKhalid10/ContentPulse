@@ -1,10 +1,10 @@
-import { ArrowLeftIcon, CompassIcon } from "lucide-react";
+import { CompassIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Logo } from "@/components/shared/logo";
 import { buttonVariants } from "@/components/ui/button";
 
-export const metadata = { title: "Page not found · ContentPulse" };
+export const metadata = { title: "Page not found" };
 
 /** Any unknown URL: say so plainly and offer the two ways back. */
 export default function NotFound() {
@@ -22,11 +22,10 @@ export default function NotFound() {
             dashboard.
           </p>
           <div className="mt-2 flex flex-wrap justify-center gap-2">
-            <Link href="/dashboard" className={buttonVariants()}>
-              Go to dashboard
+            <Link href="/" className={buttonVariants()}>
+              Go to home
             </Link>
             <Link href="/login" className={buttonVariants({ variant: "outline" })}>
-              <ArrowLeftIcon />
               Sign in
             </Link>
           </div>

@@ -7,7 +7,7 @@ import type { PostDetail } from "@/types/api";
 const SECTIONS: Record<string, [list: string, detail: string]> = {
   dashboard: ["Dashboard", "Dashboard"],
   trends: ["Trends", "Back to trend"],
-  topics: ["Topics", "Back to topic"],
+  topics: ["Shortlist & plans", "Back to plans"],
   content: ["Write posts", "Back to post"],
   design: ["Design", "Back to design task"],
   approvals: ["Approvals", "Back to review"],

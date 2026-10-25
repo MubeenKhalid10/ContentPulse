@@ -16,6 +16,7 @@ import base64
 import json
 import re
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -357,8 +358,17 @@ class KieImages:
             )
         return body.get("data") or {}
 
-    async def generate(self, prompt: str, ratio: str) -> GeneratedImage:
-        client = self._client or httpx.AsyncClient(timeout=60)
+    def _http(self) -> httpx.AsyncClient:
+        return self._client or httpx.AsyncClient(timeout=60)
+
+    async def _done(self, client: httpx.AsyncClient) -> None:
+        if self._client is None:
+            await client.aclose()
+
+    async def create_task(self, prompt: str, ratio: str) -> str:
+        """Start one (paid) image. Called once per image: retries resume the
+        task with `fetch` instead of creating another."""
+        client = self._http()
         try:
             task = await self._call(
                 client,
@@ -373,9 +383,18 @@ class KieImages:
                     },
                 },
             )
-            task_id = task.get("taskId")
-            if not task_id:
-                raise AIError(AIErrorKind.BAD_OUTPUT, "Kie AI didn't return a task id.")
+        finally:
+            await self._done(client)
+        task_id = task.get("taskId")
+        if not task_id:
+            raise AIError(AIErrorKind.BAD_OUTPUT, "Kie AI didn't return a task id.")
+        return str(task_id)
+
+    async def fetch(self, task_id: str) -> GeneratedImage:
+        """Poll an existing task and download its image. Free to repeat: a
+        timeout or failed download is retryable and keeps the task."""
+        client = self._http()
+        try:
             waited = 0.0
             while True:
                 await self.sleep(self.POLL_SECONDS)
@@ -395,9 +414,9 @@ class KieImages:
                     )
                     raise AIError(kind, f"Kie AI couldn't create the image: {reason[:200]}")
                 if waited >= self._timeout:
-                    # Not retried: a second task would be charged again.
                     raise AIError(
-                        AIErrorKind.BAD_OUTPUT, "Kie AI took too long to create the image."
+                        AIErrorKind.UNAVAILABLE,
+                        f"Kie AI is still creating the image (task {task_id}).",
                     )
             try:
                 urls = json.loads(info.get("resultJson") or "{}").get("resultUrls") or []
@@ -409,17 +428,19 @@ class KieImages:
                 download = await client.get(urls[0], timeout=60, follow_redirects=True)
             except httpx.HTTPError as exc:
                 raise AIError(
-                    AIErrorKind.BAD_OUTPUT, "Couldn't download the image from Kie AI."
+                    AIErrorKind.UNAVAILABLE, "Couldn't download the image from Kie AI."
                 ) from exc
             if download.status_code != 200 or not download.content:
-                raise AIError(AIErrorKind.BAD_OUTPUT, "Couldn't download the image from Kie AI.")
+                raise AIError(AIErrorKind.UNAVAILABLE, "Couldn't download the image from Kie AI.")
             data = download.content
             return GeneratedImage(
                 data=data, mime_type=_mime(data), provider=self.name, model=self.model
             )
         finally:
-            if self._client is None:
-                await client.aclose()
+            await self._done(client)
+
+    async def generate(self, prompt: str, ratio: str) -> GeneratedImage:
+        return await self.fetch(await self.create_task(prompt, ratio))
 
 
 def cloudflare_credentials(settings: Settings) -> tuple[str, str] | None:
@@ -429,6 +450,14 @@ def cloudflare_credentials(settings: Settings) -> tuple[str, str] | None:
     return None
 
 
+class _FreeReservation:
+    waited = 0.0
+
+    async def release(self, *_: object) -> None:
+        return None
+
+
+_FREE = _FreeReservation()
 _override = None
 
 
@@ -485,8 +514,14 @@ async def generate_image(
     organization_id: uuid.UUID,
     job_id: uuid.UUID | None = None,
     settings: Settings | None = None,
+    task_id: str | None = None,
+    on_task: Callable[[str], Awaitable[None]] | None = None,
 ) -> GeneratedImage:
-    """One image through the gateway's quotas, retries and accounting."""
+    """One image through the gateway's quotas, retries and accounting.
+
+    Task-based providers (Kie) create the paid task once: `on_task` is told
+    its id so the caller can persist it, and every retry, here or in a later
+    run given `task_id`, only polls and downloads."""
     from app.ai.gateway import backoff, record
     from app.ai.limits import QuotaExceeded, estimate_tokens, quota_limiter
     from app.ai.metrics import metrics
@@ -500,15 +535,22 @@ async def generate_image(
     call_id = uuid.uuid4()
     deadline = limits.monotonic() + settings.llm_queue_timeout_background
     retries = 0
+    tasks = hasattr(adapter, "create_task")
     while True:
         try:
-            reservation = await quota_limiter.acquire(
-                adapter.name,
-                adapter.model,
-                tokens=estimate_tokens(prompt),
-                organization_id=organization_id,
-                workflow=workflow,
-                deadline=deadline,
+            # Resuming an existing task costs nothing: it takes no new slot in
+            # the daily image cap.
+            reservation = (
+                _FREE
+                if tasks and task_id
+                else await quota_limiter.acquire(
+                    adapter.name,
+                    adapter.model,
+                    tokens=estimate_tokens(prompt),
+                    organization_id=organization_id,
+                    workflow=workflow,
+                    deadline=deadline,
+                )
             )
         except QuotaExceeded as exc:
             metrics.inc("llm_rate_limit_total", source="local", **labels)
@@ -536,7 +578,14 @@ async def generate_image(
             "started_at": started_at,
         }
         try:
-            image = await adapter.generate(prompt, ratio)
+            if tasks:
+                if not task_id:
+                    task_id = await adapter.create_task(prompt, ratio)
+                    if on_task is not None:
+                        await on_task(task_id)
+                image = await adapter.fetch(task_id)
+            else:
+                image = await adapter.generate(prompt, ratio)
         except AIError as exc:
             await reservation.release()
             metrics.inc("llm_requests_failed_total", error=exc.kind.value, **labels)
@@ -573,6 +622,7 @@ async def generate_image(
             status="succeeded",
             latency_ms=int((limits.monotonic() - started) * 1000),
             completed_at=datetime.now(UTC),
+            image_count=1,
             usage_unavailable=True,
         )
         return image

@@ -49,9 +49,16 @@ POST_MACHINE: StateMachine[PostStatus] = StateMachine(
         # Admin approves the copy → design; asks for changes → back to draft.
         _P.CONTENT_REVIEW: {_P.DRAFT, _P.DESIGN_PENDING, _P.REJECTED, _P.ARCHIVED},
         _P.DESIGN_PENDING: {_P.DESIGN_IN_PROGRESS, _P.DESIGN_UPLOADED, _P.DRAFT, _P.ARCHIVED},
-        _P.DESIGN_IN_PROGRESS: {_P.DESIGN_UPLOADED, _P.DESIGN_PENDING, _P.ARCHIVED},
-        _P.DESIGN_UPLOADED: {_P.PENDING_APPROVAL, _P.DESIGN_IN_PROGRESS, _P.ARCHIVED},
-        _P.PENDING_APPROVAL: {_P.APPROVED, _P.CHANGES_REQUESTED, _P.REJECTED},
+        # -> DRAFT: an admin reopens the approved copy.
+        _P.DESIGN_IN_PROGRESS: {_P.DESIGN_UPLOADED, _P.DESIGN_PENDING, _P.DRAFT, _P.ARCHIVED},
+        _P.DESIGN_UPLOADED: {
+            _P.PENDING_APPROVAL,
+            _P.DESIGN_IN_PROGRESS,
+            _P.DRAFT,
+            _P.ARCHIVED,
+        },
+        # -> DESIGN_UPLOADED: the designer withdraws it before an admin decided.
+        _P.PENDING_APPROVAL: {_P.APPROVED, _P.CHANGES_REQUESTED, _P.REJECTED, _P.DESIGN_UPLOADED},
         # Revisions may touch the creative or the copy.
         _P.CHANGES_REQUESTED: {
             _P.DESIGN_IN_PROGRESS,
@@ -59,8 +66,9 @@ POST_MACHINE: StateMachine[PostStatus] = StateMachine(
             _P.DRAFT,
             _P.ARCHIVED,
         },
-        _P.APPROVED: {_P.FINAL, _P.ARCHIVED},
-        _P.FINAL: {_P.ARCHIVED},
+        # -> CHANGES_REQUESTED: an admin reopens an approved post.
+        _P.APPROVED: {_P.FINAL, _P.CHANGES_REQUESTED, _P.ARCHIVED},
+        _P.FINAL: {_P.CHANGES_REQUESTED, _P.ARCHIVED},
         _P.REJECTED: {_P.ARCHIVED},
         _P.ARCHIVED: set(),
     },

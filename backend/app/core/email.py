@@ -36,8 +36,11 @@ def _send_sync(settings: Settings, message: EmailMessage) -> None:
         server.send_message(message)
 
 
-async def send_email(settings: Settings, *, to: str, subject: str, body: str) -> bool:
-    """Send a plain-text email. Returns True only if the SMTP server accepted it."""
+async def send_email(
+    settings: Settings, *, to: str, subject: str, body: str, html: str | None = None
+) -> bool:
+    """Send an email: plain text, plus an HTML version when `html` is given.
+    Returns True only if the SMTP server accepted it."""
     if not settings.email_enabled:
         return False
     message = EmailMessage()
@@ -45,6 +48,8 @@ async def send_email(settings: Settings, *, to: str, subject: str, body: str) ->
     message["To"] = to
     message["Subject"] = subject
     message.set_content(body)
+    if html:
+        message.add_alternative(html, subtype="html")
     try:
         await asyncio.to_thread(_send_sync, settings, message)
     except (OSError, smtplib.SMTPException) as exc:

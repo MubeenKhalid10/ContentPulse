@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.email import send_email
+from app.core.email_templates import invitation_email
 from app.core.errors import AppError, Conflict, ErrorCode, NotFound
 from app.core.permissions import Role
 from app.core.security import generate_invite_token
@@ -112,18 +113,21 @@ async def invite_member(
     invite_url = f"{settings.frontend_url.rstrip('/')}/invite/{raw_token}"
     organization = await db.get(Organization, organization_id)
     org_name = organization.name if organization else "a ContentPulse organization"
+    inviter = await db.get(User, inviter_id)
+    text, html = invitation_email(
+        organization=org_name,
+        role=Role(data.role).value,
+        invite_url=invite_url,
+        expires_in_hours=settings.invite_ttl_hours,
+        inviter=(inviter.full_name or inviter.email) if inviter else None,
+        site_url=settings.frontend_url.rstrip("/"),
+    )
     email_sent = await send_email(
         settings,
         to=email,
         subject=f"You're invited to {org_name} on ContentPulse",
-        body=(
-            f"You've been invited to join {org_name} on ContentPulse "
-            f"with the {Role(data.role).value.capitalize()} role.\n\n"
-            "Accept the invitation here "
-            f"(the link works for {settings.invite_ttl_hours} hours):\n\n"
-            f"{invite_url}\n\n"
-            "If you weren't expecting this, you can ignore this email.\n"
-        ),
+        body=text,
+        html=html,
     )
     return InviteResponse(member=to_read(member), invite_url=invite_url, email_sent=email_sent)
 

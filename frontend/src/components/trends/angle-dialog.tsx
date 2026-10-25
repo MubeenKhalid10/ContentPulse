@@ -93,7 +93,7 @@ function Section({
 }) {
   return (
     <section className="grid gap-2">
-      <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       {children}
     </section>
   );
@@ -148,11 +148,15 @@ export function AngleDialog({
               <span className="text-muted-foreground">
                 {" "}
                 · {trend.mention_count} mention
-                {trend.mention_count === 1 ? "" : "s"} · seen{" "}
+                {trend.mention_count === 1 ? "" : "s"} · last seen{" "}
                 {timeAgo(trend.last_seen_at)}
               </span>
             </p>
             {headlines.length > 0 ? (
+              <>
+              <p className="text-xs font-medium text-muted-foreground">
+                Top headlines for this trend
+              </p>
               <ul className="grid gap-2.5">
                 {headlines.map((m) => {
                   const url = safeUrl(m.source_url);
@@ -187,6 +191,7 @@ export function AngleDialog({
                   );
                 })}
               </ul>
+              </>
             ) : (
               <p className="text-muted-foreground">
                 No headlines were stored for this trend.

@@ -11,6 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAttention } from "@/hooks/use-organization";
 import { cn } from "@/lib/utils";
 import type { Me } from "@/types/api";
 
@@ -38,6 +39,16 @@ export function SidebarNav({
 }) {
   const pathname = usePathname();
   const current = activeHref(pathname);
+  const counts = useAttention().data;
+  // How many things are waiting on this person, shown as a badge on the step.
+  const can = (p: string) => me.permissions.includes(p as Me["permissions"][number]);
+  const attention: Record<string, number> = counts
+    ? {
+        "/trends": can("trends.manage") || can("topics.manage") ? counts.to_review : 0,
+        "/design": can("design.upload") ? counts.design : 0,
+        "/approvals": can("approval.manage") ? counts.approvals : 0,
+      }
+    : {};
 
   return (
     <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-2">
@@ -65,6 +76,7 @@ export function SidebarNav({
                           render={
                             <span
                               aria-disabled="true"
+                              aria-label={`${item.label} (coming soon)`}
                               tabIndex={0}
                               className={cn(
                                 itemClass,
@@ -75,12 +87,12 @@ export function SidebarNav({
                         >
                           <Icon />
                           <span className="flex-1">{item.label}</span>
-                          <span className="slug rounded-sm bg-muted px-1.5 text-[10px] text-muted-foreground">
+                          <span className="slug rounded-sm bg-muted px-1.5 text-[11px] text-muted-foreground" aria-hidden>
                             Soon
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="right">
-                          Arrives in {item.comingIn}
+                          Coming in {item.comingIn}
                         </TooltipContent>
                       </Tooltip>
                     </li>
@@ -91,6 +103,7 @@ export function SidebarNav({
                     key={item.href}
                     item={item}
                     current={current}
+                    attention={attention[item.href] ?? 0}
                     onNavigate={onNavigate}
                   />
                 );
@@ -103,10 +116,10 @@ export function SidebarNav({
   );
 }
 
-/** A labelled group of links; collapsible ones stay closed until you're inside one. */
 /** Section headings stand out from the links under them. */
 const SECTION_LABEL = "slug text-xs font-bold text-foreground";
 
+/** A labelled group of links; collapsible ones stay closed until you're inside one. */
 function Section({
   label,
   collapsible,
@@ -158,10 +171,12 @@ function Section({
 function NavLink({
   item,
   current,
+  attention = 0,
   onNavigate,
 }: {
   item: NavItem;
   current: string | undefined;
+  attention?: number;
   onNavigate?: () => void;
 }) {
   const children = item.children ?? [];
@@ -185,7 +200,16 @@ function NavLink({
       )}
     >
       <entry.icon />
-      {entry.label}
+      <span className="flex-1">{entry.label}</span>
+      {!child && attention > 0 && (
+        <span
+          title={`${attention} waiting for you`}
+          className="rounded-full bg-primary px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground ring-1 ring-background"
+        >
+          <span aria-hidden>{attention}</span>
+          <span className="sr-only">{attention} waiting for you</span>
+        </span>
+      )}
     </Link>
   );
 

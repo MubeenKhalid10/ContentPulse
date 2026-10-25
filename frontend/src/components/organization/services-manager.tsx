@@ -88,7 +88,7 @@ export function ServicesManager() {
           canEdit && (
             <Button onClick={() => setEditing(null)}>
               <PlusIcon />
-              Add
+              Add service
             </Button>
           )
         }
@@ -196,7 +196,11 @@ function ServiceRow({
           onCheckedChange={(active) =>
             update.mutate(
               { serviceId: service.id, active },
-              { onError: (e) => toast.error(errorMessage(e)) },
+              {
+                onSuccess: () =>
+                  toast.success(`${service.name} ${active ? "is active" : "paused"}`),
+                onError: (e) => toast.error(errorMessage(e)),
+              },
             )
           }
         />
@@ -301,13 +305,13 @@ function ServiceForm({
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 sm:grid-cols-3">
-        <FormField id="kind" label="Type">
+        <FormField id="svc-kind" label="Type">
           <Controller
             control={form.control}
             name="kind"
             render={({ field }) => (
               <SimpleSelect
-                id="kind"
+                id="svc-kind"
                 value={field.value}
                 onChange={field.onChange}
                 options={OFFERING_KIND_OPTIONS}
@@ -317,7 +321,7 @@ function ServiceForm({
         </FormField>
         <FormField
           id="svc-name"
-          label="Name"
+          label="Name (required)"
           error={errors.name?.message}
           className="sm:col-span-2"
         >
@@ -330,13 +334,13 @@ function ServiceForm({
         </FormField>
       </div>
       <FormField
-        id="category"
+        id="svc-category"
         label="Category"
         hint="Optional grouping, e.g. Engineering."
         error={errors.category?.message}
       >
         <Input
-          {...fieldAria("category", errors.category?.message)}
+          {...fieldAria("svc-category", errors.category?.message)}
           {...form.register("category")}
         />
       </FormField>
@@ -358,12 +362,12 @@ function ServiceForm({
         render={({ field }) => (
           <div className="flex items-center gap-3">
             <Switch
-              id="active"
+              id="svc-active"
               checked={field.value}
               onCheckedChange={field.onChange}
             />
-            <Label htmlFor="active" className="font-normal">
-              Active — consider it when matching trends
+            <Label htmlFor="svc-active" className="font-normal">
+              Active: use it when matching trends and writing posts
             </Label>
           </div>
         )}
@@ -373,7 +377,7 @@ function ServiceForm({
           Cancel
         </Button>
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : service ? "Save" : "Add"}
+          {pending ? "Saving…" : service ? "Save" : "Add service"}
         </Button>
       </DialogFooter>
     </form>

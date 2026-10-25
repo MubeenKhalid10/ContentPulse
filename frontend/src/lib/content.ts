@@ -11,7 +11,7 @@ export const POST_STATUS_LABEL: Record<PostStatus, string> = {
   pending_approval: "Waiting for design approval",
   // Only design approval sends a post back with changes (content goes back to Draft).
   changes_requested: "Design changes requested",
-  approved: "Design approved, waiting to be finalized",
+  approved: "Design approved, almost ready to publish",
   final: "Ready to publish",
   rejected: "Rejected",
   archived: "Archived",

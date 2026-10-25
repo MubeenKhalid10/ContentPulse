@@ -22,7 +22,7 @@ const root = (orgId: string) => ["org", orgId, "trends"] as const;
 export type RelevanceFilter = "" | "relevant" | "highly_relevant" | "weakly_relevant" | "not_relevant" | "unanalyzed";
 
 export interface TrendFilters {
-  status: "active" | "shortlisted" | "rejected";
+  status: "all" | "active" | "shortlisted";
   relevance: RelevanceFilter;
   sort: "score" | "recent" | "mentions" | "new";
   source: string;
@@ -37,7 +37,8 @@ export const TREND_WINDOW_DAYS = 7;
 export function useTrends(filters: TrendFilters, limit: number) {
   const orgId = useOrgId();
   const params = new URLSearchParams({
-    status: filters.status,
+    // "All trends" leaves out the ones already shortlisted (they have their own tab).
+    status: filters.status === "all" ? "unshortlisted" : filters.status,
     sort: filters.sort,
     limit: String(limit),
     seen_within_days: String(TREND_WINDOW_DAYS),

@@ -419,7 +419,7 @@ function PostProof({ item }: { item: WireItem }) {
         </span>
         <span className="ok-stamp ml-auto grid shrink-0 place-items-center rounded-lg border-2 border-flash px-2 py-1 text-center text-flash">
           <span className="headline text-lg leading-none">Approved</span>
-          <span className="text-xs text-[11px] leading-tight">
+          <span className="text-[11px] leading-tight">
             Ready to publish
           </span>
         </span>

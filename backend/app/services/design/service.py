@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.images import get_image_provider
 from app.core.config import get_settings
 from app.core.errors import AppError, ErrorCode, Forbidden, InvalidStateTransition, NotFound
+from app.core.logging import logger
 from app.core.permissions import Permission, has_permission
 from app.models.ai import AIGenerationJob
 from app.models.design import CreativeAsset, DesignBrief
@@ -547,9 +548,11 @@ async def _workable(
     db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, role, task_id: uuid.UUID
 ) -> tuple[DesignBrief, Post]:
     """A task the current user may deliver files for; claims it if unassigned.
-    Any creator may deliver: the assignee shows who is on it, it doesn't lock
-    others out (one role writes and designs)."""
+    Only the assignee works on an assigned task; an admin (design manager) can
+    step in on any task."""
     brief = await _get(db, organization_id, task_id)
+    if brief.assignee_id not in (None, user_id) and not _can_manage(role):
+        raise Forbidden("This task is assigned to someone else. Ask an admin to reassign it.")
     if brief.status not in ACTIVE:
         raise InvalidStateTransition("This task is closed.", details={"status": brief.status.value})
     post = await db.get(Post, brief.post_id)
@@ -738,6 +741,87 @@ async def use_version(
     await record_version(
         db, organization_id, user_id, brief, post, files, f"Reused version {version}"
     )
+    await db.commit()
+    return await task_detail(db, organization_id, brief.id)
+
+
+DELETABLE_DESIGN = (
+    PostStatus.DESIGN_PENDING,
+    PostStatus.DESIGN_IN_PROGRESS,
+    PostStatus.DESIGN_UPLOADED,
+    PostStatus.CHANGES_REQUESTED,
+)
+
+
+async def delete_design(
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    task_id: uuid.UUID,
+) -> TaskDetail:
+    """Admin: remove every uploaded creative of this post's design (all versions
+    and their files) so the design can be done again. Allowed while the design
+    is being made or being revised; once it is waiting for approval or approved,
+    request changes first (or delete the post)."""
+    brief = await _get(db, organization_id, task_id)
+    post = await db.get(Post, brief.post_id)
+    assert post is not None
+    if post.status not in DELETABLE_DESIGN:
+        raise InvalidStateTransition(
+            "This design is waiting for approval or already approved. Request changes first, "
+            "or delete the post.",
+            details={"status": post.status.value},
+        )
+    assets = list(await db.scalars(select(CreativeAsset).where(CreativeAsset.post_id == post.id)))
+    if not assets:
+        raise NotFound("Design files")
+    keys = {a.storage_key for a in assets}
+    for asset in assets:
+        await db.delete(asset)
+    await db.flush()
+    if post.status == PostStatus.DESIGN_UPLOADED:
+        await transition_post(db, post, PostStatus.DESIGN_IN_PROGRESS, user_id=user_id)
+    audit.record(
+        db,
+        organization_id=organization_id,
+        user_id=user_id,
+        action=AuditAction.DESIGN_DELETED,
+        entity_type="post",
+        entity_id=post.id,
+        old_value={"files": len(assets)},
+    )
+    await db.commit()
+    storage = get_storage()
+    for key in keys:
+        try:
+            await storage.delete(key)
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not remove creative file %s", key)
+    return await task_detail(db, organization_id, brief.id)
+
+
+async def withdraw(
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    role,
+    task_id: uuid.UUID,
+) -> TaskDetail:
+    """The designer takes a submitted design back before an admin decided, to
+    change it. The open approval is dropped; submit again when ready."""
+    brief = await _get(db, organization_id, task_id)
+    if brief.assignee_id not in (None, user_id) and not _can_manage(role):
+        raise Forbidden("This task is assigned to someone else.")
+    post = await db.get(Post, brief.post_id)
+    assert post is not None
+    if brief.status != B.SUBMITTED or post.status != PostStatus.PENDING_APPROVAL:
+        raise InvalidStateTransition(
+            "Only a design that is waiting for approval can be withdrawn.",
+            details={"status": post.status.value},
+        )
+    await approvals.withdraw_design(db, post)
+    await transition_post(db, post, PostStatus.DESIGN_UPLOADED, user_id=user_id)
+    brief.status, brief.submitted_at = B.IN_PROGRESS, None
     await db.commit()
     return await task_detail(db, organization_id, brief.id)
 

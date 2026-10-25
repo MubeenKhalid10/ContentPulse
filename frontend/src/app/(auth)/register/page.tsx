@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PasswordInput } from "@/components/auth/password-input";
 import { Input } from "@/components/ui/input";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useRegister } from "@/lib/auth";
@@ -27,6 +28,8 @@ export default function RegisterPage() {
   const router = useRouter();
   const register = useRegister();
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // A CAPTCHA token works once: show a fresh challenge after a failed attempt.
+  const [captchaKey, setCaptchaKey] = useState(0);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -41,6 +44,8 @@ export default function RegisterPage() {
         else router.replace("/onboarding");
       },
       onError: (error) => {
+        setCaptchaToken(null);
+        setCaptchaKey((k) => k + 1);
         if (error instanceof ApiError) {
           for (const [field, message] of Object.entries(error.fieldErrors)) {
             form.setError(field as keyof RegisterValues, { message });
@@ -56,6 +61,7 @@ export default function RegisterPage() {
         title="Confirm your email"
         email={sentTo}
         body="Click the link in it to activate your account. You'll set up your organization right after."
+        onUseDifferentEmail={() => setSentTo(null)}
       />
     );
   }
@@ -67,8 +73,9 @@ export default function RegisterPage() {
           Create your account
         </CardTitle>
         <CardDescription>
-          You&apos;ll set up your organization next. Invited by a teammate? Use
-          the link they sent you instead.
+          You&apos;ll set up your organization next. If a teammate invited you,
+          open the invitation link they sent you instead. It joins you to their
+          organization.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -81,6 +88,14 @@ export default function RegisterPage() {
               <Alert variant="destructive">
                 <AlertDescription>
                   {errorMessage(register.error)}
+                  {/already|registered|exists/i.test(errorMessage(register.error)) && (
+                    <>
+                      {" "}
+                      <Link href="/login" className="font-medium underline underline-offset-4">
+                        Sign in instead
+                      </Link>
+                    </>
+                  )}
                 </AlertDescription>
               </Alert>
             )}
@@ -114,14 +129,13 @@ export default function RegisterPage() {
             hint="At least 10 characters."
             error={errors.password?.message}
           >
-            <Input
+            <PasswordInput
               {...fieldAria("password", errors.password?.message)}
-              type="password"
               autoComplete="new-password"
               {...form.register("password")}
             />
           </FormField>
-          <AuthCaptcha onToken={setCaptchaToken} />
+          <AuthCaptcha key={captchaKey} onToken={setCaptchaToken} />
           <Button type="submit" size="lg" disabled={register.isPending}>
             {register.isPending ? "Creating account…" : "Create account"}
           </Button>

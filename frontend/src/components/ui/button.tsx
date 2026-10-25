@@ -16,6 +16,11 @@ const buttonVariants = cva(
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+        // Colour roles used across the app: success = a positive decision (Shortlist),
+        // view = look at something (View trend). Same hues as the status tags.
+        success:
+          "bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500/30 dark:bg-emerald-500 dark:text-emerald-950 dark:hover:bg-emerald-400",
+        view: "bg-sky-50 text-sky-800 ring-1 ring-inset ring-sky-200 hover:bg-sky-100 dark:bg-sky-950/60 dark:text-sky-200 dark:ring-sky-800/70 dark:hover:bg-sky-900/60",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

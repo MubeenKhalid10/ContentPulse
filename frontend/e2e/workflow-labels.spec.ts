@@ -65,7 +65,7 @@ test("content, design and approval tabs name their stage", async ({ page }) => {
   expect(await tabNames(page)).toEqual([
     "Draft posts",
     "Changes requested",
-    "Approval status",
+    "Sent for approval",
   ]);
 
   // Topics: no Archived tab either.
@@ -137,7 +137,7 @@ test("content, design and approval tabs name their stage", async ({ page }) => {
   expect(await tabNames(page)).toEqual([
     "Designs to create",
     "Changes requested",
-    "Approval status",
+    "Sent for approval",
   ]);
   await expect(page.getByRole("list", { name: "Design tasks" })).toContainText(
     "Waiting for design approval",
@@ -192,14 +192,14 @@ test("content, design and approval tabs name their stage", async ({ page }) => {
   expect(await tabNames(page)).toEqual([
     "Content approval",
     "Design approval",
-    "Ready to post",
+    "Ready to publish",
   ]);
   await page.getByRole("tab", { name: /Design approval/ }).click();
   await expect(queue).toContainText("Waiting for design approval");
   expect(await tabNames(page)).toEqual([
     "Content approval",
     "Design approval",
-    "Ready to post",
+    "Ready to publish",
   ]);
 });
 
@@ -267,6 +267,6 @@ test("a post waiting for content approval shows one status tag", async ({
     page.getByText("Waiting for an admin to approve the copy"),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("link", { name: "Review & approve" }),
+    page.getByRole("link", { name: "Review", exact: true }),
   ).toBeVisible();
 });

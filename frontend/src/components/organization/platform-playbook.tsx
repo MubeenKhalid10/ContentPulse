@@ -3,12 +3,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RotateCcwIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { FormSkeleton } from "@/components/shared/form-skeleton";
+import { FormSkeleton, SaveBar } from "@/components/shared/form-skeleton";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { PageHeader, ReadOnlyNotice } from "@/components/shared/page-header";
 import { TagInput } from "@/components/shared/tag-input";
@@ -76,6 +76,8 @@ export function PlatformPlaybook() {
   const settings = useOrgSettings();
   const canEdit = useCan()("organization.write");
   const [platform, setPlatform] = useState<Platform>("linkedin");
+  const [dirty, setDirty] = useState(false);
+  const [switchTo, setSwitchTo] = useState<Platform | null>(null);
   const rule = rules.data?.find((r) => r.platform === platform);
   const enabled = settings.data?.enabled_platforms ?? [];
 
@@ -89,7 +91,11 @@ export function PlatformPlaybook() {
       <div className="grid gap-6">
         <Tabs
           value={platform}
-          onValueChange={(v) => setPlatform(v as Platform)}
+          onValueChange={(v) => {
+            if (v === platform) return;
+            if (dirty) setSwitchTo(v as Platform);
+            else setPlatform(v as Platform);
+          }}
         >
           <TabsList>
             {(Object.keys(PLATFORM_LABEL) as Platform[]).map((p) => (
@@ -121,10 +127,34 @@ export function PlatformPlaybook() {
             rule={rule}
             canEdit={canEdit}
             enabled={!enabled.length || enabled.includes(rule.platform)}
+            onDirtyChange={setDirty}
           />
         ) : (
           <FormSkeleton fields={5} />
         )}
+        <AlertDialog open={!!switchTo} onOpenChange={(o) => !o && setSwitchTo(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes to the {PLATFORM_LABEL[platform]} playbook.
+                Switching platforms discards them.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep editing</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => {
+                  if (switchTo) setPlatform(switchTo);
+                  setSwitchTo(null);
+                }}
+              >
+                Discard and switch
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </>
   );
@@ -134,10 +164,12 @@ function RuleForm({
   rule,
   canEdit,
   enabled,
+  onDirtyChange,
 }: {
   rule: PlatformRule;
   canEdit: boolean;
   enabled: boolean;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const update = useUpdatePlatformRule();
   const reset = useResetPlatformRule();
@@ -156,6 +188,10 @@ function RuleForm({
     },
   });
   const { errors, isDirty } = form.formState;
+  useEffect(() => {
+    onDirtyChange(isDirty);
+    return () => onDirtyChange(false);
+  }, [isDirty, onDirtyChange]);
 
   const list = (
     name: "post_types" | "objectives" | "affinity_keywords",
@@ -224,7 +260,7 @@ function RuleForm({
                     href="/organization/content-setup#platforms"
                     className="underline underline-offset-4"
                   >
-                    Content setup
+                    Audience & platforms
                   </Link>
                   .
                 </>
@@ -250,6 +286,7 @@ function RuleForm({
                 <AlertDialogDescription>
                   Your post types, tone, limits and guidance for {label} are
                   replaced by the defaults.
+                  {isDirty && " Your unsaved changes are discarded too."}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -307,6 +344,7 @@ function RuleForm({
               <FormField
                 id={`${rule.platform}-max`}
                 label="Max characters"
+                hint="Blank = no limit."
                 error={errors.max_length?.message}
               >
                 <Input
@@ -323,6 +361,7 @@ function RuleForm({
               <FormField
                 id={`${rule.platform}-hashtags`}
                 label="Max hashtags"
+                hint="Blank = no limit."
                 error={errors.hashtag_limit?.message}
               >
                 <Input
@@ -353,19 +392,7 @@ function RuleForm({
               />
             </FormField>
             {canEdit && (
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!isDirty}
-                  onClick={() => form.reset()}
-                >
-                  Discard changes
-                </Button>
-                <Button type="submit" disabled={!isDirty || update.isPending}>
-                  {update.isPending ? "Saving…" : "Save playbook"}
-                </Button>
-              </div>
+              <SaveBar dirty={isDirty} pending={update.isPending} onReset={() => form.reset()} />
             )}
           </fieldset>
         </CardContent>

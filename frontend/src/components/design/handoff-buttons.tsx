@@ -19,7 +19,12 @@ export function HandoffButtons({ id, size = "sm" }: { id: string; size?: "sm" | 
     try {
       const doc = await fetchHandoff(id);
       if (mode === "copy") {
-        await navigator.clipboard.writeText(doc.markdown);
+        try {
+          await navigator.clipboard.writeText(doc.markdown);
+        } catch {
+          toast.error("Couldn't copy to your clipboard. Use Download brief (.md) instead.");
+          return;
+        }
         toast.success("Design brief copied");
       } else {
         const url = URL.createObjectURL(new Blob([doc.markdown], { type: "text/markdown;charset=utf-8" }));
@@ -28,6 +33,7 @@ export function HandoffButtons({ id, size = "sm" }: { id: string; size?: "sm" | 
         link.download = doc.file_name;
         link.click();
         URL.revokeObjectURL(url);
+        toast.success("Design brief downloaded");
       }
     } catch (e) {
       toast.error(errorMessage(e));
@@ -39,11 +45,11 @@ export function HandoffButtons({ id, size = "sm" }: { id: string; size?: "sm" | 
     <>
       <Button size={size} variant="outline" onClick={() => run("copy")} disabled={busy}>
         <CopyIcon />
-        Copy
+        Copy brief
       </Button>
       <Button size={size} variant="outline" onClick={() => run("download")} disabled={busy}>
         <DownloadIcon />
-        Export brief
+        Download brief (.md)
       </Button>
     </>
   );

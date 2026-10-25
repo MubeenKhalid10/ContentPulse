@@ -4,6 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CheckIcon,
+  EyeIcon,
+  EyeOffIcon,
   LogOutIcon,
   MonitorIcon,
   MoonIcon,
@@ -12,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useTheme } from "next-themes";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -50,7 +53,15 @@ export function AccountSettings() {
     <>
       <PageHeader
         title="Settings"
-        description="Your own account and preferences. Workspace settings live under Organization."
+        description={
+          <>
+            Your own account and preferences. Workspace settings live under{" "}
+            <Link href="/organization/profile" className="underline underline-offset-4">
+              Organization
+            </Link>
+            .
+          </>
+        }
       />
       {me.data ? (
         <div className="grid gap-6">
@@ -60,6 +71,10 @@ export function AccountSettings() {
           <WorkspacesCard me={me.data} />
           <SessionCard />
         </div>
+      ) : me.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn&apos;t load your account. Refresh the page to try again.
+        </p>
       ) : (
         <FormSkeleton fields={4} />
       )}
@@ -90,7 +105,7 @@ function ProfileCard({ me }: { me: Me }) {
     onSuccess: (updated) => {
       queryClient.setQueryData(meQueryKey, updated);
       form.reset({ full_name: updated.name ?? "" });
-      toast.success("Your name was saved");
+      toast.success("Your name was saved.");
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -155,10 +170,10 @@ function ProfileCard({ me }: { me: Me }) {
               disabled={!isDirty || save.isPending}
               onClick={() => form.reset()}
             >
-              Discard
+              Reset
             </Button>
             <Button type="submit" disabled={!isDirty || save.isPending}>
-              {save.isPending ? "Saving…" : "Save name"}
+              {save.isPending ? "Saving…" : "Save changes"}
             </Button>
           </div>
         </form>
@@ -202,6 +217,8 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
     },
   });
   const { errors } = form.formState;
+  const [show, setShow] = useState(false);
+  const [done, setDone] = useState(false);
   const change = useMutation({
     mutationFn: async (v: z.infer<typeof localPasswordSchema>) => {
       if (supabaseMode) {
@@ -228,7 +245,8 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
         new_password: "",
         confirm: "",
       });
-      toast.success("Password changed");
+      toast.success("Password changed.")
+      setDone(true);
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -238,13 +256,16 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
       <CardHeader>
         <CardTitle>Password</CardTitle>
         <CardDescription>
-          Use at least 10 characters. You stay signed in on this device.
+          Use at least 10 characters. You stay signed in on this device; other devices may need to sign in again.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form
           noValidate
-          onSubmit={form.handleSubmit((v) => change.mutate(v))}
+          onSubmit={form.handleSubmit((v) => {
+            setDone(false);
+            change.mutate(v);
+          })}
           className="grid gap-5 sm:grid-cols-3"
         >
           {!supabaseMode && (
@@ -258,7 +279,7 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
                   "current_password",
                   errors.current_password?.message,
                 )}
-                type="password"
+                type={show ? "text" : "password"}
                 autoComplete="current-password"
                 {...form.register("current_password")}
               />
@@ -271,7 +292,7 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
           >
             <Input
               {...fieldAria("new_password", errors.new_password?.message)}
-              type="password"
+              type={show ? "text" : "password"}
               autoComplete="new-password"
               {...form.register("new_password")}
             />
@@ -283,12 +304,26 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
           >
             <Input
               {...fieldAria("confirm", errors.confirm?.message)}
-              type="password"
+              type={show ? "text" : "password"}
               autoComplete="new-password"
               {...form.register("confirm")}
             />
           </FormField>
-          <div className="flex justify-end sm:col-span-3">
+          <div className="flex flex-wrap items-center justify-end gap-3 sm:col-span-3">
+            {done && !change.isPending && (
+              <span role="status" className="mr-auto text-sm text-success">
+                Your password was changed.
+              </span>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              aria-pressed={show}
+              onClick={() => setShow((v) => !v)}
+            >
+              {show ? <EyeOffIcon /> : <EyeIcon />}
+              {show ? "Hide passwords" : "Show passwords"}
+            </Button>
             <Button type="submit" disabled={change.isPending}>
               {change.isPending ? "Changing…" : "Change password"}
             </Button>
@@ -313,7 +348,7 @@ function AppearanceCard() {
     <Card>
       <CardHeader>
         <CardTitle>Appearance</CardTitle>
-        <CardDescription>Saved on this device.</CardDescription>
+        <CardDescription>Applies only in this browser.</CardDescription>
       </CardHeader>
       <CardContent>
         <div
@@ -329,7 +364,19 @@ function AppearanceCard() {
                 type="button"
                 role="radio"
                 aria-checked={selected}
+                tabIndex={selected || (!theme && value === "system") ? 0 : -1}
                 onClick={() => setTheme(value)}
+                onKeyDown={(e) => {
+                  const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
+                  if (!keys.includes(e.key)) return;
+                  e.preventDefault();
+                  const dir = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
+                  const i = THEMES.findIndex((t) => t.value === value);
+                  const next = THEMES[(i + dir + THEMES.length) % THEMES.length]!;
+                  setTheme(next.value);
+                  const group = e.currentTarget.parentElement;
+                  (group?.children[THEMES.indexOf(next)] as HTMLElement | undefined)?.focus();
+                }}
                 className={cn(
                   "inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                   selected
@@ -369,6 +416,7 @@ function WorkspacesCard({ me }: { me: Me }) {
             return (
               <li
                 key={m.organization_id}
+                aria-current={current ? "true" : undefined}
                 className="flex flex-wrap items-center gap-3 px-3 py-2.5"
               >
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
@@ -384,6 +432,7 @@ function WorkspacesCard({ me }: { me: Me }) {
                     type="button"
                     variant="outline"
                     size="sm"
+                    aria-label={`Switch to ${m.organization_name}`}
                     onClick={() => {
                       switchOrganization(m.organization_id);
                       router.push("/dashboard");
@@ -399,7 +448,7 @@ function WorkspacesCard({ me }: { me: Me }) {
         <Link
           href="/onboarding"
           className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
+            buttonVariants({ variant: "outline", size: "sm" }),
             "justify-self-start",
           )}
         >
@@ -417,7 +466,7 @@ function SessionCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sign out</CardTitle>
+        <CardTitle>Session</CardTitle>
         <CardDescription>Ends your session on this device.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -427,7 +476,7 @@ function SessionCard() {
           onClick={() => logout.mutate()}
           disabled={logout.isPending}
         >
-          <LogOutIcon /> Sign out
+          <LogOutIcon /> Sign out on this device
         </Button>
       </CardContent>
     </Card>

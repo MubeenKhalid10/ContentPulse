@@ -219,6 +219,10 @@ class LLMUsageGroup(BaseModel):
     fallbacks: int
     input_tokens: int
     output_tokens: int
+    cached_input_tokens: int
+    images: int
+    # Sum over priced requests (llm_prices.json); None when none was priced.
+    cost_usd: float | None
     avg_latency_ms: int | None
     avg_queue_wait_ms: int | None
     max_queue_wait_ms: int
@@ -244,6 +248,9 @@ class LLMRequestRead(BaseModel):
     input_tokens: int | None
     output_tokens: int | None
     total_tokens: int | None
+    cached_input_tokens: int | None = None
+    image_count: int | None = None
+    cost_usd: float | None = None
     usage_unavailable: bool
 
 
@@ -251,6 +258,7 @@ class LLMUsage(BaseModel):
     since: datetime
     requests_total: int
     cached_total: int
+    cost_usd_total: float | None
     groups: list[LLMUsageGroup]
     requests: list[LLMRequestRead]
 

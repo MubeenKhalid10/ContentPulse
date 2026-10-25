@@ -1,7 +1,6 @@
 """Alignment engines: AI (RAG + LLM, spec §17-18) and rule-based fallback."""
 
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,8 +24,10 @@ from app.services.knowledge.search import search_knowledge
 from app.services.trends.scoring import SOURCE_LABELS
 from app.services.trends.text import keyword_matches, normalize_terms
 
-MAX_PASSAGES = 6
+MAX_PASSAGES = 4
 MAX_MENTIONS = 8
+# Mention titles in prompts (some sources send whole paragraphs).
+MAX_TITLE = 160
 
 
 async def retrieve_passages(
@@ -79,11 +80,9 @@ async def top_mentions(db: AsyncSession, trend_id: uuid.UUID) -> list[TrendMenti
     )
 
 
-def _hours_ago(when: datetime | None) -> str:
-    if when is None:
-        return "recently"
-    hours = max(0, round((datetime.now(UTC) - when).total_seconds() / 3600))
-    return f"{hours}h ago" if hours < 48 else f"{hours // 24}d ago"
+def _title(text: str | None) -> str:
+    text = " ".join((text or "").split())
+    return text if len(text) <= MAX_TITLE else text[: MAX_TITLE - 1].rstrip() + "…"
 
 
 def trend_prompt(trend: Trend, mentions: list[TrendMention], passages: list[Passage]) -> str:
@@ -92,11 +91,12 @@ def trend_prompt(trend: Trend, mentions: list[TrendMention], passages: list[Pass
         for key, value in trend.signals.items()
         if key not in ("organization_fit", "audience_relevance")
     )
+    # No relative timestamps ("5h ago"): the prompt stays identical for the
+    # same coverage, so the cache answers repeat analyses.
     coverage = "\n".join(
-        f"- [{SOURCE_LABELS.get(m.source, m.source)}] {m.title}"
+        f"- [{SOURCE_LABELS.get(m.source, m.source)}] {_title(m.title)}"
         + (f" ({m.author})" if m.author else "")
         + (f", {m.engagement_label}" if m.engagement_label else "")
-        + f", {_hours_ago(m.published_at or m.detected_at)}"
         for m in mentions
     )
     if passages:
@@ -135,7 +135,10 @@ async def align_with_ai(
         system=system,
         prompt=trend_prompt(trend, mentions, passages),
         schema=response_schema(ctx.platforms),
-        max_tokens=8000,
+        # Sized to the answer (~1k tokens) so Groq's per-minute token limit,
+        # which counts this allowance, fits more calls; a cut-off answer is
+        # retried once with double.
+        max_tokens=2000,
         workflow="trend_alignment",
         organization_id=trend.organization_id,
         job_id=job_id,

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 import { useAuthConfig } from "@/lib/supabase-config";
@@ -11,6 +12,7 @@ export function AuthCaptcha({
   onToken: (token: string | null) => void;
 }) {
   const { data: config } = useAuthConfig();
+  const [status, setStatus] = useState<"pending" | "ready" | "failed">("pending");
   if (!config) return null;
   if (config.provider !== "supabase") return null;
   if (!config.turnstile_site_key) {
@@ -26,11 +28,32 @@ export function AuthCaptcha({
   }
 
   return (
-    <Turnstile
-      siteKey={config.turnstile_site_key}
-      onSuccess={onToken}
-      onExpire={() => onToken(null)}
-      onError={() => onToken(null)}
-    />
+    <div className="grid gap-1.5">
+      <Turnstile
+        siteKey={config.turnstile_site_key}
+        onSuccess={(token) => {
+          setStatus("ready");
+          onToken(token);
+        }}
+        onExpire={() => {
+          setStatus("pending");
+          onToken(null);
+        }}
+        onError={() => {
+          setStatus("failed");
+          onToken(null);
+        }}
+      />
+      {status === "pending" && (
+        <p role="status" className="text-xs text-muted-foreground">
+          Verifying you&apos;re human…
+        </p>
+      )}
+      {status === "failed" && (
+        <p role="alert" className="text-xs text-destructive">
+          We couldn&apos;t verify you&apos;re human. Reload the page and try again.
+        </p>
+      )}
+    </div>
   );
 }

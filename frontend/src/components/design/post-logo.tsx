@@ -53,15 +53,16 @@ export function PostLogo({
       <div className="grid gap-1">
         <span className="text-sm font-medium">Logo</span>
         <p className="text-xs text-muted-foreground">
-          No logo yet. Upload one (or add a Logo URL) in the organization
-          profile to place it on AI-generated images.{" "}
-          {canEditBrand && (
+          No logo yet, so none can be placed on AI-generated images.{" "}
+          {canEditBrand ? (
             <Link
               href="/organization/profile"
               className="underline underline-offset-4"
             >
-              Add it in Profile
+              Add one in Organization &gt; Profile
             </Link>
+          ) : (
+            "Ask an admin to add one in Organization > Profile."
           )}
         </p>
       </div>

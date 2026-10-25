@@ -130,7 +130,12 @@ async def test_invitation_is_emailed_when_smtp_is_set(client, smtp_on, outbox):
     assert r.status_code == 201, r.text
     assert r.json()["email_sent"] is True
     assert outbox[0]["To"] == "new@example.com"
-    assert r.json()["invite_url"] in outbox[0].get_content()
+    plain = outbox[0].get_body(preferencelist=("plain",)).get_content()
+    html = outbox[0].get_body(preferencelist=("html",)).get_content()
+    assert r.json()["invite_url"] in plain
+    # The branded HTML version has the Accept button pointing at the same link.
+    assert "Accept invitation" in html and f'href="{r.json()["invite_url"]}"' in html
+    assert "Mail Co" in html and "Join Mail Co on ContentPulse" in html
 
 
 async def test_invitation_without_smtp_returns_link_only(client, outbox):
@@ -146,3 +151,21 @@ async def test_invitation_without_smtp_returns_link_only(client, outbox):
     )
     assert r.json()["email_sent"] is False and r.json()["invite_url"]
     assert outbox == []
+
+
+def test_invitation_email_is_branded_escaped_and_has_a_plain_fallback():
+    from app.core.email_templates import invitation_email
+
+    url = "https://example.com/invite/abc123"
+    text, html = invitation_email(
+        organization="Acme <script>alert(1)</script> & Co",
+        role="creator",
+        invite_url=url,
+        expires_in_hours=72,
+        inviter="Rae Admin",
+        site_url="https://example.com",
+    )
+    assert url in text and "3 days" in text
+    assert "Accept invitation" in html and f'href="{url}"' in html
+    assert "<script>" not in html and "&lt;script&gt;" in html
+    assert "Rae Admin" in html and "Creator" in html

@@ -17,6 +17,7 @@ import { SearchInput } from "@/components/shared/search-input";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SubTabs } from "@/components/shared/sub-tabs";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -35,10 +36,10 @@ const PAGE = 30;
 const TABS: { value: DesignTaskFilter; label: string }[] = [
   { value: "todo", label: "Designs to create" },
   { value: "changes", label: "Changes requested" },
-  { value: "approval", label: "Approval status" },
+  { value: "approval", label: "Sent for approval" },
 ];
 const EMPTY: Record<DesignTaskFilter, string> = {
-  todo: "No open design tasks. Posts appear here when they're sent to design from the content studio.",
+  todo: "No open design tasks. A post appears here once an admin approves its copy.",
   changes: "Nothing sent back. Designs an approver asks you to change appear here.",
   approval: "No designs sent for approval yet.",
   submitted: "No designs waiting for approval.",
@@ -56,9 +57,14 @@ export function DesignTaskList() {
     q: "",
   });
   // A tab saved before it was removed falls back to the first one.
-  const filters: DesignFilters = TABS.some((t) => t.value === saved.status)
-    ? saved
-    : { ...saved, status: "todo" };
+  const tabOf = (s: DesignTaskFilter): DesignTaskFilter =>
+    s === "submitted" || s === "done" ? "approval" : s;
+  const filters: DesignFilters =
+    saved.status === "approval"
+      ? { ...saved, status: "submitted" }
+      : TABS.some((t) => t.value === tabOf(saved.status))
+        ? saved
+        : { ...saved, status: "todo" };
   const [limit, setLimit] = useState(PAGE);
   const tasks = useDesignTasks(filters, limit);
   const update = (patch: Partial<DesignFilters>) => {
@@ -81,7 +87,7 @@ export function DesignTaskList() {
             </span>
             <div className="grid max-w-md gap-1.5">
               <p className="text-lg font-medium">No design tasks yet</p>
-              <p className="text-sm text-muted-foreground">{EMPTY.todo}</p>
+              <p className="text-sm text-muted-foreground">A post appears here once an admin approves its copy.</p>
             </div>
           </CardContent>
         </Card>
@@ -89,17 +95,27 @@ export function DesignTaskList() {
         <div className="grid min-w-0 grid-cols-1 gap-6">
           <FilterBar>
             <Tabs
-              value={filters.status}
-              onValueChange={(v) => update({ status: v as DesignTaskFilter })}
+              value={tabOf(filters.status)}
+              onValueChange={(v) =>
+                update({ status: v === "approval" ? "submitted" : (v as DesignTaskFilter) })
+              }
               className="shrink-0"
             >
-              <TabsList>
+              <TabsList aria-label="Design task status">
                 {TABS.map((tab) => (
                   <TabsTrigger key={tab.value} value={tab.value}>
                     {tab.label}
                     {counts && counts[tab.value] > 0 && (
-                      <span className="ml-1 rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
+                      <span
+                        className={cn(
+                          "ml-1 rounded-full px-1.5 text-[11px] tabular-nums",
+                          tab.value === "changes"
+                            ? "bg-primary font-semibold text-primary-foreground"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
                         {counts[tab.value]}
+                        <span className="sr-only"> tasks</span>
                       </span>
                     )}
                   </TabsTrigger>
@@ -139,6 +155,17 @@ export function DesignTaskList() {
               className={FILTER_SELECT}
             />
           </FilterBar>
+          {tabOf(filters.status) === "approval" && (
+            <SubTabs
+              label="Approval status"
+              value={filters.status}
+              onChange={(status) => update({ status })}
+              items={[
+                { value: "submitted", label: "Pending", count: counts?.submitted },
+                { value: "done", label: "Approved", count: counts?.done },
+              ]}
+            />
+          )}
 
           {tasks.isPending ? (
             <div className="grid gap-3">
@@ -166,9 +193,10 @@ export function DesignTaskList() {
                 <Button
                   variant="outline"
                   className="justify-self-center"
+                  disabled={tasks.isPlaceholderData}
                   onClick={() => setLimit((n) => n + PAGE)}
                 >
-                  Show more ({tasks.data.total - tasks.data.items.length} left)
+                  {tasks.isPlaceholderData ? "Loading…" : `Show more (${tasks.data.total - tasks.data.items.length} left)`}
                 </Button>
               )}
             </>

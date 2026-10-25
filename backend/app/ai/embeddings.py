@@ -126,6 +126,27 @@ class GatedEmbeddings:
             )
             hit = await llm_cache.get(cache_key)
             if hit is not None:
+                from app.ai.gateway import record
+                from app.ai.metrics import metrics
+
+                metrics.inc("llm_cache_hits_total", workflow=workflow)
+                now = datetime.now(UTC)
+                await record(
+                    call_id=uuid.uuid4(),
+                    organization_id=organization_id,
+                    workflow=workflow,
+                    provider=self.name,
+                    model=self.model,
+                    status="cached",
+                    attempt=0,
+                    retry_count=0,
+                    fallback_used=False,
+                    queue_wait_ms=0,
+                    latency_ms=0,
+                    started_at=now,
+                    completed_at=now,
+                    usage_unavailable=True,
+                )
                 return [hit]
         deadline = limits.monotonic() + (
             self.settings.llm_queue_timeout_interactive
@@ -235,13 +256,15 @@ class GatedEmbeddings:
             await reservation.release()
             metrics.inc("llm_requests_success_total", **labels)
             metrics.observe("llm_latency_seconds", elapsed, **labels)
-            # Embedding APIs report usage inconsistently; the estimate is not
-            # recorded as if it were a count.
+            # Embedding APIs report usage inconsistently: record the estimate
+            # (usage_unavailable marks it as one) so cost can be tracked.
             await record(
                 **row,
                 status="succeeded",
                 latency_ms=int(elapsed * 1000),
                 completed_at=datetime.now(UTC),
+                input_tokens=tokens,
+                total_tokens=tokens,
                 usage_unavailable=True,
             )
             return vectors

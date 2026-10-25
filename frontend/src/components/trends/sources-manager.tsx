@@ -1,23 +1,24 @@
 "use client";
 
 import {
-  ArrowLeftIcon,
   ChevronDownIcon,
   ExternalLinkIcon,
   RadarIcon,
   SlidersHorizontalIcon,
   TriangleAlertIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { BackLink } from "@/components/shared/back-link";
 import { SourceListEditor } from "@/components/trends/source-list-editor";
 import { SourceLogo } from "@/components/trends/source-logos";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { useOrgSettings } from "@/hooks/use-organization";
 import { useToggleSource, useTrendSources } from "@/hooks/use-trends";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
@@ -111,13 +112,7 @@ export function SourcesManager() {
 
   return (
     <>
-      <Link
-        href="/trends"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeftIcon className="size-4" />
-        Trends
-      </Link>
+      <BackLink href="/trends" label="Trends" />
       {/* Screen readers hear save results without moving focus. */}
       <p className="sr-only" role="status" aria-live="polite">
         {announcement}
@@ -132,7 +127,7 @@ export function SourcesManager() {
               <SlidersHorizontalIcon className="size-5" />
             </span>
             <div className="grid gap-1 pt-0.5">
-              <h1 className="text-lg font-semibold leading-tight">Discovery Sources</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Discovery Sources</h1>
               <p className="text-sm text-muted-foreground">
                 Choose which sources contribute trends to your discovery feed.
               </p>
@@ -179,7 +174,17 @@ export function SourcesManager() {
               </p>
             </div>
           ) : (
-            groups.map((group) => (
+            <>
+            {!sources.data.some((s) => s.enabled && s.configured) && (
+              <Alert className="mb-4 border-warning/40" role="status">
+                <TriangleAlertIcon aria-hidden />
+                <AlertTitle>No sources are on</AlertTitle>
+                <AlertDescription>
+                  Trends can&apos;t be collected until you turn at least one source on.
+                </AlertDescription>
+              </Alert>
+            )}
+            {groups.map((group) => (
               <section
                 key={group.title}
                 aria-labelledby={`group-${slug(group.title)}`}
@@ -204,16 +209,14 @@ export function SourcesManager() {
                   ))}
                 </ul>
               </section>
-            ))
+            ))}
+            </>
           )}
 
           <p className="border-t pt-4 text-xs text-muted-foreground">
             Turning a source off only changes your organization&apos;s discovery feed; it
-            doesn&apos;t stop global collection or affect other organizations. Provider keys,
-            schedules and quotas stay managed by ContentPulse.
-            {canManage
-              ? " Select a status to turn a source on or off."
-              : " Only admins can change these settings."}
+            doesn&apos;t stop global collection or affect other organizations.
+            {!canManage && " Only admins can change these settings."}
           </p>
         </CardContent>
       </Card>
@@ -244,28 +247,23 @@ function StatusPill({
   const tone = source.enabled
     ? "border-success/30 bg-success/10 text-[color-mix(in_oklch,var(--color-success)_65%,var(--color-foreground))]"
     : "border-border bg-muted text-muted-foreground";
-  const label = pending ? "Saving…" : source.enabled ? "Enabled" : "Disabled";
+  const label = pending ? "Saving…" : source.enabled ? "On" : "Off";
   if (!canManage) return <span className={cn(base, tone)}>{label}</span>;
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={source.enabled}
-      aria-label={`Include ${source.name} in discovery feed`}
-      aria-describedby={descriptionId}
-      aria-busy={pending || undefined}
-      disabled={pending}
-      title={source.enabled ? "Turn off for your feed" : "Turn on for your feed"}
-      onClick={() => onToggle(!source.enabled)}
-      // 44px tall hit area around the 28px pill.
-      className={cn(
-        base,
-        tone,
-        "relative cursor-pointer transition-colors outline-none before:absolute before:-inset-y-2 before:inset-x-0 hover:brightness-95 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-wait disabled:opacity-70",
-      )}
-    >
-      {label}
-    </button>
+    <span className="inline-flex items-center gap-2">
+      <span className="text-xs text-muted-foreground" aria-hidden>
+        {label}
+      </span>
+      <Switch
+        checked={source.enabled}
+        aria-label={`Include ${source.name} in discovery feed`}
+        aria-describedby={descriptionId}
+        aria-busy={pending || undefined}
+        disabled={pending}
+        title={source.enabled ? "Turn off for your feed" : "Turn on for your feed"}
+        onCheckedChange={(checked) => onToggle(checked)}
+      />
+    </span>
   );
 }
 
@@ -292,6 +290,8 @@ function SourceRow({
   const listField =
     source.key === "reddit" ? "subreddits" : source.key === "rss" ? "rss_feeds" : null;
   const [open, setOpen] = useState(false);
+  const settings = useOrgSettings();
+  const listCount = listField ? (settings.data?.[listField]?.length ?? 0) : 0;
   const panelId = `source-${slug(source.key)}-details`;
 
   return (
@@ -306,6 +306,12 @@ function SourceRow({
         <div className="grid min-w-0 flex-1 gap-0.5">
           <h3 className={cn("font-medium leading-snug", unavailable && "text-muted-foreground")}>
             {source.name}
+            {!unavailable && (
+              <span className="ml-2 inline-flex items-center gap-1 align-middle text-xs font-normal text-muted-foreground">
+                <span className={cn("size-1.5 rounded-full", s.tone)} aria-hidden />
+                {s.label}
+              </span>
+            )}
           </h3>
           <p id={descriptionId} className="text-sm text-muted-foreground">
             {TAGLINES[source.key] ?? source.description}
@@ -321,7 +327,7 @@ function SourceRow({
           />
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
             className="text-muted-foreground"
             aria-expanded={open}
             aria-controls={panelId}
@@ -329,6 +335,12 @@ function SourceRow({
             title={listField ? "Settings" : "Details"}
             onClick={() => setOpen((v) => !v)}
           >
+            <span className="hidden sm:inline">{listField ? "Settings" : "Details"}</span>
+            {listField && listCount > 0 && (
+              <span className="rounded-full bg-muted px-1.5 text-xs font-medium text-foreground">
+                {listCount}
+              </span>
+            )}
             <ChevronDownIcon className={cn("transition-transform", open && "rotate-180")} />
           </Button>
         </div>
@@ -339,12 +351,13 @@ function SourceRow({
           {source.missing.length > 0 && (
             <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <span className="size-1.5 rounded-full bg-warning" aria-hidden />
-              {source.enabled ? "Skipped until set up on the server:" : "Set on the server:"}
-              {source.missing.map((v) => (
-                <code key={v} className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                  {v}
-                </code>
-              ))}
+              {canManage
+                ? source.enabled
+                  ? "Skipped until it is set up on the server. See Details."
+                  : "Needs server setup before it can be turned on. See Details."
+                : source.enabled
+                  ? "Skipped until your ContentPulse admin finishes setting it up."
+                  : "Needs setup by your ContentPulse admin."}
             </p>
           )}
           {unhealthy && (
@@ -364,6 +377,16 @@ function SourceRow({
           className="ml-14 grid gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground"
         >
           <p className="text-sm">{source.description}</p>
+          {canManage && source.missing.length > 0 && (
+            <p className="flex flex-wrap items-center gap-1.5">
+              Server settings needed:
+              {source.missing.map((v) => (
+                <code key={v} className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                  {v}
+                </code>
+              ))}
+            </p>
+          )}
           {listField && <SourceListEditor field={listField} canEdit={canEditLists} />}
           {source.note && <p>{source.note}</p>}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

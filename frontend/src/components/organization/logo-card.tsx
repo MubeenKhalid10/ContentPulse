@@ -1,9 +1,19 @@
 "use client";
 
 import { ImageUpIcon, Trash2Icon } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -35,6 +45,8 @@ export function LogoCard({
   const upload = useUploadLogo();
   const remove = useRemoveLogo();
   const src = useLogoSrc(org);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [broken, setBroken] = useState(false);
   const source = org.has_logo_file
     ? "Uploaded file"
     : org.logo_url
@@ -44,7 +56,7 @@ export function LogoCard({
   function choose(file: File | undefined) {
     if (!file) return;
     if (!ACCEPT.includes(file.type)) {
-      toast.error("Choose a PNG, JPG or WebP image. SVG isn't supported yet.");
+      toast.error("Choose a PNG, JPG or WebP image. SVG logos aren't supported.");
       return;
     }
     if (file.size > MAX_BYTES) {
@@ -70,16 +82,19 @@ export function LogoCard({
       <CardContent className="flex flex-wrap items-center gap-4">
         {/* White, so the logo looks the way it will on a light image. */}
         <div className="relative flex h-24 w-56 shrink-0 items-center justify-center overflow-hidden rounded-md border border-paper-5 bg-white p-3">
-          {src ? (
+          {src && !broken ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={src}
               alt="Your logo"
               referrerPolicy="no-referrer"
+              onError={() => setBroken(true)}
               className="block size-full object-contain"
             />
           ) : (
-            <span className="text-xs text-neutral-500">No logo yet</span>
+            <span className="text-xs text-neutral-500">
+              {src ? "The logo couldn't be loaded" : "No logo yet"}
+            </span>
           )}
         </div>
         <div className="grid gap-2">
@@ -117,12 +132,7 @@ export function LogoCard({
                   variant="ghost"
                   size="sm"
                   disabled={remove.isPending}
-                  onClick={() =>
-                    remove.mutate(undefined, {
-                      onSuccess: () => toast.success("Uploaded logo removed"),
-                      onError: (error) => toast.error(errorMessage(error)),
-                    })
-                  }
+                  onClick={() => setConfirmRemove(true)}
                 >
                   <Trash2Icon /> Remove uploaded logo
                 </Button>
@@ -134,6 +144,33 @@ export function LogoCard({
           </p>
         </div>
       </CardContent>
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove the uploaded logo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {org.logo_url
+                ? "AI images will use the Logo URL instead."
+                : "AI images will have no logo until you upload one."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setConfirmRemove(false);
+                remove.mutate(undefined, {
+                  onSuccess: () => toast.success("Uploaded logo removed"),
+                  onError: (error) => toast.error(errorMessage(error)),
+                });
+              }}
+            >
+              Remove logo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

@@ -13,6 +13,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
+import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { DayGroups } from "@/components/shared/day-groups";
 import { PageHeader } from "@/components/shared/page-header";
@@ -22,7 +23,9 @@ import {
   FilterBar,
 } from "@/components/shared/filter-bar";
 import { SearchInput } from "@/components/shared/search-input";
+import { SubTabs } from "@/components/shared/sub-tabs";
 import { SimpleSelect } from "@/components/shared/simple-select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,7 +41,7 @@ import {
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { POST_STATUS_LABEL } from "@/lib/content";
-import { timeAgo, timeOfDay } from "@/lib/format";
+import { formatDateTime, timeAgo, timeOfDay } from "@/lib/format";
 import { PLATFORM_OPTIONS } from "@/lib/options";
 import { PLATFORM_LABEL } from "@/lib/topics";
 import { cn } from "@/lib/utils";
@@ -50,14 +53,16 @@ const PAGE = 30;
 const TABS: { value: PostGroup; label: string }[] = [
   { value: "drafts", label: "Draft posts" },
   { value: "changes", label: "Changes requested" },
-  { value: "approval", label: "Approval status" },
+  { value: "approval", label: "Sent for approval" },
 ];
 const EMPTY: Record<PostGroup, string> = {
   drafts:
-    "No drafts. Open a shortlisted topic, plan a post and click Write post.",
+    "No drafts yet.",
   changes: "Nothing sent back. Posts an approver asks you to change appear here.",
   design: "Nothing in design right now.",
   approval: "No copy sent for approval yet.",
+  approval_pending: "Nothing is waiting for an admin right now.",
+  approval_done: "No approved posts yet.",
   approved: "Nothing ready to post yet.",
   archived: "No archived posts.",
   all: "No posts yet.",
@@ -70,40 +75,52 @@ export function ContentList() {
     q: "",
   });
   // A tab saved before it was removed (such as "Waiting for content approval").
-  const filters = TABS.some((t) => t.value === saved.status)
-    ? saved
-    : { ...saved, status: "drafts" as const };
+  const tabOf = (s: PostGroup): PostGroup =>
+    s === "approval_pending" || s === "approval_done" ? "approval" : s;
+  const filters: ContentFilters =
+    saved.status === "approval"
+      ? { ...saved, status: "approval_pending" }
+      : TABS.some((t) => t.value === tabOf(saved.status))
+        ? saved
+        : { ...saved, status: "drafts" };
   const [limit, setLimit] = useState(PAGE);
   const posts = usePosts(filters, limit);
   const update = (patch: Partial<ContentFilters>) => {
     setFilters((f) => ({ ...f, ...patch }));
     setLimit(PAGE);
-    setSelected([]);
+    setSelectedRaw([]);
   };
   const counts = posts.data?.counts;
   const canEdit = useCan()("content.edit");
   const submitAll = useSubmitAllForReview();
   // Posts ticked to be sent for approval together.
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selectedRaw, setSelectedRaw] = useState<string[]>([]);
+  // Posts that were sent leave the Draft list; the ones that failed stay ticked.
+  const stillDraft = new Set(posts.data?.items.filter(canSubmit).map((p) => p.id));
+  const selected = selectedRaw.filter((id) => stillDraft.has(id));
+  const setSelected = setSelectedRaw;
+  // Ids waiting for the "send these?" confirmation.
+  const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
   const toggle = (ids: string[], on: boolean) =>
     setSelected((cur) =>
       on
         ? [...new Set([...cur, ...ids])]
         : cur.filter((id) => !ids.includes(id)),
     );
-  const submitSelected = (ids: string[]) =>
+  const submitSelected = (ids: string[]) => setConfirmIds(ids);
+  const runSubmit = (ids: string[]) =>
     submitAll.mutate(ids, {
       onSuccess: (r) => {
-        setSelected((cur) => cur.filter((id) => !ids.includes(id)));
+        if (!r.failed) setSelected((cur) => cur.filter((id) => !ids.includes(id)));
         if (r.failed)
           toast.error(
-            `${r.ok} sent, ${r.failed} could not be sent: ${errorMessage(r.error)}`,
+            `${r.ok} sent, ${r.failed} could not be sent and ${r.failed === 1 ? "stays" : "stay"} selected: ${errorMessage(r.error)}`,
           );
         else
           toast.success(
             r.ok === 1
-              ? "Sent to an admin for approval"
-              : `${r.ok} posts sent to an admin for approval together`,
+              ? "Sent to an admin for Content approval"
+              : `${r.ok} posts sent to an admin for Content approval together`,
           );
       },
     });
@@ -113,7 +130,7 @@ export function ContentList() {
     <>
       <PageHeader
         title="Write posts"
-        description="Write and edit your posts. Posts planned together for one topic stay together: tick drafts to send their copy for approval in one go."
+        description="Write and edit your posts. Posts planned together for one topic stay together: tick drafts to send their copy for Content approval in one go."
       />
       {nothingYet ? (
         <Card>
@@ -132,7 +149,7 @@ export function ContentList() {
               href="/topics"
               className={buttonVariants({ variant: "outline" })}
             >
-              Go to Topics
+              Go to Shortlist & plans
             </Link>
           </CardContent>
         </Card>
@@ -140,8 +157,10 @@ export function ContentList() {
         <div className="grid min-w-0 grid-cols-1 gap-6">
           <FilterBar>
             <Tabs
-              value={filters.status}
-              onValueChange={(v) => update({ status: v as PostGroup })}
+              value={tabOf(filters.status)}
+              onValueChange={(v) =>
+                update({ status: v === "approval" ? "approval_pending" : (v as PostGroup) })
+              }
               className="shrink-0"
             >
               <TabsList>
@@ -149,7 +168,14 @@ export function ContentList() {
                   <TabsTrigger key={tab.value} value={tab.value}>
                     {tab.label}
                     {counts && counts[tab.value] > 0 && (
-                      <span className="ml-1 rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
+                      <span
+                        className={cn(
+                          "ml-1 rounded-full px-1.5 text-[11px] tabular-nums",
+                          tab.value === "changes"
+                            ? "bg-primary font-semibold text-primary-foreground"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
                         {counts[tab.value]}
                       </span>
                     )}
@@ -180,6 +206,17 @@ export function ContentList() {
               className={FILTER_SELECT}
             />
           </FilterBar>
+          {tabOf(filters.status) === "approval" && (
+            <SubTabs
+              label="Approval status"
+              value={filters.status}
+              onChange={(status) => update({ status })}
+              items={[
+                { value: "approval_pending", label: "Pending", count: counts?.approval_pending },
+                { value: "approval_done", label: "Approved", count: counts?.approval_done },
+              ]}
+            />
+          )}
 
           {posts.isPending ? (
             <div className="grid gap-3">
@@ -187,6 +224,17 @@ export function ContentList() {
                 <Skeleton key={i} className="h-20 w-full rounded-xl" />
               ))}
             </div>
+          ) : posts.isError ? (
+            <Alert variant="destructive">
+              <AlertTriangleIcon />
+              <AlertDescription className="grid gap-2">
+                <span>Couldn&apos;t load your posts. {errorMessage(posts.error)}</span>
+                <Button size="sm" variant="outline" className="w-fit" onClick={() => posts.refetch()}>
+                  <RefreshCwIcon />
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
           ) : posts.data?.items.length ? (
             <>
               <div
@@ -224,14 +272,30 @@ export function ContentList() {
               )}
             </>
           ) : (
-            <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              {filters.q || filters.platform
-                ? "No posts match these filters."
-                : EMPTY[filters.status]}
-            </p>
+            <div className="grid justify-items-center gap-3 rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+              <p>
+                {filters.q || filters.platform
+                  ? "No posts match these filters."
+                  : EMPTY[filters.status]}
+              </p>
+              {!filters.q && !filters.platform && filters.status === "drafts" && (
+                <Link href="/topics" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                  Open Topics to plan a post
+                </Link>
+              )}
+            </div>
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirmIds}
+        onOpenChange={(o) => !o && setConfirmIds(null)}
+        title={`Submit ${confirmIds?.length ?? 0} ${confirmIds?.length === 1 ? "post" : "posts"} for Content approval?`}
+        description="An admin will review the copy. While a post is in review its copy is locked, and you can withdraw it from the post page. Once approved, it moves on to design."
+        confirmLabel={`Submit ${confirmIds?.length ?? 0} ${confirmIds?.length === 1 ? "post" : "posts"}`}
+        pending={submitAll.isPending}
+        onConfirm={() => confirmIds && runSubmit(confirmIds)}
+      />
       {selected.length > 0 && (
         <div
           role="region"
@@ -249,7 +313,7 @@ export function ContentList() {
             onClick={() => submitSelected(selected)}
           >
             <SendIcon />
-            {submitAll.isPending ? "Sending…" : "Submit selected for approval"}
+            {submitAll.isPending ? "Sending…" : "Submit selected for Content approval"}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
             Clear
@@ -302,13 +366,16 @@ function Check({
   label: string;
 }) {
   return (
-    <input
-      type="checkbox"
-      aria-label={label}
-      checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
-      className="relative z-10 size-4 shrink-0 cursor-pointer accent-primary"
-    />
+    // The padded label makes a 32px click target around the 16px box.
+    <span className="relative z-10 -m-2 grid shrink-0 cursor-pointer place-items-center p-2">
+      <input
+        type="checkbox"
+        aria-label={label}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-4 cursor-pointer accent-primary"
+      />
+    </span>
   );
 }
 
@@ -377,12 +444,12 @@ function TopicGroup({
             onClick={() => onSubmit(ready.map((p) => p.id))}
           >
             <SendIcon />
-            Submit all {ready.length} for approval
+            Submit all {ready.length} for Content approval
           </Button>
         )}
       </div>
       <ul
-        aria-label={`Posts for ${group.topic?.title ?? "this topic"}`}
+        aria-label={`Posts for ${group.topic?.title ?? "this topic"} for Content approval`}
         className="grid gap-2"
       >
         {group.posts.map((post) => (
@@ -414,11 +481,15 @@ function FailedPostActions({ post }: { post: Post }) {
   const regenerate = useRegenerate();
   const remove = useDeletePost();
   const busy = regenerate.isPending || remove.isPending;
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const onError = (e: unknown) => toast.error(errorMessage(e));
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm text-destructive">
       <AlertTriangleIcon className="size-4" />
-      <span className="mr-auto">Writing this post failed.</span>
+      <span className="mr-auto">
+        Writing this post failed.
+        {post.generation?.error && <span className="block text-xs font-normal">{post.generation.error}</span>}
+      </span>
       {can("content.generate") && (
         <Button
           size="sm"
@@ -445,17 +516,27 @@ function FailedPostActions({ post }: { post: Post }) {
           variant="ghost"
           className="relative z-10 text-destructive"
           disabled={busy}
-          onClick={() =>
-            remove.mutate(post.id, {
-              onSuccess: () => toast.success("Failed post deleted"),
-              onError,
-            })
-          }
+          onClick={() => setConfirmOpen(true)}
         >
           <Trash2Icon />
           Delete
         </Button>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete this failed post?"
+        description="Nothing was written, so only this empty post is removed. Your plan and other posts are not affected. This can't be undone."
+        confirmLabel="Delete post"
+        destructive
+        pending={busy}
+        onConfirm={() =>
+          remove.mutate(post.id, {
+            onSuccess: () => toast.success("Failed post deleted"),
+            onError,
+          })
+        }
+      />
     </div>
   );
 }
@@ -493,7 +574,7 @@ export function PostRow({
         <PlatformTag platform={post.platform} />
         <Link
           href={href ?? `/content/${post.id}`}
-          className="truncate font-medium after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
+          className="min-w-0 max-w-full truncate font-medium after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
         >
           {post.title ?? "Untitled post"}
         </Link>
@@ -509,7 +590,9 @@ export function PostRow({
         {post.variant_of_id && <Tag tone="neutral">Variant</Tag>}
         <span className="ml-auto text-xs text-muted-foreground">
           {post.current_version ? `v${post.current_version} · ` : ""}
-          {compact ? timeAgo(post.updated_at) : timeOfDay(post.updated_at)}
+          <time dateTime={post.updated_at} title={formatDateTime(post.updated_at)}>
+            {compact ? timeAgo(post.updated_at) : timeOfDay(post.updated_at)}
+          </time>
         </span>
       </div>
       {busy ? (

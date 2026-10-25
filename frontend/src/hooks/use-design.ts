@@ -78,6 +78,18 @@ export const useAssignTask = () =>
     api<DesignTaskDetail>(`/design/tasks/${id}/assign`, { method: "POST", body: { assignee_id: assigneeId } }),
   );
 
+/** Admin: delete the uploaded design files so the design can be redone. */
+export const useDeleteDesign = () =>
+  useTaskMutation((id: string) =>
+    api<DesignTaskDetail>(`/design/tasks/${id}/creatives`, { method: "DELETE" }),
+  );
+
+/** The designer takes a submitted design back (before an admin decided) to change it. */
+export const useWithdrawDesign = () =>
+  useTaskMutation((id: string) =>
+    api<DesignTaskDetail>(`/design/tasks/${id}/withdraw`, { method: "POST" }),
+  );
+
 export const useStartTask = () =>
   useTaskMutation((id: string) => api<DesignTaskDetail>(`/design/tasks/${id}/start`, { method: "POST" }));
 

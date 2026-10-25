@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_infra_postgres_init_01_extensions_sql", "label": "01-extensions.sql", "file_type": "code", "source_file": "infra/postgres/init/01-extensions.sql", "source_location": null}], "edges": []}

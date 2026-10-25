@@ -61,8 +61,10 @@ async def list_topics(
 
 
 @router.get("/{topic_id}", response_model=TopicDetail)
-async def get_topic(topic_id: uuid.UUID, ctx: CanRead, db: DB):
-    return await service.topic_detail(db, ctx.organization_id, topic_id)
+async def get_topic(topic_id: uuid.UUID, ctx: CanRead, db: DB, include_trend: bool = True):
+    return await service.topic_detail(
+        db, ctx.organization_id, topic_id, include_trend=include_trend
+    )
 
 
 @router.patch("/{topic_id}", response_model=TopicDetail)
@@ -132,6 +134,14 @@ async def update_strategy(
     return await strategies.update_strategy(
         db, ctx.organization_id, ctx.user.id, topic_id, strategy_id, data.changes()
     )
+
+
+@router.delete("/{topic_id}/strategies/{strategy_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_strategy(
+    topic_id: uuid.UUID, strategy_id: uuid.UUID, ctx: CanWriteOrg, db: DB
+) -> None:
+    """Admins only: remove a post plan (its posts are kept)."""
+    await strategies.delete_strategy(db, ctx.organization_id, ctx.user.id, topic_id, strategy_id)
 
 
 def _strategy_transition(target: StrategyStatus):

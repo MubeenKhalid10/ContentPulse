@@ -283,7 +283,7 @@ function TrendsScreen() {
               >
                 {t.title}
               </span>
-              <span className="text-xs text-[10px] text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {t.source}
               </span>
             </span>
@@ -344,7 +344,7 @@ function WriteScreen() {
         <div className="flex flex-wrap items-center gap-1.5">
           <PlatformTag platform="linkedin" />
           <Tag tone="neutral">Draft</Tag>
-          <span className="text-xs ml-auto text-[10px] text-muted-foreground tabular-nums">
+          <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
             612 / 3,000
           </span>
         </div>
@@ -381,7 +381,7 @@ function DesignScreen() {
             <br />
             <span className="text-[oklch(0.75_0.17_29)]">EU deadline</span>
           </span>
-          <span className="text-xs absolute bottom-2 left-2 text-[10px]">
+          <span className="absolute bottom-2 left-2 text-[11px]">
             Harbor &amp; Pine
           </span>
         </div>
@@ -415,7 +415,7 @@ function ApproveScreen() {
       <div className="grid gap-3 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-center gap-2">
-            <span className="grid size-7 place-items-center rounded-lg bg-foreground text-[10px] font-semibold text-background">
+            <span className="grid size-7 place-items-center rounded-lg bg-foreground text-[11px] font-semibold text-background">
               {EXAMPLE_CLIENT.initials}
             </span>
             <span className="text-xs font-semibold">{EXAMPLE_CLIENT.name}</span>

@@ -53,6 +53,7 @@ export function DocumentSheet({
 }) {
   const doc = useKnowledgeDocument(documentId);
   const data = doc.data;
+  const failed = doc.isError && !data;
 
   return (
     <Sheet open={!!documentId} onOpenChange={(open) => !open && onClose()}>
@@ -66,7 +67,7 @@ export function DocumentSheet({
                 <span className="flex flex-wrap items-center gap-2">
                   <DocumentStatus doc={data} />
                   <span className="text-xs">
-                    {data.word_count.toLocaleString()} words · {data.chunks.length} chunks
+                    {data.word_count.toLocaleString()} words · {data.chunks.length} passages
                   </span>
                   {canManage && data.document_type === "manual" && (
                     <Button size="xs" variant="outline" className="ml-auto" onClick={() => onEdit(data)}>
@@ -75,6 +76,16 @@ export function DocumentSheet({
                   )}
                 </span>
                 {data.meta.description && <span className="text-xs italic">{data.meta.description}</span>}
+              </SheetDescription>
+            </>
+          ) : failed ? (
+            <>
+              <SheetTitle>Couldn&apos;t open this document</SheetTitle>
+              <SheetDescription render={<div className="grid gap-2" />}>
+                <span>Something went wrong while loading it.</span>
+                <Button size="sm" variant="outline" className="w-fit" onClick={() => doc.refetch()}>
+                  Try again
+                </Button>
               </SheetDescription>
             </>
           ) : (
@@ -90,10 +101,16 @@ export function DocumentSheet({
           <Tabs defaultValue="content" className="min-h-0 flex-1">
             <TabsList className="mx-4 mt-3">
               <TabsTrigger value="content">Content</TabsTrigger>
-              <TabsTrigger value="chunks">Chunks ({data.chunks.length})</TabsTrigger>
+              <TabsTrigger value="chunks">Passages ({data.chunks.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="content" className="overflow-y-auto px-4 pb-6">
               {data.crawl_error && <p className="mb-3 text-sm text-destructive">{data.crawl_error}</p>}
+              {data.document_type !== "manual" && (
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Crawled pages can&apos;t be edited here; they refresh on the next crawl. To keep one out of search and
+                  posts, exclude it from the Sources list.
+                </p>
+              )}
               {data.content ? (
                 <DocumentContent markdown={data.content} />
               ) : (
@@ -119,7 +136,8 @@ export function DocumentSheet({
                         ) : (
                           <CircleDashedIcon className="size-3.5" />
                         )}
-                        ~{chunk.token_count ?? 0} tokens
+                        <span className="sr-only">{chunk.embedded ? "Searchable by meaning" : "Keyword search only"}</span>
+                        <span aria-hidden>{chunk.embedded ? "By meaning" : "Keyword"}</span>
                       </span>
                     </div>
                     <p className="text-sm whitespace-pre-line text-muted-foreground">{chunk.content}</p>

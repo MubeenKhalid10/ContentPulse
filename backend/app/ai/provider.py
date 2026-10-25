@@ -90,12 +90,16 @@ class AIError(Exception):
         *,
         retry_after: float | None = None,
         public: bool = False,
+        truncated: bool = False,
     ) -> None:
         super().__init__(message)
         self.kind = kind
         self.message = message
         self.retry_after = retry_after
         self.public = public
+        # OVERSIZED because the answer hit its output allowance (not because
+        # the prompt was too big): a larger allowance may fix it.
+        self.truncated = truncated
 
     @property
     def retryable(self) -> bool:
@@ -123,6 +127,8 @@ class StructuredResult:
     model: str
     input_tokens: int | None
     output_tokens: int | None
+    # Part of input_tokens served from the provider's prompt cache.
+    cached_input_tokens: int | None = None
     # Filled in by the gateway.
     provider: str = ""
     cached: bool = False
@@ -282,7 +288,9 @@ class AnthropicProvider:
                 f"The model declined this request{f' ({category})' if category else ''}.",
             )
         if response.stop_reason == "max_tokens":
-            raise AIError(AIErrorKind.OVERSIZED, "The AI response was cut off (max_tokens).")
+            raise AIError(
+                AIErrorKind.OVERSIZED, "The AI response was cut off (max_tokens).", truncated=True
+            )
         text = next((b.text for b in response.content if b.type == "text"), None)
         if not text:
             raise AIError(AIErrorKind.BAD_OUTPUT, "The AI returned no content.")
@@ -291,11 +299,17 @@ class AnthropicProvider:
         except json.JSONDecodeError as exc:
             raise AIError(AIErrorKind.BAD_OUTPUT, "The AI returned invalid JSON.") from exc
         usage = response.usage
+        # Anthropic's input_tokens leaves out cache reads and writes: add them
+        # so input_tokens is the whole prompt, as for the other providers.
+        cache_read = getattr(usage, "cache_read_input_tokens", None) or 0
+        cache_write = getattr(usage, "cache_creation_input_tokens", None) or 0
+        uncached = getattr(usage, "input_tokens", None)
         return StructuredResult(
             data=data,
             model=response.model,
-            input_tokens=getattr(usage, "input_tokens", None),
+            input_tokens=None if uncached is None else uncached + cache_read + cache_write,
             output_tokens=getattr(usage, "output_tokens", None),
+            cached_input_tokens=cache_read,
         )
 
 
@@ -412,7 +426,9 @@ class GeminiProvider:
         if finish in REFUSAL_FINISH_REASONS:
             raise AIError(AIErrorKind.REFUSED, f"Gemini declined to answer ({finish}).")
         if finish == "MAX_TOKENS":
-            raise AIError(AIErrorKind.OVERSIZED, "The AI response was cut off (max tokens).")
+            raise AIError(
+                AIErrorKind.OVERSIZED, "The AI response was cut off (max tokens).", truncated=True
+            )
         text = "".join(
             part.get("text", "")
             for part in (candidate.get("content") or {}).get("parts", [])
@@ -431,8 +447,10 @@ class GeminiProvider:
         return StructuredResult(
             data=parsed,
             model=data.get("modelVersion") or self.model,
+            # promptTokenCount includes cachedContentTokenCount (implicit cache).
             input_tokens=usage.get("promptTokenCount"),
             output_tokens=output,
+            cached_input_tokens=usage.get("cachedContentTokenCount"),
         )
 
 
@@ -538,7 +556,9 @@ class OpenAICompatibleProvider:
         if message.get("refusal") or choice.get("finish_reason") == "content_filter":
             raise AIError(AIErrorKind.REFUSED, "The model declined this request.")
         if choice.get("finish_reason") == "length":
-            raise AIError(AIErrorKind.OVERSIZED, "The AI response was cut off (max tokens).")
+            raise AIError(
+                AIErrorKind.OVERSIZED, "The AI response was cut off (max tokens).", truncated=True
+            )
         text = message.get("content") or ""
         if not text.strip():
             raise AIError(AIErrorKind.BAD_OUTPUT, "The AI returned no content.")
@@ -547,11 +567,13 @@ class OpenAICompatibleProvider:
         except json.JSONDecodeError as exc:
             raise AIError(AIErrorKind.BAD_OUTPUT, "The AI returned invalid JSON.") from exc
         usage = data.get("usage") or {}
+        details = usage.get("prompt_tokens_details") or {}
         return StructuredResult(
             data=parsed,
             model=data.get("model") or self.model,
             input_tokens=usage.get("prompt_tokens"),
             output_tokens=usage.get("completion_tokens"),
+            cached_input_tokens=details.get("cached_tokens") if isinstance(details, dict) else None,
         )
 
 
@@ -663,9 +685,17 @@ def primary_targets(settings: Settings) -> list[LLMTarget]:
     return targets
 
 
+def gemini_fallback(settings: Settings) -> LLMTarget | None:
+    """Gemini as the last resort of a default chain whose models are all from
+    other providers (LLM_GEMINI_FALLBACK_MODEL; empty turns it off)."""
+    model = settings.llm_gemini_fallback_model
+    return LLMTarget("gemini", model) if model else None
+
+
 def route(workflow: str, settings: Settings) -> list[LLMTarget]:
     """The ordered model chain for `workflow`: LLM_ROUTES[workflow] if set,
-    else the primary chain then LLM_FALLBACKS. Models without a key are skipped."""
+    else the primary chain, LLM_FALLBACKS, then Gemini (when no Gemini model
+    is in the chain yet). Models without a key are skipped."""
     if settings.llm_provider in (None, "none"):
         return []
     if workflow in settings.llm_routes:
@@ -675,6 +705,8 @@ def route(workflow: str, settings: Settings) -> list[LLMTarget]:
             *primary_targets(settings),
             *(LLMTarget.parse(v) for v in settings.llm_fallbacks),
         ]
+        if not any(t and t.provider == "gemini" for t in candidates):
+            candidates.append(gemini_fallback(settings))
     chain: list[LLMTarget] = []
     for target in candidates:
         if target and target not in chain and _usable(target, settings):

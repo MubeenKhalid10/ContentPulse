@@ -87,6 +87,14 @@ async def finalize(approval_id: uuid.UUID, ctx: CanReview, db: DB):
     return await service.finalize(db, ctx.organization_id, ctx.user.id, approval_id)
 
 
+@router.post("/{approval_id}/reopen", response_model=ApprovalDetail)
+async def reopen(approval_id: uuid.UUID, data: ChangesRequest, ctx: CanReview, db: DB):
+    """Request changes to already-approved work (approved work is locked)."""
+    return await service.reopen(
+        db, ctx.organization_id, ctx.user.id, approval_id, data.comment, data.scope
+    )
+
+
 @router.post("/{approval_id}/comments", response_model=ApprovalDetail)
 async def add_comment(approval_id: uuid.UUID, data: CommentCreate, ctx: CanComment, db: DB):
     return await service.add_comment(db, ctx.organization_id, ctx.user.id, approval_id, data.body)

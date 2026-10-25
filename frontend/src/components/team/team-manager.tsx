@@ -50,11 +50,16 @@ export function TeamManager() {
           canManage && (
             <Button onClick={() => setInviteFor(null)}>
               <UserPlusIcon />
-              Invite
+              Invite teammate
             </Button>
           )
         }
       />
+      {!canManage && (
+        <p className="mb-4 text-sm text-muted-foreground">
+          Only admins can invite people or change roles.
+        </p>
+      )}
 
       <Card className="py-0">
         {members.isPending ? (
@@ -62,6 +67,10 @@ export function TeamManager() {
             {Array.from({ length: 3 }, (_, i) => (
               <Skeleton key={i} className="h-10 w-full" />
             ))}
+          </CardContent>
+        ) : members.isError ? (
+          <CardContent className="py-6 text-sm text-destructive" role="alert">
+            Couldn&apos;t load the team. Refresh the page to try again.
           </CardContent>
         ) : (
           <Table>
@@ -71,7 +80,11 @@ export function TeamManager() {
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Since</TableHead>
-                {canManage && <TableHead className="w-12" />}
+                {canManage && (
+                  <TableHead className="w-12">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -89,7 +102,12 @@ export function TeamManager() {
         )}
       </Card>
 
-      <dl className="mt-8 grid gap-4 sm:grid-cols-2">
+      <p className="mt-3 text-xs text-muted-foreground">
+        Disable access pauses someone so they can&apos;t sign in and can be restored later. Remove takes them out of the organization.
+      </p>
+
+      <h2 className="mt-8 mb-3 text-base font-semibold">About roles</h2>
+      <dl className="grid gap-4 sm:grid-cols-2">
         {ROLE_OPTIONS.map((role) => (
           <div key={role.value} className="grid gap-0.5">
             <dt className="text-sm font-medium">{role.label}</dt>
@@ -160,7 +178,7 @@ function MemberRow({
             {timeAgo(member.joined_at)}
           </time>
         ) : (
-          "—"
+          <span>Not joined yet</span>
         )}
       </TableCell>
       {canManage && (
@@ -174,18 +192,30 @@ function MemberRow({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
                 {member.status === "invited" && (
-                  <DropdownMenuItem onClick={onResend}>New invite link</DropdownMenuItem>
+                  <DropdownMenuItem onClick={onResend}>Replace invite link</DropdownMenuItem>
                 )}
                 {member.status === "active" && (
                   <DropdownMenuItem
-                    onClick={() => update.mutate({ memberId: member.id, status: "disabled" }, { onError })}
+                    onClick={() => update.mutate(
+                        { memberId: member.id, status: "disabled" },
+                        {
+                          onSuccess: () => toast.success(`${member.email} can no longer sign in`),
+                          onError,
+                        },
+                      )}
                   >
                     Disable access
                   </DropdownMenuItem>
                 )}
                 {member.status === "disabled" && (
                   <DropdownMenuItem
-                    onClick={() => update.mutate({ memberId: member.id, status: "active" }, { onError })}
+                    onClick={() => update.mutate(
+                        { memberId: member.id, status: "active" },
+                        {
+                          onSuccess: () => toast.success(`Access restored for ${member.email}`),
+                          onError,
+                        },
+                      )}
                   >
                     Restore access
                   </DropdownMenuItem>
@@ -219,9 +249,9 @@ function RemoveMemberDialog({ member, onClose }: { member: Member | undefined; o
     <AlertDialog open={!!member} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Remove {member?.full_name ?? member?.email}?</AlertDialogTitle>
+          <AlertDialogTitle>Remove {member?.full_name ?? member?.email}{member?.full_name ? ` (${member.email})` : ""}?</AlertDialogTitle>
           <AlertDialogDescription>
-            They lose access immediately. Their past work and activity history are kept.
+            They lose access immediately. Their past work and activity history are kept. To pause access and restore it later, use Disable access instead.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -240,7 +270,7 @@ function RemoveMemberDialog({ member, onClose }: { member: Member | undefined; o
               })
             }
           >
-            Remove
+            {remove.isPending ? "Removing…" : "Remove"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

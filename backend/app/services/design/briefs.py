@@ -287,7 +287,7 @@ async def run_ai_brief(job_id: uuid.UUID) -> None:
                 ),
                 prompt=brief_prompt(post, version, strategy, brief),
                 schema=response_schema(),
-                max_tokens=4000,
+                max_tokens=1500,
                 workflow=JOB_TYPE,
                 organization_id=post.organization_id,
                 job_id=job.id,

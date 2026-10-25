@@ -208,14 +208,38 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
     position = effective_position(brief.brand_requirements, brand.logo_position if brand else None)
     # The real logo goes on afterwards: only when there is one and it's wanted.
     logo_spot = position if has_logo(organization) else None
-    image = await generate_image(
-        image_prompt(brief, post, version, brand, logo_spot),
-        aspect_ratio(brief.dimensions),
-        organization_id=brief.organization_id,
-        job_id=job.id,
-    )
-    job.provider, job.model = image.provider, image.model
-    data, mime_type, note = image.data, image.mime_type, "Generated with AI"
+    storage = get_storage()
+    # A retry never pays for a second image: reuse the stored one, or resume
+    # the provider task created by an earlier attempt.
+    raw_key = job.result.get("raw_image_key")
+    data = await storage.get(raw_key) if raw_key else None
+    if data is not None:
+        mime_type = job.result.get("raw_image_type") or "image/png"
+    else:
+
+        async def remember_task(task_id: str) -> None:
+            job.result = {**job.result, "provider_task_id": task_id}
+            await db.commit()
+
+        image = await generate_image(
+            image_prompt(brief, post, version, brand, logo_spot),
+            aspect_ratio(brief.dimensions),
+            organization_id=brief.organization_id,
+            job_id=job.id,
+            task_id=job.result.get("provider_task_id"),
+            on_task=remember_task,
+        )
+        job.provider, job.model = image.provider, image.model
+        data, mime_type = image.data, image.mime_type
+        # Stored before anything that can fail (logo, storage, versioning).
+        raw_key = (
+            f"{design._prefix(brief)}{uuid.uuid4().hex[:12]}-ai-original."
+            f"{EXTENSIONS.get(mime_type, 'png')}"
+        )
+        await storage.put(raw_key, data, mime_type)
+        job.result = {**job.result, "raw_image_key": raw_key, "raw_image_type": mime_type}
+        await db.commit()
+    note = "Generated with AI"
     if logo_spot:
         try:
             placed = await add_logo(data, organization, logo_spot, get_settings())
@@ -228,7 +252,7 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
             note += f" · your logo in the {POSITION_LABEL[logo_spot]}"
     extension = EXTENSIONS.get(mime_type, "png")
     key = f"{design._prefix(brief)}{uuid.uuid4().hex[:12]}-ai-image.{extension}"
-    await get_storage().put(key, data, mime_type)
+    await storage.put(key, data, mime_type)
     requested_by = job.result.get("requested_by")
     number = await design.record_version(
         db,

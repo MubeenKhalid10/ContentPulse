@@ -38,7 +38,7 @@ function useJobCompletion(summary: KnowledgeSummary | undefined) {
       toast.success(
         finished.kind === "crawl"
           ? `Crawl finished: ${finished.pages_indexed} page${finished.pages_indexed === 1 ? "" : "s"} indexed, ${finished.pages_unchanged} unchanged`
-          : "Re-index finished",
+          : "Search index refreshed",
       );
     } else if (finished.status === "cancelled") {
       toast.message("Crawl stopped");
@@ -53,6 +53,11 @@ export function KnowledgeBase() {
   const canManage = useCan()("knowledge.write");
   const reindex = useReindex();
   const [crawlOpen, setCrawlOpen] = useState(false);
+  // "Index your website" on the dashboard checklist opens the crawl dialog here,
+  // prefilled with the organization's website. Nothing starts until the user confirms.
+  const [autoIndex, setAutoIndex] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("index") === "1",
+  );
   const [docDialog, setDocDialog] = useState<{ editing: KnowledgeDocumentDetail | null } | null>(null);
   const [openDoc, setOpenDoc] = useState<string | null>(null);
   useJobCompletion(summary.data);
@@ -112,10 +117,16 @@ export function KnowledgeBase() {
                 variant="link"
                 size="sm"
                 className="h-auto p-0"
-                onClick={() => reindex.mutate(undefined, { onError: (e) => toast.error(errorMessage(e)) })}
+                disabled={reindex.isPending}
+                onClick={() =>
+                  reindex.mutate(undefined, {
+                    onSuccess: () => toast.success("Refreshing the search index…"),
+                    onError: (e) => toast.error(errorMessage(e)),
+                  })
+                }
               >
-                <RefreshCwIcon />
-                Re-index now
+                <RefreshCwIcon className={reindex.isPending ? "animate-spin" : undefined} />
+                {reindex.isPending ? "Starting…" : "Refresh search index"}
               </Button>
             </p>
           )}
@@ -130,7 +141,17 @@ export function KnowledgeBase() {
         </div>
       )}
 
-      <CrawlDialog open={crawlOpen} onClose={() => setCrawlOpen(false)} websiteUrl={data?.website_url ?? null} />
+      <CrawlDialog
+        open={crawlOpen || (autoIndex && !!data && canManage)}
+        onClose={() => {
+          setCrawlOpen(false);
+          if (autoIndex) {
+            setAutoIndex(false);
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+        }}
+        websiteUrl={data?.website_url ?? null}
+      />
       <DocumentDialog open={!!docDialog} editing={docDialog?.editing ?? null} onClose={() => setDocDialog(null)} />
       <DocumentSheet
         documentId={openDoc}

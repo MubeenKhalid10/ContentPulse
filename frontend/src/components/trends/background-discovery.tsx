@@ -25,7 +25,7 @@ export function backgroundHint(
   frequency: TrendFrequency,
   nextDiscoveryAt?: string | null,
 ): string {
-  if (!on) return "Trends update only when you select Discover New Trends now.";
+  if (!on) return "Trends update only when you select Check for new trends.";
   const schedule = scheduleLabel(frequency);
   const next =
     nextDiscoveryAt && Date.parse(nextDiscoveryAt) > Date.now()
@@ -49,9 +49,9 @@ export function BackgroundDiscoveryToggle({ className }: { className?: string })
   const on = settings.data.background_discovery;
 
   return (
-    <div className={cn("flex items-center gap-3 rounded-md border bg-card px-3 py-2", className)}>
+    <div className={cn("flex flex-wrap items-center gap-3", className)}>
       <div className="grid gap-0.5 text-left">
-        <span id={labelId} className="text-sm font-bold whitespace-nowrap">
+        <span id={labelId} className="text-sm font-medium sm:whitespace-nowrap">
           Update trends in the background
         </span>
         <span id={hintId} className="max-w-72 text-xs text-muted-foreground">
@@ -60,6 +60,7 @@ export function BackgroundDiscoveryToggle({ className }: { className?: string })
                 settings.data.trend_frequency,
                 discovery.data?.next_discovery_at,
               )}
+          {!canEdit && !update.isPending && " Only admins can change this."}
         </span>
       </div>
       <Switch

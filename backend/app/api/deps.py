@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.errors import Forbidden, NotFound, Unauthorized
 from app.core.permissions import Permission, Role, has_permission
+from app.core.security import decode_local_token
+from app.core.supabase import verify_supabase_token
 from app.db.session import get_db
 from app.models.enums import MemberStatus
 from app.models.organization import Organization, OrganizationMember
@@ -92,6 +94,56 @@ async def load_org_context(db: AsyncSession, user: User, organization_id: uuid.U
     return OrgContext(user=user, organization=organization, membership=membership)
 
 
+async def _fused_org_context(
+    request: Request, db: AsyncSession, settings: Settings, organization_id: uuid.UUID | None
+) -> OrgContext | None:
+    """The user, their membership and the organization in ONE query.
+
+    Every organization route used to do these as two sequential queries; with a
+    database that is far away each query is a visible delay. Returns None when
+    the quick path doesn't apply (no organization header, first sight of a
+    Supabase user, inactive user, not a member), so the regular path runs and
+    raises the usual errors.
+    """
+    token = _extract_token(request, settings)
+    if not token or organization_id is None:
+        return None
+    if settings.auth_provider == "local":
+        try:
+            who = User.id == uuid.UUID(decode_local_token(token, settings)["sub"])
+        except ValueError:
+            return None
+    else:
+        claims = await verify_supabase_token(token, settings)
+        who = User.external_auth_id == str(claims["sub"])
+    row = (
+        await db.execute(
+            select(User, OrganizationMember, Organization)
+            .join(OrganizationMember, OrganizationMember.user_id == User.id)
+            .join(Organization, Organization.id == OrganizationMember.organization_id)
+            .where(
+                who,
+                OrganizationMember.organization_id == organization_id,
+                OrganizationMember.status == MemberStatus.ACTIVE,
+            )
+        )
+    ).first()
+    if row is None or not row[0].is_active:
+        return None
+    user, membership, organization = row
+    return OrgContext(user=user, organization=organization, membership=membership)
+
+
+async def _org_context_for_request(
+    request: Request, db: AsyncSession, settings: Settings, organization_id: uuid.UUID | None
+) -> OrgContext:
+    ctx = await _fused_org_context(request, db, settings, organization_id)
+    if ctx is not None:
+        return ctx
+    user = await get_current_user(await get_optional_user(request, db, settings))
+    return await _active_org_context(user, db, organization_id)
+
+
 def org_permission(permission: Permission):
     """For routes under /organizations/{organization_id}/..."""
 
@@ -107,11 +159,12 @@ def active_org_any_permission(*permissions: Permission):
     """Active-org route allowed when the caller has any of `permissions`."""
 
     async def dependency(
-        user: CurrentUser,
+        request: Request,
         db: DB,
+        settings: AppSettings,
         x_organization_id: Annotated[uuid.UUID | None, Header()] = None,
     ) -> OrgContext:
-        ctx = await _active_org_context(user, db, x_organization_id)
+        ctx = await _org_context_for_request(request, db, settings, x_organization_id)
         if not any(ctx.can(p) for p in permissions):
             raise Forbidden()
         return ctx
@@ -138,11 +191,12 @@ def active_org_permission(permission: Permission):
     """
 
     async def dependency(
-        user: CurrentUser,
+        request: Request,
         db: DB,
+        settings: AppSettings,
         x_organization_id: Annotated[uuid.UUID | None, Header()] = None,
     ) -> OrgContext:
-        ctx = await _active_org_context(user, db, x_organization_id)
+        ctx = await _org_context_for_request(request, db, settings, x_organization_id)
         ctx.require(permission)
         return ctx
 

@@ -40,13 +40,13 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
 
   // Markets + keywords drive what sources search for.
   await openOrgSetup(page);
-  await page.getByRole("link", { name: "Content setup" }).click();
+  await page.getByRole("link", { name: "Audience & platforms" }).click();
   await page.getByLabel("Target markets").fill("USA");
   await page.getByLabel("Target markets").press("Enter");
   await page.getByLabel("Keywords to track").fill("artificial intelligence");
   await page.getByLabel("Keywords to track").press("Enter");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText("Content setup saved")).toBeVisible();
+  await expect(page.getByText("Audience & platforms saved")).toBeVisible();
 
   // Sources: one click from Trends; free ones ready, keyed ones explain what's missing.
   await page.getByRole("link", { name: /Find trends/ }).first().click();
@@ -73,9 +73,9 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await page.getByRole("link", { name: /Find trends/ }).first().click();
   // New organizations get a scheduled first run within a minute, so discovery
   // may already be under way; otherwise start it.
-  const startFirst = page.getByRole("button", { name: "Discover New Trends now" }).first();
-  const startAgain = page.getByRole("button", { name: "Discover New Trends now" }).last();
-  const inProgress = page.getByRole("button", { name: "Discovering…" });
+  const startFirst = page.getByRole("button", { name: "Check for new trends" }).first();
+  const startAgain = page.getByRole("button", { name: "Check for new trends" }).last();
+  const inProgress = page.getByRole("button", { name: "Checking…" });
   await expect(startFirst.or(startAgain).or(inProgress).first()).toBeVisible();
   if (await startFirst.isVisible()) await startFirst.click();
   else if (await startAgain.isEnabled()) await startAgain.click();
@@ -92,22 +92,15 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await background.click();
   await expect(page.getByText("Trends will update only when you ask")).toBeVisible();
   await expect(background).not.toBeChecked();
-  await rows.first().getByRole("link").click();
+  await rows.first().getByRole("link").first().click();
   await expect(page.getByRole("heading", { level: 1, name: topic })).toBeVisible();
-  await expect(page.getByText("Why it's trending", { exact: true })).toBeVisible();
+  await expect(page.getByText("Summary", { exact: true })).toBeVisible();
   // Relevance analysis (Sprint 4). Without an AI model configured, discovery
   // runs the rule-based estimate automatically; trigger it if it hasn't yet.
-  await expect(page.getByText("Does this fit your business?", { exact: true })).toBeVisible();
+  await expect(page.getByText("Why it fits your business", { exact: true })).toBeVisible();
   const analyzeNow = page.getByRole("button", { name: "Analyze now" });
   if (await analyzeNow.isVisible()) await analyzeNow.click();
   await expect(page.getByText(/^Rule-based estimate/).first()).toBeVisible({ timeout: 30_000 });
-  // Evidence starts folded; opening it lists the mentions by source.
-  const evidence = page.getByRole("button", { name: /^Evidence \(\d+\)/ });
-  await expect(evidence).toHaveAttribute("aria-expanded", "false");
-  await evidence.click();
-  await expect(evidence).toHaveAttribute("aria-expanded", "true");
-  const evidencePanel = page.locator(`[id="${await evidence.getAttribute("aria-controls")}"]`);
-  await expect(evidencePanel.getByRole("link").first()).toBeVisible();
   await shot(page, "trends-03-detail");
 
   await page.getByRole("button", { name: `Shortlist ${topic}`, exact: true }).click();
@@ -120,24 +113,22 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await expect(shortlisted.getByRole("listitem")).toHaveCount(1);
 
   // Sprint 5: shortlisting the trend shortlisted its topic candidate.
-  await page.getByRole("link", { name: /Pick topics/ }).first().click();
-  await page.getByRole("tab", { name: /^Shortlisted/ }).click();
+  await page.getByRole("link", { name: /Shortlist & plans/ }).first().click();
   const topics = page.getByRole("list", { name: "Topics" });
   await expect(topics).toHaveAttribute("aria-busy", "false");
-  await expect(topics.getByRole("link")).toHaveCount(1);
+  await expect(topics.getByRole("link", { name: topic, exact: true })).toHaveCount(1);
   await topics.getByRole("link", { name: topic, exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: topic })).toBeVisible();
-  await expect(page.getByText("Recommended platforms", { exact: true })).toBeVisible();
-  await expect(page.getByText("Does this fit your business?", { exact: true })).toBeVisible();
+  await expect(page.getByText("Post ideas", { exact: true })).toBeVisible();
 
   // Plan a post and write it in one step: draft the plan from the playbook (no
-  // AI model in E2E), then "Save & write post" opens the studio.
-  await page.getByRole("button", { name: "New plan" }).click();
+  // AI model in E2E), then "Write post" opens the studio.
+  await page.getByRole("button", { name: /Create (your first )?plan/ }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "Draft from playbook" }).click();
+  await dialog.getByRole("button", { name: "Draft Plan from playbook" }).click();
   await expect(dialog.getByLabel("Post idea")).not.toHaveValue("");
   await shot(page, "topics-01-detail");
-  await dialog.getByRole("button", { name: "Save & write post" }).click();
+  await dialog.getByRole("button", { name: "Write post" }).click();
   await expect(page).toHaveURL(/\/content\//);
   await expect(page.getByText("Template draft", { exact: true })).toBeVisible({ timeout: 30_000 });
 
@@ -161,8 +152,10 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   const studioUrl = page.url();
   // The copy needs an admin's approval before design.
   await page.getByRole("button", { name: "Submit for approval" }).click();
-  await page.getByRole("link", { name: "Review & approve" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Submit" }).click();
+  await page.getByRole("link", { name: "Review", exact: true }).click();
   await page.getByRole("button", { name: "Approve content" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Approve content" }).click();
 
   // Approving keeps the reviewer in Approvals; the design task waits on the Design page.
   await expect(page).toHaveURL(/\/approvals$/);
@@ -180,7 +173,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
     mimeType: "image/png",
     buffer: readFileSync("e2e/fixtures/creative-slide-1.png"),
   });
-  const card = page.getByRole("button", { name: "Upload & submit for approval" });
+  const card = page.getByRole("button", { name: "Submit for approval" });
   const cardBox = await page.getByText("Add the design", { exact: true }).locator("xpath=ancestor::*[@data-slot='card'][1]").boundingBox();
   const buttonBox = await card.boundingBox();
   expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width);
@@ -242,7 +235,7 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
 
   // Review: ask for changes, the creator uploads a new design and resubmits
   // in one click, then one "Approve" makes the post ready to publish.
-  await page.getByRole("link", { name: /^Approve$/ }).click();
+  await page.getByRole("link", { name: /^Approvals$/ }).click();
   await page.getByRole("tab", { name: /Design approval/ }).click();
   const queue = page.getByRole("list", { name: "Approvals" });
   await expect(queue.getByRole("link")).toHaveCount(1);
@@ -261,19 +254,20 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   // The creator goes back to the post in Write posts.
   await page.goto(studioUrl);
   await expect(page.getByText(/^Changes requested \(round 1\)/)).toBeVisible();
-  await page.getByRole("link", { name: "Update design & resubmit" }).click();
+  await page.getByRole("link", { name: "Update design" }).click();
   await expect(page.getByText("Use a stronger headline on the image.")).toBeVisible();
   await page.getByLabel("Choose creative files").setInputFiles("e2e/fixtures/creative-slide-1.png");
-  await page.getByRole("button", { name: "Upload & submit for approval" }).click();
+  await page.getByRole("button", { name: "Submit for approval" }).click();
   await expect(page.getByText("Submitted for approval").first()).toBeVisible();
-  await page.getByRole("link", { name: /^Approve$/ }).click();
+  await page.getByRole("link", { name: /^Approvals$/ }).click();
   await page.getByRole("tab", { name: /Design approval/ }).click();
   await expect(queue.getByText("Round 2")).toBeVisible();
   await queue.getByRole("link").click();
   await page.getByRole("button", { name: "Approve" }).click();
-  // Back in Approvals: the post is now under Ready to post.
+  await page.getByRole("alertdialog").getByRole("button", { name: "Approve design and post" }).click();
+  // Back in Approvals: the post is now under Ready to publish.
   await expect(page).toHaveURL(/\/approvals$/);
-  await page.getByRole("tab", { name: "Ready to post" }).click();
+  await page.getByRole("tab", { name: "Ready to publish" }).click();
   await queue.getByRole("link").click();
   await expect(page.getByText("Locked and ready to publish. Use Share on the post.")).toBeVisible();
   await shot(page, "approvals-02-final");
@@ -289,12 +283,9 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   // Dashboard: the pipeline counts the shortlisted topic and the approved post;
   // the period's numbers include what this run discovered and wrote.
   await page.getByRole("link", { name: "Dashboard" }).click();
-  const flow = page.getByRole("region", { name: "Content pipeline" });
-  await expect(flow.getByRole("link", { name: /Shortlisted$/ })).toContainText("1");
-  await expect(flow.getByRole("link", { name: /Ready to publish$/ })).toContainText("1");
   const numbers = page.getByRole("region", { name: "Key numbers" });
   await expect(numbers.getByRole("link", { name: /^Posts written/ })).toContainText(/[1-9]/);
-  await expect(numbers.getByRole("link", { name: /^Approved to publish/ })).toContainText(/[1-9]/);
+  await expect(numbers.getByRole("link", { name: /^Ready to publish/ })).toContainText(/[1-9]/);
   await expect(page.getByRole("table")).toBeVisible(); // trending topics
   await expect(page.getByRole("list", { name: "Recent content" }).getByRole("listitem").first()).toBeVisible();
   await shot(page, "trends-04-dashboard");

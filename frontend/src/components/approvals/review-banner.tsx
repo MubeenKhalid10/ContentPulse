@@ -40,6 +40,9 @@ export function ReviewBanner({ review, children }: { review: ReviewSummary | nul
             ))}
           </ul>
         )}
+        {review.status === "changes_requested" && children && (
+          <p className="text-sm font-medium text-foreground">Make the changes above, then resubmit for approval.</p>
+        )}
         {children}
       </AlertDescription>
     </Alert>

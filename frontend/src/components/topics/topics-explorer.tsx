@@ -4,7 +4,6 @@ import { ListChecksIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { Tag } from "@/components/shared/tag";
 import { PageHeader } from "@/components/shared/page-header";
 import {
   FILTER_SEARCH,
@@ -20,54 +19,32 @@ import { Score } from "@/components/trends/score";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { type TopicFilters, type TopicStatusFilter, useTopics } from "@/hooks/use-topics";
+import { type TopicFilters, useTopics } from "@/hooks/use-topics";
+import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { PLATFORM_OPTIONS } from "@/lib/options";
+import { topicHref } from "@/lib/topics";
 import { cn } from "@/lib/utils";
-import type { Topic, TopicPage } from "@/types/api";
+import type { Topic } from "@/types/api";
 
 const PAGE = 30;
-const RELEVANCE_FILTERS = [
-  { value: "all", label: "Any relevance" },
-  { value: "relevant", label: "Relevant to us" },
-  { value: "highly_relevant", label: "Highly relevant" },
-  { value: "weakly_relevant", label: "Weakly relevant" },
-  { value: "not_relevant", label: "Not relevant" },
-];
 const PLATFORM_FILTERS = [{ value: "all", label: "Any platform" }, ...PLATFORM_OPTIONS];
 const SORTS = [
   { value: "score", label: "Best opportunity" },
-  { value: "relevance", label: "Most relevant" },
   { value: "recent", label: "Newest" },
 ] as const;
-const TABS: { value: TopicStatusFilter; label: string; count: (c: TopicPage["counts"]) => number }[] = [
-  { value: "open", label: "To review", count: (c) => c.new + c.reviewed },
-  { value: "shortlisted", label: "Shortlisted", count: (c) => c.shortlisted },
-  { value: "rejected", label: "Rejected", count: (c) => c.rejected },
-];
-const EMPTY: Record<TopicStatusFilter, string> = {
-  open: "Nothing waiting for review. New topics appear here after trends are analyzed.",
-  shortlisted: "No shortlisted topics yet. Shortlist a topic to plan content for it.",
-  rejected: "No rejected topics.",
-  archived: "No archived topics.",
-  all: "No topics yet.",
-};
-
 export function TopicsExplorer() {
   const canManage = useCan()("topics.manage");
   const [saved, setFilters] = usePersistedState<TopicFilters>("topics", {
-    status: "open",
+    status: "shortlisted",
     relevance: "",
     platform: "",
     sort: "score",
     q: "",
   });
-  // A tab saved before "Archived" was removed.
-  const filters = TABS.some((t) => t.value === saved.status)
-    ? saved
-    : { ...saved, status: "open" as const };
+  // This page lists shortlisted trends only; new trends are reviewed on Find trends.
+  const filters: TopicFilters = { ...saved, status: "shortlisted", relevance: "" };
   const [limit, setLimit] = useState(PAGE);
   const topics = useTopics(filters, limit);
   const update = (patch: Partial<TopicFilters>) => {
@@ -75,14 +52,13 @@ export function TopicsExplorer() {
     setLimit(PAGE);
   };
   const counts = topics.data?.counts;
-  const noTopicsAtAll =
-    counts && Object.values(counts).every((n) => n === 0) && !filters.q && !filters.platform && !filters.relevance;
+  const noTopicsAtAll = counts && counts.shortlisted === 0 && !filters.q && !filters.platform;
 
   return (
     <>
       <PageHeader
-        title="Pick topics"
-        description="Trends that fit your business and are waiting for your decision. Choose the ones worth posting about, then plan one post for each platform."
+        title="Shortlist & plans"
+        description="The trends you shortlisted, with a post plan and posts for each platform. New trends are reviewed on Find trends."
       />
 
       {noTopicsAtAll ? (
@@ -92,47 +68,26 @@ export function TopicsExplorer() {
               <ListChecksIcon className="size-6 text-muted-foreground" />
             </span>
             <div className="grid max-w-md gap-1.5">
-              <p className="text-lg font-medium">No topic candidates yet</p>
+              <p className="text-lg font-medium">Nothing shortlisted yet</p>
               <p className="text-sm text-muted-foreground">
-                When analysis finds a trend relevant to your organization, it becomes a topic here. You can
-                also shortlist any trend from the Trends page.
+                Relevant trends are reviewed on Find trends. Shortlist one there and its post plans
+                and posts appear here.
               </p>
             </div>
             <Link href="/trends" className={buttonVariants({ variant: "outline" })}>
-              Go to Trends
+              Go to Find trends
             </Link>
           </CardContent>
         </Card>
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-6">
           <FilterBar>
-            <Tabs value={filters.status} onValueChange={(v) => update({ status: v as TopicStatusFilter })} className="shrink-0">
-              <TabsList>
-                {TABS.map((tab) => (
-                  <TabsTrigger key={tab.value} value={tab.value}>
-                    {tab.label}
-                    {counts && tab.count(counts) > 0 && (
-                      <span className="ml-1 rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
-                        {tab.count(counts)}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
             <SearchInput
-              aria-label="Search topics"
-              placeholder="Search topics"
+              aria-label="Search shortlisted trends"
+              placeholder="Search shortlisted trends"
               value={filters.q}
               onChange={(q) => update({ q })}
               className={FILTER_SEARCH}
-            />
-            <SimpleSelect
-              aria-label="Relevance"
-              value={filters.relevance || "all"}
-              onChange={(v) => update({ relevance: v === "all" ? "" : (v as TopicFilters["relevance"]) })}
-              options={RELEVANCE_FILTERS}
-              className={FILTER_SELECT}
             />
             <SimpleSelect
               aria-label="Platform"
@@ -150,7 +105,19 @@ export function TopicsExplorer() {
             />
           </FilterBar>
 
-          {topics.isPending ? (
+          {topics.isError ? (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/40 p-4 text-sm"
+            >
+              <span className="text-destructive">
+                Couldn&apos;t load your shortlist. {errorMessage(topics.error)}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => topics.refetch()}>
+                Retry
+              </Button>
+            </div>
+          ) : topics.isPending ? (
             <div className="grid gap-3">
               {Array.from({ length: 4 }, (_, i) => (
                 <Skeleton key={i} className="h-24 w-full rounded-xl" />
@@ -175,7 +142,7 @@ export function TopicsExplorer() {
             </>
           ) : (
             <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              {filters.q || filters.platform || filters.relevance ? "No topics match these filters." : EMPTY[filters.status]}
+              {filters.q || filters.platform ? "No shortlisted trends match these filters." : "Nothing shortlisted yet. Shortlist a trend on Find trends to plan posts for it here."}
             </p>
           )}
         </div>
@@ -191,13 +158,12 @@ function TopicRow({ topic, canManage }: { topic: Topic; canManage: boolean }) {
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href={`/topics/${topic.id}`}
-            className="max-w-full truncate text-base font-medium after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
+            href={topicHref(topic)}
+            className="line-clamp-2 max-w-full text-base font-medium after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring"
           >
             {topic.title}
           </Link>
           <RelevanceBadge level={topic.relevance_level} />
-          {topic.status === "reviewed" && <Tag tone="sky" dot>Reviewed</Tag>}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
           <PlatformBadges platforms={topic.recommended_platforms} />
@@ -205,16 +171,21 @@ function TopicRow({ topic, canManage }: { topic: Topic; canManage: boolean }) {
           {topic.strategy_count > 0 && (
             <span>
               {topic.strategy_count} {topic.strategy_count === 1 ? "plan" : "plans"}
-              {topic.approved_strategy_count > 0 && ` · ${topic.approved_strategy_count} written`}
+              {topic.approved_strategy_count > 0 && ` · ${topic.approved_strategy_count} posts written`}
             </span>
           )}
         </div>
       </div>
-      {canManage && (
-        <div className="relative z-10 flex basis-full items-center pl-16 sm:basis-auto sm:self-center sm:pl-0">
-          <TopicActions topic={topic} compact />
-        </div>
-      )}
+      <div className="relative z-10 flex basis-full flex-wrap items-center gap-1.5 pl-16 sm:basis-auto sm:self-center sm:pl-0">
+        <Link
+          href={topicHref(topic)}
+          aria-label={`View trend ${topic.title}`}
+          className={buttonVariants({ variant: "view", size: "sm" })}
+        >
+          View trend
+        </Link>
+        {canManage && <TopicActions topic={topic} compact />}
+      </div>
     </li>
   );
 }

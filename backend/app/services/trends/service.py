@@ -344,6 +344,8 @@ async def list_runs(
 STATUS_FILTERS = {
     "active": [TrendStatus.NEW, TrendStatus.ANALYZED],
     "shortlisted": [TrendStatus.SHORTLISTED],
+    # "All trends" on the Trends page: everything not yet shortlisted (rejected ones included).
+    "unshortlisted": [TrendStatus.NEW, TrendStatus.ANALYZED, TrendStatus.REJECTED],
     "rejected": [TrendStatus.REJECTED],
     "archived": [TrendStatus.ARCHIVED],
 }

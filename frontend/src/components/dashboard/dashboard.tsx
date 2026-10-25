@@ -5,11 +5,10 @@ import {
   ArrowDownIcon,
   ArrowRightIcon,
   ArrowUpIcon,
-  CheckCircle2Icon,
   CheckIcon,
+  ChevronRightIcon,
   FileTextIcon,
-  ListChecksIcon,
-  PaletteIcon,
+  MinusIcon,
   SendIcon,
   SparklesIcon,
   TargetIcon,
@@ -62,7 +61,6 @@ import type {
   DashboardSummary,
   DashboardTrendingTopic,
   Platform,
-  TopTrend,
 } from "@/types/api";
 
 const PERIODS = [
@@ -132,7 +130,7 @@ export function Dashboard() {
 
         {showSetup && <SetupChecklist setup={setup} />}
 
-        <HowItWorks />
+        {isNew && <HowItWorks />}
 
         {simple && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
@@ -140,10 +138,17 @@ export function Dashboard() {
               Charts and trend lists appear here once ContentPulse has found
               your first trends.
             </span>
-            <Button variant="ghost" size="sm" onClick={() => setShowAll(true)}>
-              Show the full dashboard
+            <Button variant="outline" size="sm" onClick={() => setShowAll(true)}>
+              Show the full dashboard anyway
             </Button>
           </div>
+        )}
+
+        {!simple && (
+          <p className="-mb-3 text-xs text-muted-foreground">
+            Showing the last {days} days. Platform breakdown and source health
+            are not affected by the period.
+          </p>
         )}
 
         {!simple && (
@@ -178,7 +183,7 @@ export function Dashboard() {
                   color="var(--paper-8)"
                 />
                 <MetricCard
-                  label="Approved to publish"
+                  label="Ready to publish"
                   icon={SendIcon}
                   metric={data.approved_posts}
                   days={days}
@@ -200,14 +205,7 @@ export function Dashboard() {
             <div className="grid min-w-0 content-start gap-6">
               {can("trends.read") && <TrendingTopics data={data} />}
 
-              <ContentPipeline summary={summary.data} overview={data} />
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <RecentContent data={data} />
-                {can("trends.read") && (
-                  <TopOpportunities summary={summary.data} />
-                )}
-              </div>
+              <RecentContent data={data} />
             </div>
 
             {/* Side column */}
@@ -215,7 +213,7 @@ export function Dashboard() {
               aria-label="At a glance"
               className="grid min-w-0 content-start gap-6"
             >
-              {can("trends.read") && <SourceHealth />}
+              {can("trends.manage") && <SourceHealth />}
               <PlatformBreakdown data={data} />
             </aside>
           </div>
@@ -292,7 +290,7 @@ function TrendSearch() {
         placeholder="Search trends…"
         value={q}
         onChange={setQ}
-        className="w-56"
+        className="w-full sm:w-56"
       />
     </form>
   );
@@ -306,7 +304,7 @@ function Change({ metric }: { metric: DashboardMetric }) {
     return value > 0 ? (
       <span className="text-xs font-medium text-success">New</span>
     ) : (
-      <span className="text-xs text-muted-foreground">No change</span>
+      <span className="text-xs text-muted-foreground">No data yet</span>
     );
   }
   const pct = Math.round(((value - previous) / previous) * 100);
@@ -323,9 +321,9 @@ function Change({ metric }: { metric: DashboardMetric }) {
       ) : (
         <ArrowDownIcon className="size-3" aria-hidden />
       )}
-      {Math.abs(pct)}%
+      <span aria-hidden>{Math.abs(pct)}%</span>
       <span className="sr-only">
-        {up ? "up" : "down"} from {previous}
+        {up ? "up" : "down"} {Math.abs(pct)}% from {previous}
       </span>
     </span>
   );
@@ -382,16 +380,28 @@ function MetricCard({
   href: string;
   color: string;
 }) {
+  const { value, previous } = metric;
+  const changeText =
+    previous === 0
+      ? value > 0
+        ? "new this period"
+        : "no data yet"
+      : `${value >= previous ? "up" : "down"} ${Math.abs(Math.round(((value - previous) / previous) * 100))}% from ${previous}`;
   return (
     <Link
       href={href}
+      aria-label={`${label}: ${value.toLocaleString()}, ${changeText}. View ${label.toLowerCase()}`}
       className="group grid gap-3 rounded-xl border bg-card p-4 transition-colors outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <span className="flex items-center gap-2.5">
         <span className="grid size-8 place-items-center rounded-lg bg-muted">
           <Icon className="size-4" aria-hidden />
         </span>
-        <span className="text-sm font-medium">{label}</span>
+        <span className="flex-1 text-sm font-medium">{label}</span>
+        <ChevronRightIcon
+          className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+          aria-hidden
+        />
       </span>
       <span className="grid gap-1">
         <span className="flex flex-wrap items-baseline gap-x-2">
@@ -488,7 +498,8 @@ function TrendingTopics({ data }: { data?: DashboardOverview }) {
           <p className="py-6 text-center text-sm text-muted-foreground">
             {data.trending.length
               ? "No trends at this relevance in this period."
-              : "No trends collected in this period yet. Run discovery on the Trends page."}
+              : <>No trends collected in this period yet. Run discovery on the{" "}
+                  <Link href="/trends" className="underline underline-offset-4">Trends page</Link>.</>}
           </p>
         ) : (
           <div className="-mx-4 overflow-x-auto px-4">
@@ -504,8 +515,13 @@ function TrendingTopics({ data }: { data?: DashboardOverview }) {
                   <th scope="col" className="py-2 pr-3 font-medium">
                     Category
                   </th>
-                  <th scope="col" className="py-2 pr-3 font-medium">
-                    Score
+                  <th
+                    scope="col"
+                    className="py-2 pr-3 font-medium"
+                    title="Opportunity score, 0 to 100"
+                  >
+                    Opportunity score
+                    <span className="block text-[11px] font-normal">0–100</span>
                   </th>
                   <th
                     scope="col"
@@ -533,6 +549,8 @@ function TrendingTopics({ data }: { data?: DashboardOverview }) {
         {data && rows.length > 0 && (
           <p className="mt-3 text-xs text-muted-foreground">
             Showing {shown.length} of {rows.length} trends in this period.
+            Opportunity score shows how well a trend fits your organization;
+            momentum shows how fast attention is growing (both 0–100).
           </p>
         )}
       </CardContent>
@@ -579,6 +597,11 @@ function TrendingRow({ topic: t }: { topic: DashboardTrendingTopic }) {
             }
             className="tabular-nums"
           >
+            {t.relevance_level && (
+              <span className="sr-only">
+                {RELEVANCE_LABEL[t.relevance_level]}:{" "}
+              </span>
+            )}
             {Math.round(t.opportunity_score)}
           </Tag>
         ) : (
@@ -588,8 +611,13 @@ function TrendingRow({ topic: t }: { topic: DashboardTrendingTopic }) {
       <td className="py-2.5 pr-3 whitespace-nowrap tabular-nums">
         {t.momentum != null ? (
           <span className="inline-flex items-center gap-1">
-            <ArrowUpIcon className="size-3 text-success" aria-hidden />
+            {t.momentum >= 50 ? (
+              <ArrowUpIcon className="size-3 text-success" aria-hidden />
+            ) : (
+              <MinusIcon className="size-3 text-muted-foreground" aria-hidden />
+            )}
             {t.momentum}
+            <span className="text-xs text-muted-foreground">/100</span>
           </span>
         ) : (
           <span className="text-muted-foreground">—</span>
@@ -601,18 +629,22 @@ function TrendingRow({ topic: t }: { topic: DashboardTrendingTopic }) {
         </span>
       </td>
       <td className="py-2.5 text-right whitespace-nowrap">
-        {t.shortlisted || !canShortlist ? (
+        {t.shortlisted ? (
+          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+            <CheckIcon className="size-4 text-success" aria-hidden /> Shortlisted
+          </span>
+        ) : !canShortlist ? (
           <Link
             href={withFrom(`/trends/${t.id}`, "/dashboard")}
             className={buttonVariants({ variant: "outline", size: "sm" })}
           >
-            {t.shortlisted ? "Shortlisted" : "Open"}
+            Open
           </Link>
         ) : (
           <Button
             variant="outline"
             size="sm"
-            disabled={action.isPending}
+            disabled={action.isPending && action.variables?.id === t.id}
             aria-label={`Shortlist ${t.topic}`}
             onClick={() =>
               action.mutate(
@@ -620,7 +652,7 @@ function TrendingRow({ topic: t }: { topic: DashboardTrendingTopic }) {
                 {
                   onSuccess: () => {
                     toast.success(
-                      `Shortlisted “${t.topic}”. Plan a post from Topics.`,
+                      `Shortlisted “${t.topic}”. Plan a post from Shortlist & plans.`,
                     );
                     queryClient.invalidateQueries({
                       queryKey: ["org", orgId, "dashboard"],
@@ -641,111 +673,6 @@ function TrendingRow({ topic: t }: { topic: DashboardTrendingTopic }) {
 
 // --- Content pipeline ----------------------------------------------------------------
 
-function ContentPipeline({
-  summary,
-  overview,
-}: {
-  summary?: DashboardSummary;
-  overview?: DashboardOverview;
-}) {
-  const stages = overview
-    ? [
-        {
-          label: "Shortlisted",
-          value: summary?.shortlisted_topics ?? 0,
-          href: "/topics",
-          icon: ListChecksIcon,
-        },
-        {
-          label: "Drafts",
-          value: overview.pipeline.draft,
-          href: "/content",
-          icon: FileTextIcon,
-        },
-        {
-          label: "In design",
-          value: overview.pipeline.design,
-          href: "/design",
-          icon: PaletteIcon,
-        },
-        {
-          label: "Waiting approval",
-          value: overview.pipeline.approval,
-          href: "/approvals",
-          icon: CheckCircle2Icon,
-        },
-        {
-          label: "Ready to publish",
-          value: overview.pipeline.ready,
-          href: "/approvals",
-          icon: SendIcon,
-        },
-      ]
-    : [];
-  return (
-    <section
-      aria-labelledby="pipeline-title"
-      className="rounded-xl border bg-card p-4"
-    >
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h2 id="pipeline-title" className="text-base font-semibold">
-            Content pipeline
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Where every post is right now, from topic to ready to publish.
-          </p>
-        </div>
-        {overview && overview.pipeline.changes > 0 && (
-          <Link
-            href="/content"
-            className="text-xs font-medium text-warning underline-offset-4 hover:underline"
-          >
-            {overview.pipeline.changes} sent back for changes
-          </Link>
-        )}
-      </div>
-      {!overview ? (
-        <Skeleton className="h-16 w-full" />
-      ) : (
-        <ol className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {stages.map((stage, i) => (
-            <li key={stage.label} className="relative">
-              <Link
-                href={stage.href}
-                className="grid h-full justify-items-center gap-1 rounded-lg p-2 text-center transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <span className="grid size-9 place-items-center rounded-full bg-muted">
-                  <stage.icon className="size-4" aria-hidden />
-                </span>
-                <span
-                  className={cn(
-                    "text-xl leading-tight font-semibold tabular-nums",
-                    stage.value === 0 && "text-muted-foreground",
-                  )}
-                >
-                  {stage.value}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {stage.label}
-                </span>
-              </Link>
-              {i < stages.length - 1 && (
-                <ArrowRightIcon
-                  className="absolute top-6 -right-2 hidden size-4 text-muted-foreground sm:block"
-                  aria-hidden
-                />
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
-  );
-}
-
-// --- Recent content & top opportunities ---------------------------------------------
-
 function RecentContent({ data }: { data?: DashboardOverview }) {
   return (
     <Card>
@@ -754,7 +681,7 @@ function RecentContent({ data }: { data?: DashboardOverview }) {
           <CardTitle>Recent content</CardTitle>
           <Link
             href="/content"
-            className="text-xs font-medium whitespace-nowrap underline-offset-4 hover:underline"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             View all
           </Link>
@@ -794,64 +721,6 @@ function RecentContent({ data }: { data?: DashboardOverview }) {
               </li>
             ))}
           </ul>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function TopOpportunities({ summary }: { summary?: DashboardSummary }) {
-  const trends: TopTrend[] = summary?.top_trends.slice(0, 5) ?? [];
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <div className="grid gap-1">
-            <CardTitle>Top opportunities</CardTitle>
-            <CardDescription>
-              Best-scoring trends from the last week.
-            </CardDescription>
-          </div>
-          <Link
-            href="/trends"
-            className="text-xs font-medium whitespace-nowrap underline-offset-4 hover:underline"
-          >
-            View all
-          </Link>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {!summary ? (
-          <Skeleton className="h-40 w-full" />
-        ) : trends.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            The best-scoring trends appear here once trends have been collected.
-          </p>
-        ) : (
-          <ol className="divide-y">
-            {trends.map((t) => (
-              <li key={t.id}>
-                <Link
-                  href={withFrom(`/trends/${t.id}`, "/dashboard")}
-                  className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 hover:bg-muted/60"
-                >
-                  <span className="grid min-w-0 flex-1">
-                    <span className="truncate text-sm font-medium">
-                      {t.topic}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {t.sources.map(sourceName).join(" · ")}
-                    </span>
-                  </span>
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-success/15 text-sm font-semibold tabular-nums">
-                    {t.opportunity_score != null
-                      ? Math.round(t.opportunity_score)
-                      : "—"}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ol>
         )}
       </CardContent>
     </Card>
@@ -916,7 +785,9 @@ function PlatformBreakdown({ data }: { data?: DashboardOverview }) {
     <Card>
       <CardHeader>
         <CardTitle>Platform breakdown</CardTitle>
-        <CardDescription>Posts by platform, all time.</CardDescription>
+        <CardDescription>
+          Posts by platform, all time. Not affected by the period.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {!data ? (
@@ -957,7 +828,7 @@ function PlatformBreakdown({ data }: { data?: DashboardOverview }) {
                 <span className="text-2xl leading-none font-semibold tabular-nums">
                   {total}
                 </span>
-                <span className="text-[11px] text-muted-foreground">posts</span>
+                <span className="text-xs text-muted-foreground">posts</span>
               </span>
             </div>
             <ul className="grid flex-1 gap-1.5 text-sm">
@@ -991,10 +862,15 @@ function SourceHealth() {
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
-          <CardTitle>Source health</CardTitle>
+          <div className="grid gap-1">
+            <CardTitle>Source health</CardTitle>
+            <CardDescription>
+              Current status and last successful sync. Not affected by the period.
+            </CardDescription>
+          </div>
           <Link
             href="/trends/sources"
-            className="text-xs font-medium whitespace-nowrap underline-offset-4 hover:underline"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             View all
           </Link>
@@ -1025,11 +901,25 @@ function SourceHealth() {
                     {status.label}
                   </span>
                   <span className="shrink-0 whitespace-nowrap text-right text-xs text-muted-foreground">
-                    {s.last_success_at ? timeAgo(s.last_success_at) : "—"}
+                    {s.last_success_at ? (
+                      timeAgo(s.last_success_at)
+                    ) : (
+                      <span title="This source hasn't synced successfully yet">
+                        Never synced
+                      </span>
+                    )}
                   </span>
                 </li>
               );
             })}
+            {enabled.length > 7 && (
+              <li className="text-xs text-muted-foreground">
+                +{enabled.length - 7} more in{" "}
+                <Link href="/trends/sources" className="underline underline-offset-4">
+                  Discovery Sources
+                </Link>
+              </li>
+            )}
           </ul>
         )}
       </CardContent>
@@ -1094,9 +984,9 @@ function useSetupSteps() {
       ? [
           {
             done: (knowledge.data?.indexed_documents ?? 0) > 0,
-            title: "Add your website to the knowledge base",
-            detail: "So posts only say things your website backs up.",
-            href: "/organization/knowledge",
+            title: "Index your website",
+            detail: "One click reads your pages so posts only say what your website backs up.",
+            href: "/organization/knowledge?index=1",
           },
         ]
       : []),
@@ -1191,11 +1081,21 @@ function SetupChecklist({
                     )}
                   >
                     {step.title}
+                    {step.optional && (
+                      <Tag tone="neutral" className="ml-2 align-middle">
+                        Optional
+                      </Tag>
+                    )}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {step.detail}
                   </span>
                 </span>
+                {step.done && (
+                  <span className="text-xs text-muted-foreground group-hover:text-foreground">
+                    Edit
+                  </span>
+                )}
               </Link>
             </li>
           ))}

@@ -71,7 +71,7 @@ export function PostColors({
           Colors for this post
         </legend>
         <p className="text-xs text-muted-foreground">
-          Only this post changes. Your Brand settings stay the same.
+          Only this post changes. Your Brand settings stay the same. Leave empty to use brand colors.
         </p>
         <ul className="grid gap-2">
           {draft.map((color, i) => (
@@ -117,7 +117,7 @@ export function PostColors({
             variant="outline"
             size="sm"
             disabled={draft.length >= MAX_COLORS}
-            onClick={() => setDraft([...draft, draft.at(-1) ?? "#000000"])}
+            onClick={() => setDraft([...draft, ""])}
           >
             <PlusIcon /> Add color
           </Button>
@@ -128,7 +128,7 @@ export function PostColors({
           )}
         </div>
         {tooLong && (
-          <p className="text-xs text-destructive">
+          <p role="alert" className="text-xs text-destructive">
             Keep each color under 40 characters.
           </p>
         )}

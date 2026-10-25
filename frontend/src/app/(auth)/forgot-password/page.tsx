@@ -3,8 +3,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { AuthCaptcha } from "@/components/auth/captcha";
 import { CheckEmail } from "@/components/auth/check-email";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -38,12 +40,17 @@ export default function ForgotPasswordPage() {
   const { errors } = form.formState;
 
   const config = useAuthConfig();
+  // A CAPTCHA token works once: a new widget (new key) is needed after each attempt.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
   const send = useMutation({
     mutationFn: async ({ email }: ForgotPasswordValues) => {
       const supabase = await getSupabase();
       if (supabase) {
+        if (!captchaToken) throw new Error("Complete the CAPTCHA challenge.");
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: authRedirect("/auth/callback", "/auth/reset"),
+          captchaToken,
         });
         if (error) throw new Error(supabaseErrorMessage(error.message));
         return email;
@@ -56,6 +63,10 @@ export default function ForgotPasswordPage() {
       }
       await api("/auth/password-reset", { method: "POST", body: { email } });
       return email;
+    },
+    onSettled: () => {
+      setCaptchaToken(null);
+      setCaptchaKey((k) => k + 1);
     },
   });
 
@@ -89,7 +100,8 @@ export default function ForgotPasswordPage() {
       <CheckEmail
         title="Check your email"
         email={send.data}
-        body="If an account exists for it, the link inside lets you choose a new password."
+        body="If that email has an account, the link in it lets you choose a new password."
+        onUseDifferentEmail={() => send.reset()}
       />
     );
   }
@@ -124,6 +136,7 @@ export default function ForgotPasswordPage() {
               {...form.register("email")}
             />
           </FormField>
+          <AuthCaptcha key={captchaKey} onToken={setCaptchaToken} />
           <Button type="submit" size="lg" disabled={send.isPending}>
             {send.isPending ? "Sending…" : "Send reset link"}
           </Button>

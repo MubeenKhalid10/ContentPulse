@@ -1,32 +1,47 @@
 "use client";
 
-import { LoaderCircleIcon, PencilIcon, SparklesIcon } from "lucide-react";
+import { LoaderCircleIcon, LockIcon, PencilIcon, RotateCcwIcon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
-import { BackLink } from "@/components/shared/back-link";
+import { BackLink, useFromHere } from "@/components/shared/back-link";
+import { PostProgress } from "@/components/shared/post-progress";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { ReviewBanner } from "@/components/approvals/review-banner";
 import { BriefDialog } from "@/components/design/brief-dialog";
 import { CreativeUploader, CreativeVersions } from "@/components/design/creatives";
 import { PostColors } from "@/components/design/post-colors";
 import { PostLogo } from "@/components/design/post-logo";
+import { DeleteButton } from "@/components/shared/delete-button";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArticlePreview } from "@/components/content/article-preview";
 import { HandoffButtons } from "@/components/design/handoff-buttons";
-import { useAssignTask, useDesignTask } from "@/hooks/use-design";
+import { useDeletePost } from "@/hooks/use-content";
+import { useAssignTask, useDeleteDesign, useDesignTask, useWithdrawDesign } from "@/hooks/use-design";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useMembers } from "@/hooks/use-organization";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan, useMe } from "@/lib/auth";
 import { POST_STATUS_LABEL, fullText } from "@/lib/content";
 import { formatLabel } from "@/lib/design";
+import { cn } from "@/lib/utils";
 import type { DesignTaskDetail } from "@/types/api";
 
 const ACTIVE = ["open", "assigned", "in_progress"];
@@ -36,6 +51,7 @@ export function DesignTaskPage({ id }: { id: string }) {
   const task = useDesignTask(id);
   const me = useMe();
   const can = useCan();
+  const fromHere = useFromHere();
   const [editing, setEditing] = useState(false);
 
   const back = <BackLink href="/design" label="Design" />;
@@ -67,8 +83,13 @@ export function DesignTaskPage({ id }: { id: string }) {
   const active = ACTIVE.includes(t.status);
   const mine = t.assignee?.id === me.data?.id;
   const manager = can("design.manage");
-  // Any creator can deliver; the assignee only shows who is on it.
-  const canWork = can("design.upload") && active && UPLOADABLE_POST.includes(t.post.status);
+  const canReview = can("approval.manage");
+  // Only the assignee works on an assigned task (anyone when it is unassigned); an admin can step in.
+  const assignedToOther = !!t.assignee && !mine && !manager;
+  const canWork =
+    can("design.upload") && active && !assignedToOther && UPLOADABLE_POST.includes(t.post.status);
+  const canWithdraw =
+    can("design.upload") && t.status === "submitted" && t.review?.status === "pending" && (mine || manager || !t.assignee);
   const canEditBrief = (can("content.edit") || manager) && active;
 
   return (
@@ -89,11 +110,51 @@ export function DesignTaskPage({ id }: { id: string }) {
         <TaskActions task={t} manager={manager} mine={mine} />
       </div>
 
+      <PostProgress status={t.post.status} />
+
       <ReviewBanner review={t.review} />
       {t.status === "submitted" && t.review?.status === "pending" && (
         <Alert className="mb-6">
           <AlertTitle>Waiting for design approval</AlertTitle>
-          <AlertDescription>An admin will approve the design or ask for changes. You&apos;ll see their decision here.</AlertDescription>
+          <AlertDescription className="grid gap-2">
+            <span>
+              The design is locked while an admin reviews it. They will approve it or ask for changes, and you&apos;ll
+              see the decision here.
+              {canWithdraw && " Need to change something first? Take it back and submit it again when you are done."}
+            </span>
+            {canWithdraw && <WithdrawButton taskId={t.id} />}
+          </AlertDescription>
+        </Alert>
+      )}
+      {assignedToOther && active && (
+        <Alert className="mb-6">
+          <LockIcon />
+          <AlertTitle>Assigned to {t.assignee?.name ?? t.assignee?.email}</AlertTitle>
+          <AlertDescription>
+            Only they or an admin can add the design for this post. Ask an admin to reassign it if you should take it.
+          </AlertDescription>
+        </Alert>
+      )}
+      {t.status === "completed" && (
+        <Alert className="mb-6">
+          <LockIcon />
+          <AlertTitle>Approved design is locked</AlertTitle>
+          <AlertDescription className="grid gap-2">
+            <span>
+              {canReview
+                ? "Request changes to let the creator update the design again."
+                : "An admin can request changes to reopen it."}
+            </span>
+            {canReview && t.review?.status === "approved" && (
+              <Link
+                href={fromHere(`/approvals/${t.review.request_id}`)}
+                className={cn(buttonVariants({ size: "sm", variant: "outline" }), "w-fit")}
+              >
+                <RotateCcwIcon />
+                Request changes
+              </Link>
+            )}
+          </AlertDescription>
         </Alert>
       )}
       {t.status === "cancelled" && (
@@ -102,7 +163,7 @@ export function DesignTaskPage({ id }: { id: string }) {
           <AlertDescription>
             {t.post.status === "rejected"
               ? "The post was rejected, so this design task is closed."
-              : "The post was taken back from design. A new task opens when it's sent to design again."}
+              : "The post was taken back from design. A new task opens when its copy is approved again."}
           </AlertDescription>
         </Alert>
       )}
@@ -126,7 +187,7 @@ export function DesignTaskPage({ id }: { id: string }) {
               <CreativeVersions task={t} canUse={canWork} />
               {!canWork && !t.creatives.length && (
                 <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                  No creative uploaded yet.
+                  No design files uploaded yet.
                 </p>
               )}
             </div>
@@ -140,18 +201,66 @@ export function DesignTaskPage({ id }: { id: string }) {
   );
 }
 
+function WithdrawButton({ taskId }: { taskId: string }) {
+  const [open, setOpen] = useState(false);
+  const withdraw = useWithdrawDesign();
+  return (
+    <>
+      <Button size="sm" variant="outline" className="w-fit" onClick={() => setOpen(true)} disabled={withdraw.isPending}>
+        <RotateCcwIcon />
+        Withdraw to make changes
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Take the design back?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It leaves the admin&apos;s approval queue and you can change the files again. Submit it again when it is
+              ready.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it submitted</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setOpen(false);
+                withdraw.mutate(taskId, {
+                  onSuccess: () => toast.success("Design withdrawn. You can change it now."),
+                  onError: (e) => toast.error(errorMessage(e)),
+                });
+              }}
+            >
+              Withdraw
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+// While the design is being made or revised its files can be deleted; once it is waiting for
+// approval or approved, the admin requests changes first (or deletes the post).
+const DESIGN_DELETABLE = ["design_pending", "design_in_progress", "design_uploaded", "changes_requested"];
+
 function TaskActions({ task, manager, mine }: { task: DesignTaskDetail; manager: boolean; mine: boolean }) {
   const members = useMembers();
   const assign = useAssignTask();
+  const isAdmin = useCan()("organization.write");
+  const removeDesign = useDeleteDesign();
+  const removePost = useDeletePost();
+  const router = useRouter();
   const active = ACTIVE.includes(task.status);
   const onError = (e: unknown) => toast.error(errorMessage(e));
   const people = (members.data ?? []).filter((m) => m.status === "active" && (m.role === "creator" || m.role === "admin"));
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
+      {active && manager && <span className="text-sm text-muted-foreground">Assigned to</span>}
       {active && manager ? (
         <SimpleSelect
-          aria-label="Assignee"
+          id="task-assignee"
+          aria-label="Assigned to"
           value={task.assignee?.id ?? "none"}
           onChange={(v) =>
             assign.mutate(
@@ -159,7 +268,7 @@ function TaskActions({ task, manager, mine }: { task: DesignTaskDetail; manager:
               { onSuccess: (t) => toast.success(t.assignee ? `Assigned to ${t.assignee.name ?? t.assignee.email}` : "Unassigned"), onError },
             )
           }
-          options={[{ value: "none", label: "Anyone can take it" }, ...people.map((m) => ({ value: m.user_id, label: m.full_name ?? m.email }))]}
+          options={[{ value: "none", label: "Unassigned (anyone can take it)" }, ...people.map((m) => ({ value: m.user_id, label: m.full_name ?? m.email }))]}
           className="w-48"
         />
       ) : (
@@ -168,6 +277,40 @@ function TaskActions({ task, manager, mine }: { task: DesignTaskDetail; manager:
             {mine ? "You're on this" : `${task.assignee.name ?? task.assignee.email} is on this`}
           </span>
         )
+      )}
+      {isAdmin && (
+        <span aria-hidden className="mx-1 hidden h-5 w-px bg-border sm:block" />
+      )}
+      {isAdmin && task.creatives.length > 0 && DESIGN_DELETABLE.includes(task.post.status) && (
+        <DeleteButton
+          label="Delete design"
+          title="Delete the uploaded design?"
+          description="This permanently deletes every uploaded design file and version for this post so the design can be done again. The copy and approvals are kept. This can't be undone."
+          pending={removeDesign.isPending}
+          onConfirm={() =>
+            removeDesign.mutate(task.id, {
+              onSuccess: () => toast.success("Design deleted"),
+              onError,
+            })
+          }
+        />
+      )}
+      {isAdmin && (
+        <DeleteButton
+          label="Delete post"
+          title={`Delete “${task.post.title ?? "this post"}”?`}
+          description="This permanently deletes the post and everything attached to it: every version of the copy, its design task and files, and its approvals. The plan it came from is kept. This can't be undone."
+          pending={removePost.isPending}
+          onConfirm={() =>
+            removePost.mutate(task.post.id, {
+              onSuccess: () => {
+                toast.success("Post deleted");
+                router.push("/design");
+              },
+              onError,
+            })
+          }
+        />
       )}
     </div>
   );
@@ -187,7 +330,7 @@ function BriefCard({ task: t, canEdit, onEdit }: { task: DesignTaskDetail; canEd
       <CardHeader className="flex flex-row flex-wrap items-start gap-2">
         <div className="grid flex-1 gap-1">
           <CardTitle>Design brief</CardTitle>
-          <CardDescription className="flex items-center gap-1.5">
+          <CardDescription className="flex items-center gap-1.5" role={t.ai_brief_pending ? "status" : undefined}>
             {t.ai_brief_pending ? (
               <>
                 <LoaderCircleIcon className="size-3.5 animate-spin" />
@@ -259,7 +402,7 @@ function ContentCard({ task: t }: { task: DesignTaskDetail }) {
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start gap-2">
         <div className="grid flex-1 gap-1">
-          <CardTitle>Post Content</CardTitle>
+          <CardTitle>Post content</CardTitle>
           <CardDescription>
             Version {t.content.version}
             {t.post.topic_title && ` · ${t.post.topic_title}`}
@@ -319,7 +462,7 @@ function BrandCard({
             ["Voice", t.brand.brand_voice],
             ["Tone", t.brand.tone],
             ["Requirements", req.requirements?.join(" · ")],
-            ["Never use", (req.avoid_terms ?? t.brand.forbidden_terms).join(", ")],
+            ["Forbidden terms", (req.avoid_terms ?? t.brand.forbidden_terms).join(", ")],
           ]
             .filter(([, v]) => v)
             .map(([label, value]) => (

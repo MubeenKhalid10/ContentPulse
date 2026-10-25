@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 /**
- * One collection per discovery window: inside it, "Discover New Trends now"
+ * One collection per discovery window: inside it, "Check for new trends"
  * collects nothing and says when the next discovery is due. The discovery
  * answers are served by the test (no internet, no provider calls).
  */
@@ -85,7 +85,7 @@ test("inside the discovery window the button reads stored trends and shows the w
   await expect(page.getByText(/Next update in about 2h 1[34]m/)).toBeVisible();
   await listed;
 
-  await page.getByRole("button", { name: "Discover New Trends now" }).first().click();
+  await page.getByRole("button", { name: "Check for new trends" }).first().click();
   await expect(page.getByText("No new trends found since the last discovery.")).toBeVisible();
   await expect(page.getByText(/New discovery will be available in 2h 1[34]m/)).toBeVisible();
   expect(discoverCalls).toEqual(["POST"]);
@@ -96,7 +96,7 @@ test("trends from a discovery that finished after the page loaded are announced"
 }) => {
   await signUp(page);
   await page.goto("/trends");
-  await expect(page.getByRole("button", { name: "Discover New Trends now" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check for new trends" }).first()).toBeVisible();
 
   // A scheduled discovery finished while the page was open.
   const lastAt = minutesFromNow(0.2);
@@ -112,7 +112,7 @@ test("trends from a discovery that finished after the page loaded are announced"
       },
     }),
   );
-  await page.getByRole("button", { name: "Discover New Trends now" }).first().click();
+  await page.getByRole("button", { name: "Check for new trends" }).first().click();
   await expect(page.getByText(/Showing the latest trends: 7 new from the/)).toBeVisible();
   await expect(page.getByText(/The next discovery runs in 2h 1[34]m/)).toBeVisible();
 });

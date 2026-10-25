@@ -34,6 +34,13 @@ async def submit_post(
     """DESIGN_UPLOADED (or CHANGES_REQUESTED with a creative) → PENDING_APPROVAL,
     opening a new review round pinned to the current copy and creative."""
     creative = await latest_creative_version(db, post.id)
+    if creative is not None and post.status in (
+        PostStatus.DESIGN_PENDING,
+        PostStatus.DESIGN_IN_PROGRESS,
+    ):
+        # The files are there but the post was never moved on (e.g. an interrupted
+        # upload or AI image): record that the design is added, then submit.
+        await transition_post(db, post, PostStatus.DESIGN_UPLOADED, user_id=user_id)
     if post.status not in SUBMITTABLE or creative is None:
         raise InvalidStateTransition(
             "Upload the creative before submitting it for approval."
@@ -145,6 +152,36 @@ async def withdraw_copy(db: AsyncSession, post: Post) -> None:
         )
     ):
         await db.delete(request)
+
+
+async def withdraw_design(db: AsyncSession, post: Post) -> None:
+    """The designer took the design back before anyone decided: drop the open design request."""
+    for request in await db.scalars(
+        select(ApprovalRequest).where(
+            ApprovalRequest.post_id == post.id,
+            ApprovalRequest.creative_version.is_not(None),
+            ApprovalRequest.status == ApprovalStatus.PENDING,
+        )
+    ):
+        await db.delete(request)
+
+
+async def changes_scope(db: AsyncSession, post_id: uuid.UUID) -> str:
+    """What the latest change request opened: "copy", "design" or "both"
+    (requests from before scopes were recorded count as "both")."""
+    from app.models.audit import AuditLog
+
+    value = await db.scalar(
+        select(AuditLog.new_value)
+        .where(
+            AuditLog.entity_type == "post",
+            AuditLog.entity_id == post_id,
+            AuditLog.action == AuditAction.CHANGES_REQUESTED,
+        )
+        .order_by(AuditLog.created_at.desc())
+        .limit(1)
+    )
+    return (value or {}).get("scope") or "both"
 
 
 async def latest_review(db: AsyncSession, post_id: uuid.UUID) -> ReviewSummary | None:

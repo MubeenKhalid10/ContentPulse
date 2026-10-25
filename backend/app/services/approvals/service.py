@@ -487,6 +487,93 @@ async def finalize(
     return await approval_detail(db, organization_id, request.id)
 
 
+# Where approved copy can still be reopened: its design isn't submitted yet.
+COPY_REOPENABLE = (
+    PostStatus.DESIGN_PENDING,
+    PostStatus.DESIGN_IN_PROGRESS,
+    PostStatus.DESIGN_UPLOADED,
+)
+
+
+async def reopen(
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    request_id: uuid.UUID,
+    comment: str,
+    scope: str = "both",
+) -> ApprovalDetail:
+    """An admin asks for changes to work they already approved. Approved copy
+    and designs are locked; this is the one way to open them again.
+
+    Copy approval (post in design): the post goes back to draft and its design
+    task is cancelled. Final approval: the post goes to "changes requested",
+    with the copy, the design or both open (`scope`), then is resubmitted."""
+    request = await _get(db, organization_id, request_id)
+    if request.status != A.APPROVED:
+        raise InvalidStateTransition("Only approved work can be reopened.")
+    latest = await db.scalar(
+        select(ApprovalRequest.id)
+        .where(ApprovalRequest.post_id == request.post_id)
+        .order_by(ApprovalRequest.created_at.desc())
+        .limit(1)
+    )
+    if latest != request.id:
+        raise InvalidStateTransition("This post has a newer submission. Reopen that one instead.")
+    post = await db.get(Post, request.post_id)
+    assert post is not None
+    copy_stage = request.creative_version is None
+    if copy_stage:
+        if post.status not in COPY_REOPENABLE:
+            raise InvalidStateTransition(
+                "This post has moved on from design.", details={"status": post.status.value}
+            )
+        await transition_post(db, post, PostStatus.DRAFT, user_id=user_id)
+        await design.cancel_briefs(db, post)
+    else:
+        if post.status not in (PostStatus.APPROVED, PostStatus.FINAL):
+            raise InvalidStateTransition(
+                "This post isn't approved.", details={"status": post.status.value}
+            )
+        await transition_post(db, post, PostStatus.CHANGES_REQUESTED, user_id=user_id)
+        if scope in ("design", "both"):
+            brief = await db.scalar(
+                select(DesignBrief)
+                .where(
+                    DesignBrief.post_id == post.id,
+                    DesignBrief.status == DesignBriefStatus.COMPLETED,
+                )
+                .order_by(DesignBrief.created_at.desc())
+                .limit(1)
+            )
+            if brief is not None:
+                brief.status = DesignBriefStatus.IN_PROGRESS
+    request.status, request.reviewer_id, request.reviewed_at = (
+        A.CHANGES_REQUESTED,
+        user_id,
+        _now(),
+    )
+    request.comments = comment
+    db.add(_comment(request, user_id, comment, "changes_requested"))
+    audit.record(
+        db,
+        organization_id=organization_id,
+        user_id=user_id,
+        action=AuditAction.CHANGES_REQUESTED,
+        entity_type="post",
+        entity_id=post.id,
+        new_value={
+            "approval_request_id": request.id,
+            "post_version": request.post_version,
+            "creative_version": request.creative_version,
+            "reopened": True,
+            **({"stage": "copy"} if copy_stage else {"scope": scope}),
+        },
+    )
+    await db.commit()
+    return await approval_detail(db, organization_id, request.id)
+
+
 async def add_comment(
     db: AsyncSession,
     organization_id: uuid.UUID,

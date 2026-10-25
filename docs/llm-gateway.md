@@ -157,6 +157,10 @@ API and workers.
 | `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `OPENROUTER_API_KEY` | | Keys for fallback providers. A model without a key is skipped. |
 | `LLM_BASE_URLS` | `{}` | Endpoint override per OpenAI-compatible provider, e.g. `{"openai": "https://proxy/v1"}`. |
 | `LLM_FALLBACKS` | empty | Models tried in order after the primary chain, comma-separated (or a JSON list): `gemini/gemini-3.1-flash-lite, groq/openai/gpt-oss-120b, cerebras/qwen-3.8-27b`. |
+| `LLM_GEMINI_FALLBACK_MODEL` | `gemini-3.5-flash` | Added as the last model of every default chain that has no Gemini model yet, when a Gemini key is set. Empty turns it off. `LLM_ROUTES` chains are left as written. |
+| `LLM_PRICES_FILE`, `LLM_PRICES` | `llm_prices.json`, `{}` | Prices for `cost_usd` (see §7). |
+| `ALIGNMENT_AI_GATE` | `true` | Automatic analysis only sends a trend to the LLM when the free rule engine finds a keyword, service or knowledge signal. |
+| `ALIGNMENT_FAILURE_BACKOFF_HOURS`, `ALIGNMENT_MAX_FAILURES` | `3`, `4` | After the n-th failed automatic analysis of a trend, wait base × 2^(n-1) hours; stop after the max. |
 | `LLM_ROUTES` | `{}` | A chain per workflow (first entry = primary): `{"trend_alignment": ["gemini/gemini-3.5-flash", "groq/..."]}`. |
 | `LLM_FALLBACK_ENABLED` | `true` | `false` uses only the first model. |
 | `LLM_LIMITS_FILE`, `LLM_LIMITS` | `llm_limits.json`, `{}` | See above. |
@@ -262,14 +266,22 @@ Every one of those retries goes through the quotas again.
 
 1. `LLM_PROVIDER`'s model;
 2. its same-provider fallback;
-3. `LLM_FALLBACKS`, in order.
+3. `LLM_FALLBACKS`, in order;
+4. Gemini (`LLM_GEMINI_FALLBACK_MODEL`), unless the chain already has a
+   Gemini model or there is no Gemini key.
 
 **Per workflow:** `LLM_ROUTES` replaces the chain for that workflow.
 
 **Skipped models:** any model whose provider has no key.
 
 **What triggers a fallback:** only `rate_limited`, `unavailable`,
-`model_unavailable` and `quota_exhausted`. A bad key, a bad request or bad
+`model_unavailable`, `quota_exhausted` and `oversized`.
+
+**Cut-off answers:** output allowances are sized to the answer (alignment
+2,000 tokens, strategy and brief 1,500, blog strategy 3,000), because Groq
+counts the allowance against its per-minute token limit. An answer cut off at
+its allowance is retried once on the same model with double the allowance
+before falling back. A bad key, a bad request or bad
 output fails fast instead of burning other quotas.
 
 **What gets recorded:**
@@ -282,9 +294,11 @@ compared.
 
 ## 6. Cache
 
-- **What is cached:** trend analyses and single-query embeddings.
-  - Content, strategies and briefs are not cached: regenerating should give a
-    new take.
+- **What is cached:** trend analyses, strategy suggestions (per topic and
+  platform) and single-query embeddings.
+  - Content and briefs are not cached: regenerating should give a new take.
+  - Alignment prompts carry no relative timestamps ("5h ago"), so the same
+    coverage gives the same prompt and a repeat analysis is a cache hit.
 - **Where:** Redis when available, otherwise memory. TTL is
   `LLM_CACHE_TTL_SECONDS`.
 - **The key** contains the workflow, the organization and the model chain, plus
@@ -305,14 +319,28 @@ compared.
     `status = 'cached'`;
   - columns: organization, workflow, job, provider, model, status, error
     kind, attempt, retry count, fallback, queue wait, latency, start and end
-    times, input/output/total tokens, `usage_unavailable`;
-  - tokens are only stored when the provider reported them, never estimated;
+    times, input/output/total tokens, `cached_input_tokens`, `image_count`,
+    `cost_usd`, `usage_unavailable`;
+  - chat tokens are only stored when the provider reported them. Embedding
+    tokens are estimated (the providers don't report them) and the row is
+    marked `usage_unavailable`;
+  - `cached_input_tokens` is the part of the prompt served from the
+    provider's prompt cache (Gemini `cachedContentTokenCount`, OpenAI-style
+    `prompt_tokens_details.cached_tokens`, Anthropic cache reads). For
+    Anthropic, `input_tokens` includes cache reads and writes, as for the
+    other providers;
+  - `cost_usd` comes from `backend/llm_prices.json` (`LLM_PRICES` overrides
+    entries): per-million input, cached input and output rates, or a price
+    per image. Free-tier traffic is priced at the paid rate. Models without a
+    price, and failed requests, record NULL; cache hits record 0. Kie AI bills
+    credits: add `"kie/<model>": {"per_image": <USD>}` to price its images;
   - prompts and outputs are never stored, and error details are truncated.
   - `call_id` groups the attempts of one call; `job_id` links them to
     `ai_generation_jobs`.
 - **`GET /api/v1/ai/usage?days=7`** (organization admins): requests,
-  successes, failures, cache hits, retries, fallbacks, tokens and average or
-  max queue wait, by workflow and model. Add `&job_id=…` to list every request
+  successes, failures, cache hits, retries, fallbacks, tokens (incl. cached),
+  images, cost and average or max queue wait, by workflow and model, plus
+  `cost_usd_total`. Add `&job_id=…` to list every request
   one job made: how many requests one analysis generated, on which model, with
   how many retries and tokens, and how long it took.
 - **`/health/metrics`** with `METRICS_ENABLED=true`:
@@ -334,6 +362,30 @@ SELECT attempt, provider, model, status, error_kind, retry_count, fallback_used,
        queue_wait_ms, latency_ms, input_tokens, output_tokens
 FROM llm_requests WHERE job_id = '<ai_generation_jobs.id>' ORDER BY attempt;
 ```
+
+### Cost controls
+
+- **Alignment gate** (`ALIGNMENT_AI_GATE`): after discovery, the rule engine
+  scores each trend first. A trend with no keyword, service or knowledge
+  signal keeps the free rule-based result (`alignment.ai_gate = "no_signal"`)
+  and is reconsidered only when its coverage (`mention_count`) changes.
+  Analysis someone asks for in the app always uses the LLM.
+- **Failure backoff:** automatic analysis skips a trend whose last AI run
+  failed with a refused or unusable answer until its coverage changes, and
+  backs off other failures (3 h, 6 h, 12 h, then stops).
+- **Prompt size:** 4 knowledge passages, mention titles capped at 160
+  characters.
+- **Kie AI images are idempotent:** the task id is saved on the job as soon
+  as the task exists, so retries (in the call or a re-queued job) only poll
+  and download, without a second charge or a daily-cap slot. The downloaded
+  image is stored before the logo and versioning steps.
+- **Re-indexing** reuses each chunk's vector when its text and the embedding
+  model are unchanged, so an unchanged page makes no embedding request.
+- **Comparing models:** `python -m app.ai.eval_alignment --models
+  groq/qwen/qwen3.8-27b,groq/openai/gpt-oss-120b` runs the real alignment
+  prompt on labeled trends (by default, trends whose relevance someone
+  overrode; or `--labels file.json`) and reports accuracy, over-rating,
+  failures, tokens and cost per model.
 
 ## 8. What people see
 

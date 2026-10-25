@@ -82,7 +82,7 @@ function CrawlForm({ websiteUrl, onClose }: { websiteUrl: string | null; onClose
         </Alert>
       )}
       <FormField id="crawl-url" label="Website" error={errors.url?.message}>
-        <Input {...fieldAria("crawl-url", errors.url?.message)} type="url" {...form.register("url")} />
+        <Input {...fieldAria("crawl-url", errors.url?.message)} type="url" placeholder="https://www.yourcompany.com" {...form.register("url")} />
       </FormField>
       <FormField
         id="crawl-max"
@@ -175,7 +175,11 @@ function DocumentForm({ editing, onClose }: { editing: KnowledgeDocumentDetail |
       <FormField id="doc-title" label="Title" error={errors.title?.message}>
         <Input {...fieldAria("doc-title", errors.title?.message)} autoFocus {...form.register("title")} />
       </FormField>
-      <FormField id="doc-content" label="Content" error={errors.content?.message}>
+      <FormField
+        id="doc-content"
+        label="Content"
+        hint={`${(form.watch("content") ?? "").length.toLocaleString()} / 100,000 characters`}
+        error={errors.content?.message}>
         <Textarea
           {...fieldAria("doc-content", errors.content?.message)}
           rows={14}

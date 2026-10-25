@@ -16,7 +16,7 @@ export function PageHeader({
   return (
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b-[3px] border-double border-foreground pb-4">
       <div className={`grid gap-1.5 ${contentClassName ?? ""}`}>
-        <h1 className="headline text-4xl">{title}</h1>
+        <h1 className="headline text-3xl sm:text-4xl">{title}</h1>
         {description && <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && (
