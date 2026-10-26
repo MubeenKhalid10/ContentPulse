@@ -37,7 +37,7 @@ from app.services.topics import sync as topic_sync
 from app.services.trends import visibility
 from app.services.trends.inputs import load_org_inputs
 from app.services.workflow import TREND_MACHINE
-from app.sources import SOURCES
+from app.sources import KEYLESS_SOURCES, SOURCES
 from app.sources.base import is_public_error
 from app.workers import scheduler, trend_tasks
 from app.workers.tasks import enqueue
@@ -179,6 +179,7 @@ async def start_discovery(
     user_id: uuid.UUID | None,
     sources: list[str] | None,
     locations: list[str] | None,
+    keyless_only: bool = False,
 ) -> TrendDiscoveryRun:
     unknown = [s for s in sources or [] if s not in SOURCES]
     if unknown:
@@ -189,6 +190,8 @@ async def start_discovery(
         )
     org = await load_org_inputs(db, organization_id)
     chosen = sources if sources is not None else org.enabled_sources
+    if keyless_only:
+        chosen = [s for s in chosen if s in KEYLESS_SOURCES]
     if not chosen:
         raise AppError(
             ErrorCode.VALIDATION_ERROR,
@@ -297,6 +300,7 @@ async def discovery_window(
         .where(
             TrendDiscoveryRun.organization_id == organization_id,
             TrendDiscoveryRun.status == DiscoveryRunStatus.SUCCEEDED,
+            scheduler.paces_schedule(),
         )
         .order_by(TrendDiscoveryRun.created_at.desc())
         .limit(1)

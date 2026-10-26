@@ -1,5 +1,5 @@
-"""One collection per discovery window: inside it, "Discover New Trends"
-reads the stored trends and calls no provider."""
+"""One keyed collection per discovery window: inside it, "Discover New Trends"
+runs only the keyless sources and calls no keyed provider."""
 
 from datetime import datetime, timedelta
 
@@ -9,6 +9,7 @@ from sqlalchemy import func, select, update
 from app.core.config import get_settings
 from app.models.enums import DiscoveryRunStatus
 from app.models.trend import TrendDiscoveryRun
+from app.sources import KEYLESS_SOURCES
 from app.workers.runner import runner
 from tests.conftest import create_org, register
 from tests.test_trends_api import API, internet, setup  # noqa: F401  (fixture)
@@ -40,25 +41,24 @@ async def test_second_click_inside_window_reads_stored_trends(client, internet, 
     assert calls > 0
     trends_before = (await admin.get(API)).json()["total"]
 
+    # Inside the window the button still runs the keyless sources, never the keyed ones.
     second = await _click(admin)
-    assert second.status_code == 200, second.text
+    assert second.status_code == 202, second.text
     body = second.json()
-    assert body["started"] is False
-    assert body["run_id"] == first.json()["run_id"]
-    assert body["status"] == "succeeded"
+    assert body["started"] is True and body["run_id"] != first.json()["run_id"]
+    assert body["run"]["sources"]
+    assert set(body["run"]["sources"]) <= KEYLESS_SOURCES
     window = body["window"]
     assert window["background"] is True and window["can_discover"] is False
-    assert window["new_trends"] == body["run"]["trends_created"] > 0
-    run = await db.get(TrendDiscoveryRun, body["run_id"])
-    assert window["next_discovery_at"] is not None
-    next_at = datetime.fromisoformat(window["next_discovery_at"])
-    assert next_at == run.created_at + timedelta(hours=3)
 
-    # Nothing was collected: no provider request, no new run, same trends.
-    assert len(internet.calls) == calls
-    assert await _run_count(db) == 1
-    assert (await admin.get(API)).json()["total"] == trends_before
-    assert (await admin.get(f"{API}/discovery")).json() == window
+    # The keyless run neither opens a new window nor delays the scheduled run.
+    first_run = await db.get(TrendDiscoveryRun, first.json()["run_id"])
+    status = (await admin.get(f"{API}/discovery")).json()
+    assert status["can_discover"] is False
+    assert datetime.fromisoformat(status["next_discovery_at"]) == first_run.created_at + timedelta(
+        hours=3
+    )
+    assert await _run_count(db) == 2
 
 
 async def test_discovery_collects_again_once_the_window_ends(client, internet, db):  # noqa: F811

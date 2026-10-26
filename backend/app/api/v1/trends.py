@@ -29,6 +29,8 @@ from app.schemas.trend import (
     TrendPage,
 )
 from app.services.trends import export, service
+from app.services.trends.inputs import load_org_inputs
+from app.sources import KEYLESS_SOURCES
 from app.sources.locations import supported_markets
 
 AI_LIMIT = per_user(AI_PER_USER)
@@ -87,11 +89,29 @@ async def discovery_status(ctx: CanRead, db: DB, settings: AppSettings):
 async def discover(
     data: DiscoverRequest, ctx: CanManage, db: DB, settings: AppSettings, response: Response
 ):
-    """Collect new trends, at most once per discovery window. Inside the
-    window nothing is collected (no provider calls): the answer points at the
-    stored trends and says when the next discovery is due."""
+    """Collect new trends. Keyed (API) sources are called at most once per
+    discovery window; inside the window only the keyless sources run, on every
+    click. When none is enabled, nothing is collected: the answer points at
+    the stored trends and says when the next discovery is due."""
     window = await service.discovery_window(db, ctx.organization_id, settings)
     if not window.can_discover and window.last_run is not None:
+        org = await load_org_inputs(db, ctx.organization_id)
+        keyless = [s for s in data.sources or org.enabled_sources if s in KEYLESS_SOURCES]
+        if keyless:
+            run = await service.start_discovery(
+                db,
+                organization_id=ctx.organization_id,
+                user_id=ctx.user.id,
+                sources=data.sources,
+                locations=data.locations,
+                keyless_only=True,
+            )
+            return RunStarted(
+                run_id=run.id,
+                status=run.status,
+                run=RunRead.model_validate(run),
+                window=_window_read(window),
+            )
         response.status_code = status.HTTP_200_OK
         run = window.last_run
         return RunStarted(

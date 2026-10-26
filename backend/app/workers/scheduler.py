@@ -17,7 +17,7 @@ import uuid
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from app.ai.metrics import metrics
@@ -27,6 +27,7 @@ from app.db.session import SessionLocal
 from app.models.enums import DiscoveryRunStatus, RunTrigger, TrendFrequency
 from app.models.organization import Organization, OrganizationSettings
 from app.models.trend import TrendDiscoveryRun
+from app.sources import KEYLESS_SOURCES
 from app.workers.tasks import enqueue
 
 DAILY_AT = time(8, 0)
@@ -40,6 +41,17 @@ ACTIVE = (DiscoveryRunStatus.QUEUED, DiscoveryRunStatus.RUNNING)
 # Literal predicate of uq_trend_discovery_runs_one_active (ON CONFLICT must
 # repeat it to pick the partial index; bound parameters don't match).
 ACTIVE_PREDICATE = "status IN ('queued', 'running')"
+
+
+def paces_schedule():
+    """SQL condition: runs that count toward the schedule and the discovery
+    window. A manual run of only keyless sources (the button's refresh inside
+    a window) costs no provider quota, so it neither delays the next scheduled
+    run nor opens a window. Scheduled runs always count."""
+    return or_(
+        TrendDiscoveryRun.trigger == RunTrigger.SCHEDULED,
+        ~TrendDiscoveryRun.sources.contained_by(sorted(KEYLESS_SOURCES)),
+    )
 
 
 def is_due(
@@ -85,16 +97,20 @@ def is_due(
 async def _failed_streaks(db, limit: int) -> dict[uuid.UUID, int]:
     """Consecutive failed runs at the head of each organization's history
     (only the latest `limit` runs are looked at)."""
-    ranked = select(
-        TrendDiscoveryRun.organization_id,
-        TrendDiscoveryRun.status,
-        func.row_number()
-        .over(
-            partition_by=TrendDiscoveryRun.organization_id,
-            order_by=TrendDiscoveryRun.created_at.desc(),
+    ranked = (
+        select(
+            TrendDiscoveryRun.organization_id,
+            TrendDiscoveryRun.status,
+            func.row_number()
+            .over(
+                partition_by=TrendDiscoveryRun.organization_id,
+                order_by=TrendDiscoveryRun.created_at.desc(),
+            )
+            .label("rn"),
         )
-        .label("rn"),
-    ).subquery()
+        .where(paces_schedule())
+        .subquery()
+    )
     rows = await db.execute(
         select(ranked.c.organization_id, ranked.c.status)
         .where(ranked.c.rn <= limit)
@@ -122,7 +138,9 @@ async def schedule_due_runs(now: datetime | None = None) -> int:
         last_run = (
             select(
                 TrendDiscoveryRun.organization_id,
-                func.max(TrendDiscoveryRun.created_at).label("last_run"),
+                func.max(TrendDiscoveryRun.created_at)
+                .filter(paces_schedule())
+                .label("last_run"),
                 func.count().filter(TrendDiscoveryRun.status.in_(ACTIVE)).label("active"),
             )
             .group_by(TrendDiscoveryRun.organization_id)

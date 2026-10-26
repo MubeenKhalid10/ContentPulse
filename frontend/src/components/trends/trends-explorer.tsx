@@ -65,10 +65,10 @@ export function TrendsExplorer() {
   const can = useCan();
   const canDiscover = can("trends.manage");
   const canReview = can("trends.manage") || can("topics.manage");
-  const [saved, setFilters] = usePersistedState<TrendFilters>("trends", {
+  const [saved, setFilters] = usePersistedState<TrendFilters>("trends-v2", {
     status: "active",
-    // Only trends tied to the organization's website by default.
-    relevance: "relevant",
+    // Any relevance by default; the filter applies only when the user sets it.
+    relevance: "",
     sort: "score",
     source: "",
     location: "",
@@ -113,12 +113,12 @@ export function TrendsExplorer() {
   const [showFilters, setShowFilters] = useState(false);
   // Only what differs from the default view counts as an active filter.
   const activeFilters = [
-    ...(filters.relevance !== "relevant"
+    ...(filters.relevance
       ? [
           {
             key: "relevance",
             label: RELEVANCE_FILTERS.find((o) => o.value === (filters.relevance || "all"))?.label ?? "Relevance",
-            clear: () => update({ relevance: "relevant" }),
+            clear: () => update({ relevance: "" }),
           },
         ]
       : []),
@@ -342,18 +342,8 @@ export function TrendsExplorer() {
                   </FilterField>
                 </div>
               )}
-              {(activeFilters.length > 0 || filters.relevance === "relevant") && (
+              {activeFilters.length > 0 && (
                 <ul className="flex flex-wrap items-center gap-1.5" aria-label="Active filters">
-                  {filters.relevance === "relevant" && (
-                    <li>
-                      <span
-                        className="inline-flex h-6 items-center rounded-full bg-muted px-2.5 text-xs font-medium"
-                        title="Default view. Change it under Filters."
-                      >
-                        Relevant to us
-                      </span>
-                    </li>
-                  )}
                   {activeFilters.map((f) => (
                     <li key={f.key}>
                       <button
@@ -373,7 +363,7 @@ export function TrendsExplorer() {
                       variant="ghost"
                       size="xs"
                       onClick={() =>
-                        update({ relevance: "relevant", source: "", location: "" })
+                        update({ relevance: "", source: "", location: "" })
                       }
                     >
                       Reset filters
