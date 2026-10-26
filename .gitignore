@@ -56,3 +56,6 @@ celerybeat-schedule*
 AUDIT_REPORT.md
 DESIGN.md
 PRODUCT.md
+.claude
+
+docs/ *.md
