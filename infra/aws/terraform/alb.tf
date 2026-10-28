@@ -7,6 +7,15 @@ resource "aws_lb" "main" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
   idle_timeout       = 120
+
+  lifecycle {
+    # Without a certificate the stack serves plain HTTP and drops the Secure
+    # cookie flag: passwords and sessions would cross the network in cleartext.
+    precondition {
+      condition     = var.environment != "prod" || var.certificate_arn != ""
+      error_message = "A prod environment needs HTTPS: set certificate_arn (an ACM certificate for domain_name, in this region). Plain HTTP is for non-prod test stacks only (environment = \"staging\" or similar)."
+    }
+  }
 }
 
 resource "aws_lb_target_group" "api" {
@@ -17,7 +26,9 @@ resource "aws_lb_target_group" "api" {
   vpc_id      = aws_vpc.main.id
 
   health_check {
-    path                = "/health"
+    # Liveness only: /health also queries the database, so a brief RDS failover
+    # would mark every task unhealthy and ECS would replace them all.
+    path                = "/health/live"
     matcher             = "200"
     interval            = 15
     healthy_threshold   = 2

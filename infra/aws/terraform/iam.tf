@@ -22,7 +22,11 @@ resource "aws_iam_role_policy_attachment" "execution" {
 data "aws_iam_policy_document" "read_secret" {
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.app.arn]
+    resources = [
+      aws_secretsmanager_secret.app.arn,
+      aws_secretsmanager_secret.redis.arn,
+      aws_db_instance.main.master_user_secret[0].secret_arn,
+    ]
   }
 }
 

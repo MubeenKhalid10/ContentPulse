@@ -12,13 +12,15 @@ terraform {
     }
   }
 
-  # Optional: keep state in S3 so a team can share it. Create the bucket first,
-  # then uncomment and run `terraform init -migrate-state`.
-  # backend "s3" {
-  #   bucket = "your-terraform-state-bucket"
-  #   key    = "contentpulse/prod.tfstate"
-  #   region = "us-east-1"
-  # }
+  # State lives in an encrypted, versioned S3 bucket with a DynamoDB lock, never
+  # on a laptop. The bucket, region and lock table are yours, so they are given
+  # at init time (see backend.hcl.example and the README):
+  #   terraform init -backend-config=backend.hcl
+  # (An existing local state is copied over with `-migrate-state`.)
+  backend "s3" {
+    key     = "contentpulse/prod.tfstate"
+    encrypt = true
+  }
 }
 
 provider "aws" {

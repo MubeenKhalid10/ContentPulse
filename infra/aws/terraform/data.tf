@@ -1,10 +1,5 @@
 # --- PostgreSQL 17 with pgvector (the migrations run CREATE EXTENSION vector) ----------
 
-resource "random_password" "db" {
-  length  = 32
-  special = false # goes into a connection URL
-}
-
 resource "aws_db_subnet_group" "main" {
   name       = "${local.name}-db"
   subnet_ids = aws_subnet.private[*].id
@@ -22,8 +17,12 @@ resource "aws_db_instance" "main" {
 
   db_name  = "contentpulse"
   username = "contentpulse"
-  password = random_password.db.result
   port     = 5432
+
+  # RDS creates the master password in Secrets Manager (and can rotate it), so
+  # it never appears in this configuration or in Terraform state. The
+  # containers read it from that secret (see db_password in ecs.tf).
+  manage_master_user_password = true
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.data.id]
@@ -45,15 +44,29 @@ resource "aws_elasticache_subnet_group" "main" {
   subnet_ids = aws_subnet.private[*].id
 }
 
-resource "aws_elasticache_cluster" "redis" {
-  cluster_id         = "${local.name}-redis"
-  engine             = "redis"
-  engine_version     = "7.1"
-  node_type          = var.redis_node_type
-  num_cache_nodes    = 1
-  port               = 6379
-  subnet_group_name  = aws_elasticache_subnet_group.main.name
-  security_group_ids = [aws_security_group.data.id]
+resource "random_password" "redis" {
+  length  = 48
+  special = false # goes into a connection URL
+}
+
+# A replication group (one node, no failover) because only it supports in-transit
+# encryption and an auth token: Redis carries the Celery queue and rate-limit counters.
+resource "aws_elasticache_replication_group" "redis" {
+  replication_group_id       = "${local.name}-redis"
+  description                = "${local.name} Celery broker and rate limits"
+  engine                     = "redis"
+  engine_version             = "7.1"
+  node_type                  = var.redis_node_type
+  num_cache_clusters         = 1
+  automatic_failover_enabled = false
+  port                       = 6379
+  subnet_group_name          = aws_elasticache_subnet_group.main.name
+  security_group_ids         = [aws_security_group.data.id]
+
+  at_rest_encryption_enabled = true
+  transit_encryption_enabled = true
+  auth_token                 = random_password.redis.result
+  apply_immediately          = true
 }
 
 # --- S3: designer creatives (browsers upload with presigned URLs) ---------------------

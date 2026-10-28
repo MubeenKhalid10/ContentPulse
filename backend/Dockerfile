@@ -1,6 +1,8 @@
-FROM python:3.13-slim
+# Base images are pinned by digest: builds are reproducible, and a moved tag
+# can't change what ships. Refresh them on purpose (docker buildx imagetools inspect <tag>).
+FROM python:3.13-slim@sha256:b3575dcf816cdacc5292df77a6e3e59b8941631078373a045efa2ac1e9c5c3b2
 
-COPY --from=ghcr.io/astral-sh/uv:0.12 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12@sha256:3af4716e991d6956a41e573eab705d0ee08500cd829ed30293eb8472f372c65a /uv /uvx /bin/
 
 ENV PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \

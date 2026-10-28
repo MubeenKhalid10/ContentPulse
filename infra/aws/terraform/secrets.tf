@@ -13,9 +13,27 @@ resource "random_password" "jwt" {
 locals {
   # Keys exposed to the containers. Add a key here AND in the secret to pass a new one.
   secret_keys = [
-    "DATABASE_URL",
     "JWT_SECRET",
     "LLM_API_KEY",
+    "GEMINI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GROQ_API_KEY",
+    "CEREBRAS_API_KEY",
+    "OPENROUTER_API_KEY",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USERNAME",
+    "SMTP_PASSWORD",
+    "SMTP_FROM",
+    "METRICS_TOKEN",
+    "INGEST_TRIGGER_SECRET",
+    "CLOUDFLARE_ACCOUNT_ID",
+    "CLOUDFLARE_API_KEY",
+    "CLOUDFLARE_API_TOKEN",
+    "KIE_AI_API_KEY",
+    "THE_NEWS_API_KEY",
+    "EXA_API_KEY",
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
     "SUPABASE_JWT_SECRET",
@@ -36,6 +54,20 @@ locals {
   ]
 }
 
+# The Redis connection string carries the auth token, so it lives in its own
+# secret (managed here, unlike the app secret you edit by hand).
+resource "aws_secretsmanager_secret" "redis" {
+  name                    = "${local.name}/redis"
+  recovery_window_in_days = var.protect_data ? 7 : 0
+}
+
+resource "aws_secretsmanager_secret_version" "redis" {
+  secret_id = aws_secretsmanager_secret.redis.id
+  secret_string = jsonencode({
+    REDIS_URL = "rediss://:${random_password.redis.result}@${aws_elasticache_replication_group.redis.primary_endpoint_address}:6379/0?ssl_cert_reqs=required"
+  })
+}
+
 resource "aws_secretsmanager_secret" "app" {
   name                    = "${local.name}/app"
   recovery_window_in_days = var.protect_data ? 7 : 0
@@ -46,8 +78,7 @@ resource "aws_secretsmanager_secret_version" "app" {
   secret_string = jsonencode(merge(
     { for key in local.secret_keys : key => "" },
     {
-      DATABASE_URL = "postgresql+asyncpg://${aws_db_instance.main.username}:${random_password.db.result}@${aws_db_instance.main.address}:5432/${aws_db_instance.main.db_name}"
-      JWT_SECRET   = random_password.jwt.result
+      JWT_SECRET = random_password.jwt.result
     },
   ))
 
