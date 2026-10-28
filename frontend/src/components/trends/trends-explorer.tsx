@@ -1,16 +1,10 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRightIcon, RadarIcon, SlidersHorizontalIcon, TrendingUpIcon, XIcon } from "lucide-react";
+import { RadarIcon, SlidersHorizontalIcon, TrendingUpIcon, XIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
 
-import {
-  FILTER_SEARCH,
-  FILTER_SELECT,
-  FilterBar,
-} from "@/components/shared/filter-bar";
+import { FILTER_SEARCH, FILTER_SELECT, FilterBar } from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { SimpleSelect } from "@/components/shared/simple-select";
@@ -22,10 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import {
-  useOrgSettings,
-  useOrgId,
-} from "@/hooks/use-organization";
+import { useOrgSettings } from "@/hooks/use-organization";
 import {
   TREND_WINDOW_DAYS,
   type RelevanceFilter,
@@ -33,19 +24,22 @@ import {
   useAIStatus,
   useDiscover,
   useDiscoveryRuns,
-  useDiscoveryWindow,
   useMarkets,
   useTrendSources,
   useTrends,
 } from "@/hooks/use-trends";
-import { ApiError, errorMessage } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { formatDateTime, timeOfDay, timeUntil } from "@/lib/format";
-import type { RunStarted, TrendSourceInfo } from "@/types/api";
 import { sourceName } from "@/lib/trends";
 import { cn } from "@/lib/utils";
 
+import { onDiscoverStarted, onDiscoverError, useRunCompletion } from "./use-run-completion";
+import { DiscoveryStatus } from "./discovery-status";
+import { FilterField } from "./filter-field";
+import { SourcesStrip } from "./sources-strip";
+
 const PAGE = 30;
+
 const RELEVANCE_FILTERS = [
   { value: "relevant", label: "Relevant to us" },
   { value: "all", label: "Any relevance" },
@@ -54,6 +48,7 @@ const RELEVANCE_FILTERS = [
   { value: "not_relevant", label: "Not relevant" },
   { value: "unanalyzed", label: "Not analyzed yet" },
 ];
+
 const SORTS = [
   { value: "score", label: "Best opportunity" },
   { value: "recent", label: "Latest activity" },
@@ -303,10 +298,6 @@ export function TrendsExplorer() {
                   )}
                 </Button>
               </FilterBar>
-              <p className="text-xs text-muted-foreground" id="trend-tabs-hint">
-                To review: trends you haven&apos;t decided on. Rejected trends
-                appear under All trends, where you can restore them.
-              </p>
               {showFilters && (
                 <div
                   id="trend-filters"
@@ -457,167 +448,3 @@ export function TrendsExplorer() {
     </>
   );
 }
-
-/** Inside the discovery window nothing is collected: the page reloads the
- * stored trends and says when the next discovery is due. Trends count as new
- * only if that discovery finished after the list on screen was loaded. */
-function onDiscoverStarted(result: RunStarted, shownAt: number) {
-  if (result.started) {
-    toast.success("Discovery started. Results appear here in a minute.");
-    return;
-  }
-  const info = result.window;
-  const next = info.next_discovery_at;
-  const wait = next ? `in ${timeUntil(next)} (${timeOfDay(next)})` : "soon";
-  const last = info.last_discovery_at;
-  if (info.new_trends > 0 && last && Date.parse(last) > shownAt) {
-    toast.success(
-      `Showing the latest trends: ${info.new_trends} new from the ${timeOfDay(last)} discovery.`,
-      { description: `The next discovery runs ${wait}.` },
-    );
-  } else {
-    toast.message("No new trends found since the last discovery.", {
-      description: `New discovery will be available ${wait}.`,
-    });
-  }
-}
-
-function onDiscoverError(error: unknown) {
-  if (error instanceof ApiError && error.status === 409) {
-    toast.message(
-      "Discovery is already running. Results will appear here shortly.",
-    );
-  } else {
-    toast.error(errorMessage(error));
-  }
-}
-
-/** Refresh trends and notify when a discovery run finishes. */
-function useRunCompletion(
-  runId: string | undefined,
-  status: string | undefined,
-) {
-  const queryClient = useQueryClient();
-  const orgId = useOrgId();
-  const previous = useRef<{ id?: string; status?: string }>({});
-
-  useEffect(() => {
-    const before = previous.current;
-    previous.current = { id: runId, status };
-    const wasActive = before.status === "queued" || before.status === "running";
-    if (!runId || before.id !== runId || !wasActive || status === before.status)
-      return;
-    if (status === "succeeded") {
-      toast.success("New trends are in");
-      queryClient.invalidateQueries({ queryKey: ["org", orgId, "trends"] });
-      queryClient.invalidateQueries({ queryKey: ["org", orgId, "dashboard"] });
-    } else if (status === "failed") {
-      toast.error(
-        "Trend discovery failed. See the run details for each source.",
-      );
-    }
-  }, [runId, status, queryClient, orgId]);
-}
-
-const isFuture = (iso: string) => Date.parse(iso) > Date.now();
-
-/** Time of day for today, date and time otherwise. */
-function stamp(iso: string): string {
-  const d = new Date(iso);
-  return d.toDateString() === new Date().toDateString() ? timeOfDay(iso) : formatDateTime(iso);
-}
-
-/** When the stored trends were last refreshed and roughly when the next
- * refresh is due. Reads the discovery window the page already loads; shows
- * only the times the server returned. The next time is an estimate. */
-function DiscoveryStatus() {
-  const info = useDiscoveryWindow().data;
-  const last = info?.last_discovery_at;
-  if (!info || !last) return null;
-  const next = info.next_discovery_at;
-  const upcoming = !!next && isFuture(next);
-  return (
-    <p className="text-sm text-muted-foreground">
-      <span title={formatDateTime(last)}>Last updated {stamp(last)}</span>
-      {upcoming && next && (
-        <>
-          {" · "}
-          <span title={formatDateTime(next)}>
-            {info.background
-              ? `Next update about ${stamp(next)}`
-              : `You can check again after ${stamp(next)}`}
-          </span>
-        </>
-      )}
-    </p>
-  );
-}
-
-function FilterField({
-  id,
-  label,
-  children,
-}: {
-  id: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid gap-1.5">
-      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-/** Which sources are being watched, one click from managing them. */
-function SourcesStrip({ sources }: { sources: TrendSourceInfo[] }) {
-  const on = sources.filter((s) => s.enabled && s.configured);
-  const needSetup = sources.filter(
-    (s) => s.enabled && !s.configured && s.pricing !== "unavailable",
-  );
-  const shown = on.slice(0, 4).map((s) => s.name);
-  return (
-    <section
-      aria-label="Discovery sources"
-      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-card px-4 py-3"
-    >
-      <RadarIcon
-        className="size-4 shrink-0 text-muted-foreground"
-        aria-hidden
-      />
-      <p className="min-w-0 flex-1 text-sm">
-        {on.length ? (
-          <>
-            Watching{" "}
-            <span className="font-medium">
-              {on.length} source{on.length === 1 ? "" : "s"}
-            </span>
-            <span className="text-muted-foreground">
-              : {shown.join(", ")}
-              {on.length > shown.length
-                ? ` and ${on.length - shown.length} more`
-                : ""}
-              .
-            </span>
-          </>
-        ) : (
-          <span className="font-medium">No sources are on yet.</span>
-        )}
-        {needSetup.length > 0 && (
-          <span className="text-muted-foreground">
-            {" "}
-            {needSetup.length} {needSetup.length === 1 ? "needs" : "need"}{" "}
-            setup.
-          </span>
-        )}
-      </p>
-      <Link href="/trends/sources" className={buttonVariants({ size: "sm" })}>
-        Discovery Sources <ArrowRightIcon />
-      </Link>
-    </section>
-  );
-}
-

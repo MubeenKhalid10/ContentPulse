@@ -12,7 +12,8 @@ import { CollapsibleCard } from "@/components/shared/collapsible-card";
 import { Score, SignalBreakdown } from "@/components/trends/score";
 import { TrendActions } from "@/components/trends/trend-row";
 import { StrategyDialog } from "@/components/topics/strategy-dialog";
-import { StrategiesCard, TopicPosts } from "@/components/topics/topic-detail";
+import { StrategiesCard } from "@/components/topics/strategies-card";
+import { TopicPosts } from "@/components/topics/topic-posts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,7 +123,8 @@ export function TrendDetailView({ id }: { id: string }) {
 
       <div className="grid gap-6">
         <div className="grid content-start gap-6">
-          <SummaryCard trend={t} marketNames={marketNames} />
+          {/* Once shortlisted the page is for planning: the summary is only for deciding. */}
+          {t.status !== "shortlisted" && <SummaryCard trend={t} marketNames={marketNames} />}
           {t.status === "shortlisted" && t.topic_id && can("topics.read") ? (
             <ShortlistPlans trend={t} canReview={canReview} />
           ) : (
