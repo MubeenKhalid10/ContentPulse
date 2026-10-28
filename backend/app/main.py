@@ -30,6 +30,12 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         settings.auth_provider,
         settings.task_backend,
     )
+    if settings.is_production and settings.frontend_url_is_local:
+        logger.warning(
+            "FRONTEND_URL is %s in production: invitation and password-reset emails will "
+            "link there. Set FRONTEND_URL to your site's public address.",
+            settings.frontend_url,
+        )
     recovered = (
         await recover_stale_jobs()
         + await trend_tasks.recover_stale_runs()

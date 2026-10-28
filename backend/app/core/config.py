@@ -2,6 +2,7 @@ import json
 import os
 from functools import lru_cache
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -417,6 +418,13 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def frontend_url_is_local(self) -> bool:
+        """True while FRONTEND_URL is still a localhost address, which is what
+        invitation and password-reset emails would link to."""
+        host = (urlsplit(self.frontend_url).hostname or "").lower()
+        return host in ("localhost", "127.0.0.1", "::1", "0.0.0.0")
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> "Settings":

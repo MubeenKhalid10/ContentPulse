@@ -441,6 +441,17 @@ def test_production_refuses_weak_secrets_and_a_wildcard_origin():
     Settings(_env_file=None, app_env="development", jwt_secret="short")
 
 
+def test_a_localhost_frontend_url_is_flagged_so_email_links_are_not_left_pointing_there():
+    from app.core.config import Settings
+
+    base = {"_env_file": None, "app_env": "production", "jwt_secret": "x" * 48}
+    assert Settings(**base).frontend_url_is_local  # the default
+    assert Settings(**base, frontend_url="http://127.0.0.1:3000").frontend_url_is_local
+    assert not Settings(
+        **base, frontend_url="https://contentpulse-hms.vercel.app"
+    ).frontend_url_is_local
+
+
 def test_forwarded_for_with_too_few_hops_is_not_trusted():
     from starlette.requests import Request
 

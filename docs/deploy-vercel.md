@@ -106,6 +106,10 @@ runs while it's awake. For real use, change `plan: free` to `plan: starter` in
    own domain under **Settings > Domains**).
 5. Back in Render, set `FRONTEND_URL` and `CORS_ORIGINS` to that URL and save (Render
    redeploys). Invitation and password-reset links use `FRONTEND_URL`.
+   Use the bare site address, for example `https://contentpulse-hms.vercel.app` (no path, no
+   trailing `/login`): the app adds `/invite/<token>` or `/reset-password` itself. If invitation
+   emails link to `http://localhost:3000`, this value was never set on Render; the API also logs
+   a warning at startup in that case.
 
 ## 5. Check it
 
