@@ -390,8 +390,8 @@ async def test_design_permissions(client, internet, design_ai):
     ).status_code == 422
     assigned = await admin.post(f"{url}/assign", json={"assignee_id": dee.user["id"]})
     assert assigned.status_code == 200
-    # Creators can't take a task from someone else, but anyone may deliver on
-    # it: the assignee shows who's on it, it doesn't lock teammates out.
+    # Creators can't take a task from someone else, or deliver on it: only the
+    # assignee (or an admin) works on an assigned task.
     assert (
         await dan.post(f"{url}/assign", json={"assignee_id": dan.user["id"]})
     ).status_code == 403
@@ -399,7 +399,7 @@ async def test_design_permissions(client, internet, design_ai):
         await dan.post(
             f"{url}/uploads", json={"file_name": "a.png", "file_type": "image/png", "file_size": 5}
         )
-    ).status_code == 200
+    ).status_code == 403
     unassigned = (await admin.post(f"{url}/assign", json={"assignee_id": None})).json()
     assert unassigned["status"] == "open" and unassigned["assignee"] is None
 

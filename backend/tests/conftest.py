@@ -6,6 +6,27 @@ TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
     "postgresql+asyncpg://contentpulse:contentpulse@localhost:5434/contentpulse_test",
 )
+
+
+def _refuse_unsafe_database(url: str) -> None:
+    """The suite drops the whole schema and truncates every table: it only ever
+    runs against a local database whose name says it is for tests."""
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    name = parts.path.lstrip("/")
+    local = parts.hostname in ("localhost", "127.0.0.1", "::1")
+    if "test" not in name.lower() or not (
+        local or os.environ.get("ALLOW_REMOTE_TEST_DATABASE") == "1"
+    ):
+        raise RuntimeError(
+            f"Refusing to run the tests against database {name!r} on {parts.hostname!r}: "
+            "TEST_DATABASE_URL must point at a local database with 'test' in its name "
+            "(ALLOW_REMOTE_TEST_DATABASE=1 allows a non-local host)."
+        )
+
+
+_refuse_unsafe_database(TEST_DATABASE_URL)
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["APP_ENV"] = "test"
 os.environ["AUTH_PROVIDER"] = "local"
@@ -13,6 +34,10 @@ os.environ["TREND_SCHEDULER_ENABLED"] = "false"
 # Tests run discovery repeatedly; test_discovery_window.py turns the window on.
 os.environ["TREND_MANUAL_REUSE_WINDOW"] = "false"
 os.environ["TASK_BACKEND"] = "inprocess"
+# The relevance pre-filter drops collected items that don't match the test
+# organization's profile, which would empty every fixture-driven discovery run:
+# off by default here, switched on in the tests that cover it.
+os.environ["TREND_RELEVANCE_PREFILTER"] = "false"
 # Opt-in per test (tests/test_operations.py): limits and retry delays would
 # otherwise make unrelated tests slow or order-dependent.
 os.environ["RATE_LIMIT_ENABLED"] = "false"
@@ -49,12 +74,31 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 PASSWORD = "correct-horse-battery"
 
 
+def _reset_schema() -> None:
+    import asyncio
+
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    async def reset() -> None:
+        scratch = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+        try:
+            async with scratch.begin() as conn:
+                await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+                await conn.execute(text("CREATE SCHEMA public"))
+        finally:
+            await scratch.dispose()
+
+    asyncio.run(reset())
+
+
 @pytest.fixture(scope="session", autouse=True)
 def migrated_database() -> None:
-    """Apply migrations from scratch once per run (also exercises downgrade)."""
+    """Apply migrations from scratch once per run. The schema is dropped rather
+    than downgraded: some migrations are deliberately irreversible."""
+    _reset_schema()
     cfg = Config(str(BACKEND_DIR / "alembic.ini"))
     cfg.attributes["database_url"] = TEST_DATABASE_URL
-    command.downgrade(cfg, "base")
     command.upgrade(cfg, "head")
 
 

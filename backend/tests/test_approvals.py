@@ -3,6 +3,9 @@ changes → revision → re-submit, reject, final (spec §31-33, §42, §53)."""
 
 import uuid
 
+from sqlalchemy import select
+
+from app.models.approval import ApprovalRequest
 from tests.conftest import add_member, create_org, register
 from tests.test_alignment import internet, setup_org  # noqa: F401  (fixtures)
 from tests.test_design import design_ai, in_design, upload  # noqa: F401  (fixtures)
@@ -85,7 +88,10 @@ async def test_approve_then_final(client, internet, design_ai):
     assert (await admin.post(f"{url}/finalize")).status_code == 409  # already final
     summary = (await admin.get("/api/v1/dashboard/summary")).json()
     assert summary["approved"] == 1 and summary["pending_approval"] == 0
-    assert (await admin.get(API, params={"status": "approved"})).json()["total"] == 1
+    # Copy and design reviews are separate lists: the copy round approved on the
+    # way to design is still there, so look at the design stage.
+    design_stage = {"status": "approved", "stage": "design"}
+    assert (await admin.get(API, params=design_stage)).json()["total"] == 1
 
 
 async def test_changes_requested_revision_and_resubmit(client, internet, design_ai):
@@ -146,16 +152,22 @@ async def test_changes_requested_revision_and_resubmit(client, internet, design_
     assert detail["comments"][1]["creative_version"] == 2
     assert [c["version"] for c in detail["creatives"]] == [2, 1]  # nothing replaced
     # One row per post: the superseded round is history, not a second reviewed item.
-    assert (await admin.get(API, params={"status": "reviewed"})).json()["total"] == 0
+    design_stage = {"status": "reviewed", "stage": "design"}
+    assert (await admin.get(API, params=design_stage)).json()["total"] == 0
 
 
-async def test_copy_only_changes_resubmit_from_the_studio(client, internet, design_ai):
+async def test_copy_only_changes_resubmit_from_the_studio(client, internet, design_ai, db):
     admin, org = await setup_org(client)
     post, item, _ = await submitted(client, admin, org)
     await admin.post(
         f"{API}/{item['id']}/request-changes",
         json={"comment": "Stronger headline.", "scope": "copy"},
     )
+    # The scope is stored on the request, not only in the audit log.
+    stored = await db.scalar(
+        select(ApprovalRequest.scope).where(ApprovalRequest.id == uuid.UUID(item["id"]))
+    )
+    assert stored == "copy"
     task_id = (await admin.get(f"/api/v1/content/{post['id']}")).json()["design_task"]["id"]
     # The designer isn't asked to redo anything.
     assert (await admin.get(f"/api/v1/design/tasks/{task_id}")).json()["status"] == "submitted"
