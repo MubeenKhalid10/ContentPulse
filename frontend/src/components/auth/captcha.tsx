@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Turnstile } from "@marsidev/react-turnstile";
 
-import { useAuthConfig } from "@/lib/supabase-config";
+import { useAuthConfig } from "@/lib/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function AuthCaptcha({

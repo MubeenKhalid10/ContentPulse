@@ -1,5 +1,7 @@
 """Optional SMTP email: invitations and local password reset."""
 
+import re
+
 import pytest
 
 from app.core import email as email_module
@@ -52,7 +54,7 @@ async def test_reset_flow_end_to_end(client, smtp_on, outbox):
     assert r.status_code == 202
     assert len(outbox) == 1
     body = outbox[0].get_content()
-    token = body.split("/reset-password?token=")[1].split()[0]
+    token = body.split("/reset-password#token=")[1].split()[0]
 
     # A reset token is never a session.
     with pytest.raises(Unauthorized):
@@ -132,9 +134,11 @@ async def test_invitation_is_emailed_when_smtp_is_set(client, smtp_on, outbox):
     assert outbox[0]["To"] == "new@example.com"
     plain = outbox[0].get_body(preferencelist=("plain",)).get_content()
     html = outbox[0].get_body(preferencelist=("html",)).get_content()
-    assert r.json()["invite_url"] in plain
+    # The link goes to the invitee only; the inviter isn't handed it.
+    assert r.json()["invite_url"] is None
+    link = re.search(r"https?://\S+/invite/\S+", plain).group(0)
     # The branded HTML version has the Accept button pointing at the same link.
-    assert "Accept invitation" in html and f'href="{r.json()["invite_url"]}"' in html
+    assert "Accept invitation" in html and f'href="{link}"' in html
     assert "Mail Co" in html and "Join Mail Co on ContentPulse" in html
 
 

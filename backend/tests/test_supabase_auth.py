@@ -46,6 +46,7 @@ class FakeSupabase:
         aud: str = "authenticated",
         iss: str = ISSUER,
         kid: str | None = None,
+        email_verified: bool = True,
     ) -> str:
         now = int(time.time())
         claims = {
@@ -56,7 +57,9 @@ class FakeSupabase:
             "iat": now,
             "exp": now + expires_in,
             "role": "authenticated",
-            "user_metadata": {"full_name": name} if name else {},
+            "user_metadata": {"full_name": name, "email_verified": email_verified}
+            if name
+            else {"email_verified": email_verified},
         }
         kid = kid or self.current
         return jwt.encode(claims, self.keys[kid], algorithm="ES256", headers={"kid": kid})
@@ -122,13 +125,16 @@ async def test_local_mode_publishes_no_turnstile_key(client, monkeypatch):
 
 
 async def test_es256_token_provisions_and_links_user(client, supabase):
-    token = supabase.token("Sam@Example.com")
+    sub = str(uuid.uuid4())
+    token = supabase.token("Sam@Example.com", sub=sub)
     me = await client.get("/api/v1/auth/me", headers=bearer(token))
     assert me.status_code == 200, me.text
     assert me.json()["email"] == "sam@example.com"
     assert me.json()["name"] == "Sam Supabase"
 
-    again = await client.get("/api/v1/auth/me", headers=bearer(supabase.token("sam@example.com")))
+    again = await client.get(
+        "/api/v1/auth/me", headers=bearer(supabase.token("sam@example.com", sub=sub))
+    )
     assert again.json()["id"] == me.json()["id"]
     assert supabase.jwks_fetches == 1  # keys are cached
 
@@ -206,6 +212,29 @@ async def test_password_endpoints_disabled(client, supabase):
         json={"email": "a@example.com", "password": "correct-horse-battery", "full_name": "A"},
     )
     assert resp.status_code == 403
+
+
+async def test_an_existing_account_is_never_taken_over_by_email(client, supabase):
+    victim = bearer(supabase.token("victim@example.com", sub=str(uuid.uuid4())))
+    assert (await client.get("/api/v1/auth/me", headers=victim)).status_code == 200
+
+    # Same email, a different identity: the account stays with its owner.
+    attacker = bearer(supabase.token("victim@example.com", sub=str(uuid.uuid4())))
+    resp = await client.get("/api/v1/auth/me", headers=attacker)
+    assert resp.status_code == 401
+    assert (await client.get("/api/v1/auth/me", headers=victim)).status_code == 200
+
+
+async def test_an_unverified_email_cannot_claim_an_existing_account(client, supabase, db):
+    from app.models import User
+
+    db.add(User(email="seat@example.com", auth_provider="supabase"))  # an invite placeholder
+    await db.commit()
+
+    unverified = bearer(supabase.token("seat@example.com", email_verified=False))
+    assert (await client.get("/api/v1/auth/me", headers=unverified)).status_code == 401
+    verified = bearer(supabase.token("seat@example.com"))
+    assert (await client.get("/api/v1/auth/me", headers=verified)).status_code == 200
 
 
 async def test_invites_with_supabase_identities(client, supabase):

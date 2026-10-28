@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,6 +23,16 @@ class DesignBrief(UUIDPk, Timestamps, OrgScoped, Base):
     """Design direction for a post; doubles as the designer's task (spec §27, §41)."""
 
     __tablename__ = "design_briefs"
+    __table_args__ = (
+        # One open design task per post, even when a double click or two
+        # approvals race to create it.
+        Index(
+            "uq_design_briefs_one_active",
+            "post_id",
+            unique=True,
+            postgresql_where=text("status IN ('open', 'assigned', 'in_progress')"),
+        ),
+    )
 
     post_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), index=True, nullable=False

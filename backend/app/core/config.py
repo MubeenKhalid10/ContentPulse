@@ -30,6 +30,14 @@ class Settings(BaseSettings):
 
     # Database / Redis
     database_url: str = "postgresql+asyncpg://contentpulse:contentpulse@localhost:5434/contentpulse"
+    # Alternative to DATABASE_URL for hosts that keep the password in a managed
+    # secret (the AWS stack's RDS-managed password): when DB_HOST and
+    # DB_PASSWORD are both set, they build the URL. Unset = nothing changes.
+    db_host: str | None = None
+    db_port: int = 5432
+    db_name: str = "contentpulse"
+    db_user: str = "contentpulse"
+    db_password: str | None = None
     redis_url: str = "redis://localhost:6380/0"
 
     # Background jobs (Sprint 9).
@@ -385,6 +393,17 @@ class Settings(BaseSettings):
             return [part.strip(" \"'") for part in text.split(",") if part.strip(" \"'")]
         return value
 
+    @model_validator(mode="after")
+    def _database_url_from_parts(self) -> "Settings":
+        if self.db_host and self.db_password:
+            from urllib.parse import quote
+
+            self.database_url = (
+                f"postgresql+asyncpg://{quote(self.db_user, safe='')}:"
+                f"{quote(self.db_password, safe='')}@{self.db_host}:{self.db_port}/{self.db_name}"
+            )
+        return self
+
     @field_validator("cors_origins")
     @classmethod
     def _bare_origins(cls, value: list[str]) -> list[str]:
@@ -403,6 +422,15 @@ class Settings(BaseSettings):
     def _check_production_secrets(self) -> "Settings":
         if self.is_production and self.jwt_secret == _INSECURE_DEV_SECRET:
             raise ValueError("JWT_SECRET must be set in production")
+        if self.is_production and len(self.jwt_secret) < 32:
+            raise ValueError(
+                "JWT_SECRET is too short for production: use at least 32 random characters "
+                '(for example `python -c "import secrets; print(secrets.token_urlsafe(48))"`).'
+            )
+        if "*" in self.cors_origins:
+            # Browsers refuse a wildcard with cookies, and allowing it would
+            # let any site make credentialed requests: list the real origins.
+            raise ValueError("CORS_ORIGINS=* can't be used: list the exact origins instead.")
         if self.auth_provider == "supabase" and not (self.supabase_url and self.supabase_anon_key):
             raise ValueError(
                 "SUPABASE_URL and SUPABASE_ANON_KEY are required when AUTH_PROVIDER=supabase"

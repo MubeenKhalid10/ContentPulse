@@ -62,3 +62,4 @@ ignore = ["B008"]  # FastAPI Depends() in defaults is idiomatic
 "tests/test_blog.py" = ["E501", "F811"]
 "tests/test_design_logo.py" = ["E501", "F811"]
 "tests/test_dashboard.py" = ["E501", "F811"]
+"tests/test_races_and_jobs.py" = ["E501", "F811"]

@@ -22,7 +22,8 @@ class S3Storage:
     name = "s3"
 
     def __init__(self, settings: Settings, client=None) -> None:
-        assert settings.s3_bucket
+        if not settings.s3_bucket:
+            raise ValueError("S3_BUCKET is required for S3 storage")
         self.bucket = settings.s3_bucket
         self.ttl = settings.signed_url_ttl_seconds
         # Credentials fall back to the standard AWS chain (env, profile, IAM role).

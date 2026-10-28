@@ -2,13 +2,14 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Header, Response, status
+from fastapi import APIRouter, Header, Request, Response, status
 
-from app.api.deps import DB, AppSettings, CurrentUser, OptionalUser
+from app.api.deps import DB, AppSettings, CurrentUser, OptionalUser, _extract_token
 from app.core.config import Settings
 from app.core.ratelimit import (
     INVITE_PER_IP,
     LOGIN_PER_ACCOUNT,
+    LOGIN_PER_ACCOUNT_ANYWHERE,
     LOGIN_PER_IP,
     REGISTER_PER_IP,
     RESET_PER_ACCOUNT,
@@ -53,7 +54,7 @@ def _set_session_cookie(
 async def _start_session(
     db: DB, user: User, response: Response, settings: Settings
 ) -> SessionResponse:
-    token, expires_at = create_access_token(user.id, settings)
+    token, expires_at = create_access_token(user.id, settings, user.token_version)
     _set_session_cookie(response, token, expires_at, settings)
     return SessionResponse(
         access_token=token,
@@ -90,10 +91,13 @@ async def register(
 
 @router.post("/login", response_model=SessionResponse, dependencies=[per_ip(LOGIN_PER_IP)])
 async def login(
-    data: LoginRequest, response: Response, db: DB, settings: AppSettings
+    data: LoginRequest, request: Request, response: Response, db: DB, settings: AppSettings
 ) -> SessionResponse:
-    # Per account too, so one address can't be guessed at from many IPs.
-    await limiter.check(LOGIN_PER_ACCOUNT, data.email.lower())
+    # Per account from one address (so an attacker's attempts can't lock the
+    # real owner out), plus a generous account-wide cap against many addresses.
+    email = data.email.lower()
+    await limiter.check(LOGIN_PER_ACCOUNT, f"{email}|{limiter.client_ip(request)}")
+    await limiter.check(LOGIN_PER_ACCOUNT_ANYWHERE, email)
     user = await auth_service.authenticate(db, data.email, data.password, settings)
     return await _start_session(db, user, response, settings)
 
@@ -125,7 +129,8 @@ async def confirm_password_reset(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(response: Response, settings: AppSettings) -> None:
+async def logout(request: Request, response: Response, db: DB, settings: AppSettings) -> None:
+    await auth_service.end_sessions(db, _extract_token(request, settings), settings)
     response.delete_cookie(settings.session_cookie_name, path="/")
 
 
@@ -155,11 +160,14 @@ async def update_me(
     dependencies=[per_ip(LOGIN_PER_IP)],
 )
 async def change_password(
-    data: PasswordChange, user: CurrentUser, db: DB, settings: AppSettings
+    data: PasswordChange, user: CurrentUser, db: DB, response: Response, settings: AppSettings
 ) -> None:
     # Same limits as sign-in: the current password can't be guessed from here.
     await limiter.check(LOGIN_PER_ACCOUNT, user.email.lower())
     await auth_service.change_password(db, user, data.current_password, data.new_password, settings)
+    # Other devices are signed out; this one gets a fresh session and stays in.
+    token, expires_at = create_access_token(user.id, settings, user.token_version)
+    _set_session_cookie(response, token, expires_at, settings)
 
 
 @router.get("/invites/{token}", response_model=InvitePreview)
@@ -177,7 +185,7 @@ async def accept_invite(
 ) -> MeResponse:
     user = await auth_service.accept_invite(db, data, settings, current_user)
     if settings.auth_provider == "local":
-        token, expires_at = create_access_token(user.id, settings)
+        token, expires_at = create_access_token(user.id, settings, user.token_version)
         _set_session_cookie(response, token, expires_at, settings)
     me = await auth_service.build_me(db, user)
     return me

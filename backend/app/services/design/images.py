@@ -3,15 +3,15 @@ the post into an image, stored as the task's next creative version. The
 creator then reviews it and submits it for approval like an upload."""
 
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.images import aspect_ratio, generate_image, get_image_provider
 from app.ai.provider import AIError, AIErrorKind
+from app.core.clock import utcnow
 from app.core.config import get_settings
-from app.core.errors import AppError, Conflict, ErrorCode
+from app.core.errors import AppError, Conflict, ErrorCode, require
 from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.models.ai import AIGenerationJob
@@ -34,10 +34,6 @@ from app.workers.tasks import enqueue, schedule_retry
 
 JOB_TYPE = "design_image"
 EXTENSIONS = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 async def active_job(db: AsyncSession, brief_id: uuid.UUID) -> AIGenerationJob | None:
@@ -171,7 +167,7 @@ async def run(job_id: uuid.UUID) -> None:
         except AIError as exc:
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
-            assert job is not None
+            job = require(job, "job")
             if await schedule_retry(db, job, exc, "design.image"):
                 return
             logger.warning("Design image job %s failed: %s", job_id, exc.message)
@@ -181,9 +177,9 @@ async def run(job_id: uuid.UUID) -> None:
             logger.exception("Design image job %s crashed", job_id)
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
-            assert job is not None
+            job = require(job, "job")
             job.status, job.error = JobStatus.FAILED, "Image generation failed unexpectedly."
-        job.completed_at = _now()
+        job.completed_at = utcnow()
         await db.commit()
 
 
@@ -250,6 +246,15 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
         else:
             data, mime_type = placed.data, placed.mime_type
             note += f" · your logo in the {POSITION_LABEL[logo_spot]}"
+    # The provider call took a while (the post may have been approved meanwhile):
+    # re-read both rows under a lock and only continue if the post is still
+    # waiting for a design. The raw image stays stored; nothing else changes.
+    await db.refresh(post, with_for_update=True)
+    await db.refresh(brief, with_for_update=True)
+    if brief.status not in design.ACTIVE or post.status not in design.UPLOADABLE:
+        raise AIError(
+            AIErrorKind.BAD_REQUEST, "The post isn't waiting for a design any more.", public=True
+        )
     extension = EXTENSIONS.get(mime_type, "png")
     key = f"{design._prefix(brief)}{uuid.uuid4().hex[:12]}-ai-image.{extension}"
     await storage.put(key, data, mime_type)

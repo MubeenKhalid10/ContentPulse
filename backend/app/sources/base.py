@@ -412,7 +412,18 @@ class RequestCache:
                 future.exception()  # mark retrieved: waiters re-raise it
             else:
                 self._entries.pop(key, None)
-                future.cancel()
+                # Never cancel(): that raises CancelledError in every other
+                # organization waiting on this request. Hand them the error
+                # (or, if this run itself was cancelled, a retryable one).
+                waiter_error = (
+                    exc
+                    if isinstance(exc, Exception)
+                    else SourceError(
+                        SourceErrorKind.UNAVAILABLE, "The shared request was interrupted."
+                    )
+                )
+                future.set_exception(waiter_error)
+                future.exception()  # mark retrieved: waiters re-raise it
             raise
         future.set_result(response)
         return response

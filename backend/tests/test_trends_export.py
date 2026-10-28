@@ -26,7 +26,7 @@ TICK = timedelta(microseconds=1)
 
 @pytest.fixture(autouse=True)
 def frozen_now(monkeypatch):
-    monkeypatch.setattr(export, "_now", lambda: END)
+    monkeypatch.setattr(export, "utcnow", lambda: END)
 
 
 async def add_trend(db, org_id, title, last_seen, *, sources=("google_trends",), **fields):

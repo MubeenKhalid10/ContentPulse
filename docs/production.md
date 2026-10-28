@@ -9,8 +9,8 @@ Fly or Railway all work. Work through this list before inviting a real client.
 | Setting | Why | Value |
 |---|---|---|
 | `APP_ENV=production` | Turns on the production safety checks (the API refuses to start with the development JWT secret). | `production` |
-| `JWT_SECRET` | Signs sessions and password-reset links. | `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Keep it out of git. |
-| `FRONTEND_URL`, `CORS_ORIGINS` | Invite and reset links point to `FRONTEND_URL`; the browser may only call the API from these origins. | Your HTTPS address, e.g. `https://app.example.com` and `["https://app.example.com"]` |
+| `JWT_SECRET` | Signs sessions and password-reset links. At least 32 characters: production refuses to start with a shorter one. | `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Keep it out of git. |
+| `FRONTEND_URL`, `CORS_ORIGINS` | Invite and reset links point to `FRONTEND_URL`; the browser may only call the API from these origins. `*` is refused in production. | Your HTTPS address, e.g. `https://app.example.com` and `["https://app.example.com"]` |
 | `COOKIE_SECURE` | Session cookies only over HTTPS. Empty already means "on" in production. | empty, or `true` |
 | `DATABASE_URL` | A managed Postgres with backups and pgvector. | `postgresql+asyncpg://…` |
 | `CRAWLER_ALLOW_PRIVATE_NETWORKS` | Must stay off: it disables the crawler's SSRF protection. | `false` |
@@ -32,7 +32,7 @@ Fly or Railway all work. Work through this list before inviting a real client.
   real limits there or in `LLM_LIMITS`, including the daily image cap (`rpd` for
   `kie/*` and `cloudflare/*`). Optionally cap daily requests with `LLM_ORG_DAILY_REQUEST_BUDGET` (per organization) or `LLM_DAILY_REQUEST_BUDGET` (whole app).
 - **Monitoring.** `METRICS_ENABLED=true` serves Prometheus metrics at `/health/metrics`;
-  keep that path off the public internet. `/health/live` is the liveness check and `/health` checks the database too.
+  in production it is only served when `METRICS_TOKEN` is set (scrapers send it as a Bearer token). Keep that path off the public internet. `/health/live` is the liveness check and `/health` checks the database too.
 
 ## Rotating API keys
 

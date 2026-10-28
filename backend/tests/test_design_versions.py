@@ -47,6 +47,9 @@ async def test_an_earlier_version_becomes_the_newest(client, db):
     await add_version(admin, task_id, "second.png")
 
     creator = await add_member(client, admin, org["id"], "cleo@acme.example.com", "creator")
+    # Uploading claimed the task for the admin; only its assignee works on it.
+    assert (await creator.post(f"{API}/{task_id}/versions/1/use")).status_code == 403
+    await admin.post(f"{API}/{task_id}/assign", json={"assignee_id": creator.user["id"]})
     resp = await creator.post(f"{API}/{task_id}/versions/1/use")
     assert resp.status_code == 200, resp.text
     body = resp.json()

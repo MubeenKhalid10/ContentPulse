@@ -143,3 +143,11 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=500,
             content=error_body(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred."),
         )
+
+
+def require[T](value: T | None, what: str = "record") -> T:
+    """`value`, or a clear server error if it is missing. Unlike `assert`, this
+    is still checked when Python runs with -O, and it narrows the type."""
+    if value is None:
+        raise RuntimeError(f"Expected the {what} to exist, but it is missing.")
+    return value

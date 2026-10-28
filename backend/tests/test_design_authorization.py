@@ -96,15 +96,19 @@ async def test_the_designer_can_withdraw_a_submitted_design_before_an_admin_deci
     resp = await creator.post(f"{TASKS}/{task.id}/withdraw")
     assert resp.status_code == 200, resp.text
     assert resp.json()["post"]["status"] == "design_uploaded"
+    post_id, task_id = (
+        post.id,
+        task.id,
+    )  # read before expiring: expired rows can't lazy-load under asyncio
     db.expire_all()
     pending = await db.scalars(
         select(ApprovalRequest).where(
-            ApprovalRequest.post_id == post.id, ApprovalRequest.status == ApprovalStatus.PENDING
+            ApprovalRequest.post_id == post_id, ApprovalRequest.status == ApprovalStatus.PENDING
         )
     )
     assert list(pending) == []
     # Not waiting for approval any more: nothing left to withdraw.
-    assert (await creator.post(f"{TASKS}/{task.id}/withdraw")).status_code == 409
+    assert (await creator.post(f"{TASKS}/{task_id}/withdraw")).status_code == 409
 
 
 async def test_a_design_with_files_can_be_submitted_even_if_the_post_was_never_moved_on(client, db):

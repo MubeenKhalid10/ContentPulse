@@ -360,10 +360,13 @@ async def test_review_and_hand_off_to_design(client, internet, content_ai):
 
     sent = await send_to_design(admin, post["id"])
     assert sent["status"] == "design_pending"
-    # A typo found during design can still be fixed without leaving design.
-    assert sent["editable"] is True
-    fixed = await admin.patch(url, json={"base_version": 1, "hook": "Fixed a typo"})
-    assert fixed.status_code == 200 and fixed.json()["status"] == "design_pending"
+    # Approved copy is locked in design; reopening it is the admin's explicit
+    # "back to draft" below (see test_approved_lock.py).
+    assert sent["editable"] is False
+    locked = await admin.patch(url, json={"base_version": 1, "hook": "Fixed a typo"})
+    assert (
+        locked.status_code == 409 and locked.json()["error"]["code"] == "INVALID_STATE_TRANSITION"
+    )
     listed = (await admin.get(API, params={"status": "design"})).json()
     assert [p["id"] for p in listed["items"]] == [post["id"]]
 

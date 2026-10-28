@@ -1,61 +1,74 @@
-# Environment
+# ContentPulse .gitignore
+# Anything here stays on your machine only: secrets, build output, local state,
+# and notes or tool caches that are for your own use.
+
+# --- Secrets and local environment ---------------------------------------------
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
 
-# Python
+# --- Python ---------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 .venv/
+venv/
+*.egg-info/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-*.egg-info/
+.coverage
+htmlcov/
+# Scratch scripts
+*.tmp.py
 
-# Node
+# --- Node / Next.js ---------------------------------------------------------------
 node_modules/
 .next/
 out/
+build/
 *.tsbuildinfo
 next-env.d.ts
+npm-debug.log*
 
-# OS / editors
+# --- Test output ------------------------------------------------------------------
+test-results/
+playwright-report/
+blob-report/
+
+# --- Runtime state ------------------------------------------------------------------
+# Local creative storage (used when S3_BUCKET is not set)
+backend/storage/
+# Celery beat schedule
+celerybeat-schedule*
+
+# --- Terraform / AWS ----------------------------------------------------------------
+# Keep .terraform.lock.hcl; ignore working files, state, plans and per-machine values.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+infra/aws/terraform/terraform.tfvars
+infra/aws/terraform/release.auto.tfvars
+infra/aws/terraform/backend.hcl
+
+# --- AI tooling and personal notes (for your own use, not part of the product) -------
+.claude/
+.claudeignore
+.impeccable/
+graphify-out/
+# Audit, design and product notes
+AUDIT_REPORT.md
+DESIGN.md
+PRODUCT.md
+docs/ux-audit/
+
+# --- OS / editors -------------------------------------------------------------------
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
-
-# Local creative storage (when S3_BUCKET is not set)
-backend/storage/
-
-# Terraform working files (keep .terraform.lock.hcl)
-.terraform/
-*.tfstate
-*.tfstate.*
-infra/aws/terraform/terraform.tfvars
-
-# Test output
-test-results/
-playwright-report/
-blob-report/
-.coverage
-htmlcov/
-
-# Celery beat state
-celerybeat-schedule*
-
-# Impeccable: transient decision-page state (keep surfaces/, decision/, design.json)
-.impeccable/questions/
-
-# Scratch scripts
-*.tmp.py
-.impeccable/review/
-.impeccable
-
-.claudeignore
-AUDIT_REPORT.md
-DESIGN.md
-PRODUCT.md
-.claude
-
-docs/ *.md
+*.swp

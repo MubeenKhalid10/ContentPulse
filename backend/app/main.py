@@ -80,7 +80,9 @@ def create_app() -> FastAPI:
         """Process is up (container liveness); doesn't touch dependencies."""
         return {"status": "ok"}
 
-    if settings.metrics_enabled:
+    # Metrics describe the whole platform: in production they are served only
+    # to a scraper holding METRICS_TOKEN, never openly.
+    if settings.metrics_enabled and not (settings.is_production and not settings.metrics_token):
         from fastapi import Request
         from fastapi.responses import PlainTextResponse
 

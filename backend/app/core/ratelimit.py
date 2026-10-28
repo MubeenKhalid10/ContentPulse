@@ -29,12 +29,25 @@ LOGIN_PER_IP = Rule("login-ip", 30, 900, "Too many sign-in attempts. Try again i
 LOGIN_PER_ACCOUNT = Rule(
     "login-account", 10, 900, "Too many sign-in attempts for this account. Try again later."
 )
+# Guessing one account's password from many addresses. High on purpose: the
+# strict limit is per account *and* address (below), so someone hammering an
+# account locks out their own address, not its owner.
+LOGIN_PER_ACCOUNT_ANYWHERE = Rule(
+    "login-account-any", 100, 900, "Too many sign-in attempts for this account. Try again later."
+)
 REGISTER_PER_IP = Rule("register", 20, 3600, "Too many sign-ups from this network. Try later.")
 RESET_PER_IP = Rule("reset", 10, 3600, "Too many reset requests. Try again later.")
 RESET_PER_ACCOUNT = Rule(
     "reset-account", 3, 3600, "A reset link was sent recently. Check your inbox."
 )
 INVITE_PER_IP = Rule("invite", 30, 3600, "Too many invitation attempts. Try again later.")
+# Sending invitations (each one can email a stranger): per admin and per organization.
+INVITE_SEND_PER_USER = Rule(
+    "invite-send-user", 20, 3600, "You've sent a lot of invitations. Try again in an hour."
+)
+INVITE_SEND_PER_ORG = Rule(
+    "invite-send-org", 50, 3600, "This organization has sent a lot of invitations. Try again later."
+)
 AI_PER_USER = Rule(
     "ai", 30, 60, "You're generating very quickly. Wait a minute before trying again."
 )
@@ -132,8 +145,10 @@ class RateLimiter:
         forwarded = request.headers.get("x-forwarded-for")
         if self.trusted_proxies and forwarded:
             hops = [h.strip() for h in forwarded.split(",") if h.strip()]
-            if hops:
-                return hops[-self.trusted_proxies] if len(hops) >= self.trusted_proxies else hops[0]
+            # Fewer hops than our proxies add means the header didn't pass
+            # through them all: don't trust a value the client may have set.
+            if len(hops) >= self.trusted_proxies:
+                return hops[-self.trusted_proxies]
         return request.client.host if request.client else "unknown"
 
 

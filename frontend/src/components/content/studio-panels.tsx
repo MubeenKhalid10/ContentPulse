@@ -6,7 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { useFromHere } from "@/components/shared/back-link";
-import { PostRow } from "@/components/content/content-list";
+import { PostRow } from "@/components/content/post-row";
 import { CollapsibleCard } from "@/components/shared/collapsible-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

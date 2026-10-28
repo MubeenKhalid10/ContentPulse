@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,6 +11,16 @@ from app.models.enums import ApprovalStatus
 
 class ApprovalRequest(UUIDPk, CreatedAt, OrgScoped, Base):
     __tablename__ = "approval_requests"
+    __table_args__ = (
+        # One open review round per post, even when two reviewers or a double
+        # click race.
+        Index(
+            "uq_approval_requests_one_pending",
+            "post_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+    )
 
     post_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), index=True, nullable=False
@@ -29,6 +39,9 @@ class ApprovalRequest(UUIDPk, CreatedAt, OrgScoped, Base):
     )
     comments: Mapped[str | None] = mapped_column(Text)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # What a change request opened: "copy", "design" or "both". NULL on anything
+    # that isn't a design-stage change request (and on older ones: read as "both").
+    scope: Mapped[str | None] = mapped_column(String(20))
 
 
 class ApprovalComment(UUIDPk, CreatedAt, OrgScoped, Base):

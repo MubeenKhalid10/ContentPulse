@@ -9,19 +9,21 @@ import asyncio
 import time
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import httpx
 from sqlalchemy import or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.ai.metrics import metrics
+from app.core.clock import utcnow
 from app.core.config import Settings, get_settings
+from app.core.errors import require
 from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.models.enums import DiscoveryRunStatus, SourceHealth
 from app.models.trend import TrendDiscoveryRun, TrendSource
-from app.services.knowledge.fetcher import Resolver, system_resolver
+from app.services.knowledge.fetcher import Resolver, public_only_transport, system_resolver
 from app.services.trends import pipeline
 from app.services.trends.inputs import load_org_inputs
 from app.sources import SOURCES, bookkeeping, get_source
@@ -41,7 +43,10 @@ STALE_AFTER = timedelta(minutes=10)
 
 
 def build_client(settings: Settings) -> httpx.AsyncClient:
+    # Also used by RSS sources, whose feed URLs are user-supplied.
     return httpx.AsyncClient(
+        transport=public_only_transport(settings),
+        trust_env=False,
         timeout=httpx.Timeout(20.0),
         headers={"User-Agent": settings.trend_user_agent},
         follow_redirects=True,
@@ -58,10 +63,6 @@ _HEALTH = {
     SourceErrorKind.UNAVAILABLE: SourceHealth.DEGRADED,
     SourceErrorKind.BAD_RESPONSE: SourceHealth.DEGRADED,
 }
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 async def sync_source_registry() -> None:
@@ -94,11 +95,11 @@ async def _record_health(key: str, error: SourceError | None) -> None:
         return
     async with SessionLocal() as db:
         values = (
-            {"health": SourceHealth.HEALTHY, "last_success_at": _now(), "last_error": None}
+            {"health": SourceHealth.HEALTHY, "last_success_at": utcnow(), "last_error": None}
             if error is None
             else {
                 "health": source_health(error.kind),
-                "last_failure_at": _now(),
+                "last_failure_at": utcnow(),
                 "last_error": error.public_message,
             }
         )
@@ -119,7 +120,7 @@ async def _recently_collected(
     minimums = settings.provider_min_refresh_minutes
     if not minimums:
         return {}
-    window = _now() - timedelta(minutes=max(minimums.values()))
+    window = utcnow() - timedelta(minutes=max(minimums.values()))
     runs = await db.scalars(
         select(TrendDiscoveryRun)
         .where(
@@ -133,7 +134,7 @@ async def _recently_collected(
     for run in runs:
         for key, minutes in minimums.items():
             result = (run.results or {}).get(key) or {}
-            age = (_now() - run.created_at).total_seconds() / 60
+            age = (utcnow() - run.created_at).total_seconds() / 60
             if key not in out and result.get("status") == "ok" and age < minutes:
                 out[key] = max(int(age), 0)
     return out
@@ -166,7 +167,7 @@ async def _finish(run_id: uuid.UUID, status: DiscoveryRunStatus, error: str | No
             return
         run.status = status
         run.error = error
-        run.finished_at = run.heartbeat_at = _now()
+        run.finished_at = run.heartbeat_at = utcnow()
         await db.commit()
     metrics.inc("trend_discovery_runs_total", status=status.value, trigger=run.trigger.value)
     if run.started_at:
@@ -178,7 +179,7 @@ async def _discover(run_id: uuid.UUID) -> None:
     settings = get_settings()
     async with SessionLocal() as db:
         run = await db.get(TrendDiscoveryRun, run_id)
-        assert run is not None
+        run = require(run, "run")
         org_inputs = await load_org_inputs(db, run.organization_id, run.locations or None)
         org_inputs_org_id = run.organization_id
         requested = list(run.sources)
@@ -224,7 +225,7 @@ async def _discover(run_id: uuid.UUID) -> None:
     if not runnable:
         async with SessionLocal() as db:
             run = await db.get(TrendDiscoveryRun, run_id)
-            assert run is not None
+            run = require(run, "run")
             run.results, run.warnings = results, warnings
             await db.commit()
         await _finish(
@@ -243,7 +244,7 @@ async def _discover(run_id: uuid.UUID) -> None:
             inputs=inputs,
             # Whole hours: every run in the same hour asks providers the same
             # question, so their responses can be shared (provider cache).
-            since=_now().replace(minute=0, second=0, microsecond=0) - LOOKBACK,
+            since=utcnow().replace(minute=0, second=0, microsecond=0) - LOOKBACK,
             resolver=resolver,
             organization_id=str(org_inputs_org_id),
         )
@@ -271,10 +272,10 @@ async def _discover(run_id: uuid.UUID) -> None:
 
     async with SessionLocal() as db:
         run = await db.get(TrendDiscoveryRun, run_id)
-        assert run is not None
+        run = require(run, "run")
         run.results, run.warnings = results, warnings[:50]
         run.items_collected = len(items)
-        run.heartbeat_at = _now()
+        run.heartbeat_at = utcnow()
         if items:
             stats = await pipeline.ingest(db, run.organization_id, list(items.values()), profile)
             run.trends_created = stats.trends_created
@@ -305,7 +306,7 @@ async def run_discovery(run_id: uuid.UUID) -> None:
         if run is None or run.status != DiscoveryRunStatus.QUEUED:
             return
         run.status = DiscoveryRunStatus.RUNNING
-        run.started_at = run.heartbeat_at = _now()
+        run.started_at = run.heartbeat_at = utcnow()
         await db.commit()
     try:
         await _discover(run_id)
@@ -320,7 +321,7 @@ async def run_discovery(run_id: uuid.UUID) -> None:
 
 
 def stale_condition():
-    cutoff = _now() - STALE_AFTER
+    cutoff = utcnow() - STALE_AFTER
     return or_(
         TrendDiscoveryRun.heartbeat_at < cutoff,
         TrendDiscoveryRun.heartbeat_at.is_(None) & (TrendDiscoveryRun.created_at < cutoff),
@@ -340,7 +341,7 @@ async def recover_stale_runs() -> int:
             .values(
                 status=DiscoveryRunStatus.FAILED,
                 error="Interrupted: the server restarted.",
-                finished_at=_now(),
+                finished_at=utcnow(),
             )
         )
         await db.commit()

@@ -138,9 +138,7 @@ async def schedule_due_runs(now: datetime | None = None) -> int:
         last_run = (
             select(
                 TrendDiscoveryRun.organization_id,
-                func.max(TrendDiscoveryRun.created_at)
-                .filter(paces_schedule())
-                .label("last_run"),
+                func.max(TrendDiscoveryRun.created_at).filter(paces_schedule()).label("last_run"),
                 func.count().filter(TrendDiscoveryRun.status.in_(ACTIVE)).label("active"),
             )
             .group_by(TrendDiscoveryRun.organization_id)

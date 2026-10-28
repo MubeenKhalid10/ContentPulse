@@ -1,7 +1,7 @@
 "use client";
 
 import { CopyIcon, DownloadIcon, LoaderCircleIcon, Share2Icon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,30 @@ function SocialShareButton({
     .filter(Boolean)
     .join("\n\n");
   const files = creative?.files ?? [];
+  // Browsers only allow navigator.share() straight from the click (Safari and
+  // mobile reject it after awaited downloads), so the files are fetched ahead.
+  const [prepared, setPrepared] = useState<File[] | null>(null);
+  useEffect(() => {
+    if (!files.length || typeof navigator === "undefined" || !navigator.share || !navigator.canShare) return;
+    let cancelled = false;
+    Promise.all(
+      files.map(async (file) => {
+        const response = await fetch(file.url);
+        if (!response.ok) throw new Error(`Unable to download ${file.file_name}`);
+        return new File([await response.blob()], file.file_name, { type: file.file_type });
+      }),
+    )
+      .then((ready) => {
+        if (!cancelled) setPrepared(ready);
+      })
+      .catch(() => {
+        if (!cancelled) setPrepared(null); // the caption-and-open flow still works
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creative]);
 
   const platformUrl = () => {
     const encoded = encodeURIComponent(caption);
@@ -113,19 +137,10 @@ function SocialShareButton({
     }
     setSharing(true);
     try {
-      if (files.length > 0 && navigator.share && navigator.canShare) {
-        const sharedFiles = await Promise.all(
-          files.map(async (file) => {
-            const response = await fetch(file.url);
-            if (!response.ok) throw new Error(`Unable to download ${file.file_name}`);
-            return new File([await response.blob()], file.file_name, { type: file.file_type });
-          }),
-        );
-        const shareData = { title: title ?? "ContentPulse post", text: caption, files: sharedFiles };
-        if (navigator.canShare({ files: sharedFiles })) {
-          await navigator.share(shareData);
-          return;
-        }
+      // First await in this branch is navigator.share itself: the click gesture is still live.
+      if (prepared && navigator.canShare?.({ files: prepared })) {
+        await navigator.share({ title: title ?? "ContentPulse post", text: caption, files: prepared });
+        return;
       }
 
       // Copying can fail (permissions) without stopping the platform from opening.

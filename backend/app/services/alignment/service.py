@@ -3,15 +3,16 @@ record every AI call (spec §56), and let humans override (spec §16)."""
 
 import asyncio
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import prompts
 from app.ai.provider import AIError, AIErrorKind, get_ai_provider
+from app.core.clock import utcnow
 from app.core.config import get_settings
-from app.core.errors import NotFound
+from app.core.errors import NotFound, require
 from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.models.ai import AIGenerationJob
@@ -34,6 +35,7 @@ from app.workers.tasks import schedule_retry
 
 JOB_TYPE = "trend_alignment"
 STALE_AFTER = timedelta(minutes=15)
+RETRY_STALE_AFTER = timedelta(hours=3)
 # The model's answer, not its availability, failed: asking again with the same
 # trend coverage gives the same result, so automatic runs stop retrying it.
 FINAL_FAILURES = frozenset(
@@ -52,17 +54,13 @@ LEVEL_LABELS = {
 }
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 async def active_job(db: AsyncSession, trend_id: uuid.UUID) -> AIGenerationJob | None:
     return await db.scalar(
         select(AIGenerationJob).where(
             AIGenerationJob.entity_id == trend_id,
             AIGenerationJob.type == JOB_TYPE,
             AIGenerationJob.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]),
-            AIGenerationJob.created_at >= _now() - STALE_AFTER,
+            AIGenerationJob.created_at >= utcnow() - STALE_AFTER,
         )
     )
 
@@ -103,7 +101,7 @@ async def create_job(db: AsyncSession, trend: Trend, *, auto: bool = False) -> A
 
 def _apply(trend: Trend, result: AlignmentResult, alignment: dict) -> None:
     trend.alignment = alignment
-    trend.analyzed_at = _now()
+    trend.analyzed_at = utcnow()
     if not trend.relevance_overridden:
         trend.relevance_level = result.classification
         trend.relevance_confidence = result.confidence
@@ -172,7 +170,7 @@ async def run_job(job_id: uuid.UUID) -> None:
             else:
                 result = align_with_rules(ctx, trend, mentions, passages)
                 job.provider, job.model = "rules", None
-            alignment = result.to_json(passages, analyzed_at=_now().isoformat(), **meta)
+            alignment = result.to_json(passages, analyzed_at=utcnow().isoformat(), **meta)
             _apply(trend, result, alignment)
             await topic_sync.sync_from_trend(db, trend)
             job.status = JobStatus.SUCCEEDED
@@ -186,7 +184,7 @@ async def run_job(job_id: uuid.UUID) -> None:
         except AIError as exc:
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
-            assert job is not None
+            job = require(job, "job")
             if await schedule_retry(db, job, exc, "trends.align"):
                 return
             logger.warning("Alignment job %s failed: %s", job_id, exc.message)
@@ -203,10 +201,10 @@ async def run_job(job_id: uuid.UUID) -> None:
             logger.exception("Alignment job %s crashed", job_id)
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
-            assert job is not None
+            job = require(job, "job")
             job.status = JobStatus.FAILED
             job.error = "Analysis failed unexpectedly."
-        job.completed_at = _now()
+        job.completed_at = utcnow()
         await db.commit()
 
 
@@ -229,7 +227,7 @@ async def failure_hold(
     if not trends:
         return set()
     settings = get_settings()
-    now = now or _now()
+    now = now or utcnow()
     jobs = await db.execute(
         select(
             AIGenerationJob.entity_id,
@@ -311,7 +309,7 @@ async def analyze_organization(organization_id: uuid.UUID) -> int:
                     Trend.status.in_(
                         [TrendStatus.NEW, TrendStatus.ANALYZED, TrendStatus.SHORTLISTED]
                     ),
-                    Trend.last_seen_at >= _now() - timedelta(days=7),
+                    Trend.last_seen_at >= utcnow() - timedelta(days=7),
                     or_(*needs),
                 )
                 .order_by(ai_priority().desc(), Trend.last_seen_at.desc())
@@ -374,12 +372,21 @@ async def recover_stale_jobs() -> int:
             update(AIGenerationJob)
             .where(
                 AIGenerationJob.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]),
-                AIGenerationJob.created_at < _now() - STALE_AFTER,
+                # A job re-queued after a rate limit or outage (it carries a
+                # "retries" count) is waiting on purpose, up to an hour per
+                # retry: it only counts as lost after a much longer time.
+                or_(
+                    and_(
+                        AIGenerationJob.result["retries"].astext.is_(None),
+                        AIGenerationJob.created_at < utcnow() - STALE_AFTER,
+                    ),
+                    AIGenerationJob.created_at < utcnow() - RETRY_STALE_AFTER,
+                ),
             )
             .values(
                 status=JobStatus.FAILED,
                 error="Interrupted: the server restarted.",
-                completed_at=_now(),
+                completed_at=utcnow(),
             )
         )
         await db.commit()

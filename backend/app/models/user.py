@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, true
+from sqlalchemy import Boolean, DateTime, Integer, String, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, Timestamps, UUIDPk, str_enum
@@ -25,3 +25,8 @@ class User(UUIDPk, Timestamps, Base):
         Boolean, default=True, server_default=true(), nullable=False
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Local sessions carry this number; changing it signs every session out
+    # (password change/reset, logout).
+    token_version: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )

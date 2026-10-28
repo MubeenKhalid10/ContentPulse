@@ -117,9 +117,12 @@ function InviteLink({ result, onClose }: { result: InviteResponse; onClose: () =
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
 
+  const inviteUrl = result.invite_url;
+
   async function copy() {
+    if (!inviteUrl) return;
     try {
-      await navigator.clipboard.writeText(result.invite_url);
+      await navigator.clipboard.writeText(inviteUrl);
       setCopyFailed(false);
       setCopied(true);
       toast.success("Invite link copied");
@@ -136,22 +139,26 @@ function InviteLink({ result, onClose }: { result: InviteResponse; onClose: () =
         <DialogTitle>{result.email_sent ? "Invitation sent" : "Invite ready"}</DialogTitle>
         <DialogDescription>
           {result.email_sent
-            ? `We emailed an invitation to ${result.member.email}. You can also share this link yourself; it's shown only once.`
+            ? `We emailed an invitation to ${result.member.email}. It expires on its own; send a new one if it doesn't arrive.`
             : `Send this link to ${result.member.email}. For security it's shown only once.`}
         </DialogDescription>
       </DialogHeader>
-      <div className="flex gap-2">
-        <Input readOnly value={result.invite_url} aria-label="Invite link" onFocus={(e) => e.target.select()} className="font-mono text-xs" />
-        <Button type="button" variant="outline" onClick={copy} aria-label="Copy invite link">
-          {copied ? <CheckIcon className="text-primary" /> : <CopyIcon />}
-          {copied ? "Copied" : "Copy"}
-        </Button>
-      </div>
-      <p role="status" className="text-sm text-muted-foreground">
-        {copyFailed
-          ? "Couldn't copy. Select the link above and copy it manually."
-          : "Copy the link now: it is shown only once and can't be retrieved after you close this window."}
-      </p>
+      {inviteUrl && (
+        <div className="flex gap-2">
+          <Input readOnly value={inviteUrl} aria-label="Invite link" onFocus={(e) => e.target.select()} className="font-mono text-xs" />
+          <Button type="button" variant="outline" onClick={copy} aria-label="Copy invite link">
+            {copied ? <CheckIcon className="text-primary" /> : <CopyIcon />}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        </div>
+      )}
+      {inviteUrl && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {copyFailed
+            ? "Couldn't copy. Select the link above and copy it manually."
+            : "Copy the link now: it is shown only once and can't be retrieved after you close this window."}
+        </p>
+      )}
       <DialogFooter>
         <Button onClick={onClose}>Done</Button>
       </DialogFooter>

@@ -24,6 +24,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.core.config import Settings, get_settings
+from app.core.errors import require
 from app.core.logging import logger
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -585,9 +586,9 @@ class QuotaLimiter:
                 continue
             if verdict.ok:
                 return Reservation(self, backend, member, rules, monotonic() - started)
-            assert verdict.rule is not None
-            if verdict.rule.daily or monotonic() + verdict.wait > deadline:
-                raise QuotaExceeded(verdict.rule, verdict.wait)
+            verdict_rule = require(verdict.rule, "refused rule")
+            if verdict_rule.daily or monotonic() + verdict.wait > deadline:
+                raise QuotaExceeded(verdict_rule, verdict.wait)
             # Poll: a finished call can free a slot before the window says so.
             await self.sleep(min(verdict.wait, self.MAX_POLL) + 0.05)
 

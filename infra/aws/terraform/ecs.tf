@@ -4,7 +4,9 @@
 resource "aws_ecr_repository" "repo" {
   for_each             = toset(["api", "web"])
   name                 = "${local.name}-${each.key}"
-  image_tag_mutability = "MUTABLE"
+  # A tag always names the same image: deploy.sh pushes one release tag per
+  # build, so a rollback goes to a different image, never a re-pushed one.
+  image_tag_mutability = "IMMUTABLE"
   force_delete         = !var.protect_data
 
   image_scanning_configuration {
@@ -50,7 +52,10 @@ locals {
       AUTH_PROVIDER       = var.auth_provider
       LLM_PROVIDER        = var.llm_provider
       TASK_BACKEND        = "celery"
-      REDIS_URL           = "redis://${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379/0"
+      DB_HOST             = aws_db_instance.main.address
+      DB_PORT             = tostring(aws_db_instance.main.port)
+      DB_NAME             = aws_db_instance.main.db_name
+      DB_USER             = aws_db_instance.main.username
       S3_BUCKET           = aws_s3_bucket.creatives.bucket
       AWS_REGION          = var.region
       FRONTEND_URL        = local.app_url
@@ -59,9 +64,13 @@ locals {
       TRUSTED_PROXY_COUNT = "1" # the load balancer appends the client address
     } : { name = name, value = value }
   ]
-  backend_secrets = [
-    for key in local.secret_keys : { name = key, valueFrom = "${aws_secretsmanager_secret.app.arn}:${key}::" }
-  ]
+  backend_secrets = concat(
+    [for key in local.secret_keys : { name = key, valueFrom = "${aws_secretsmanager_secret.app.arn}:${key}::" }],
+    # The Redis URL, with its auth token (TLS: rediss://).
+    [{ name = "REDIS_URL", valueFrom = "${aws_secretsmanager_secret.redis.arn}:REDIS_URL::" }],
+    # RDS-managed master password (JSON: {"username": ..., "password": ...}).
+    [{ name = "DB_PASSWORD", valueFrom = "${aws_db_instance.main.master_user_secret[0].secret_arn}:password::" }],
+  )
 
   log_config = {
     logDriver = "awslogs"

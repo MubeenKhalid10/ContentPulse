@@ -6,7 +6,7 @@ reason and never touch existing versions, so the studio can offer a retry.
 """
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import distinct_on
@@ -15,11 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai import prompts
 from app.ai.gateway import LLMGateway
 from app.ai.provider import AIError, AIErrorKind, get_ai_provider
-from app.core.errors import Conflict
+from app.ai.untrusted import UNTRUSTED_NOTICE, untrusted, untrusted_attr
+from app.core.clock import utcnow
+from app.core.errors import Conflict, require
 from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.models.ai import AIGenerationJob
-from app.models.enums import JobStatus, Platform, VersionSource
+from app.models.enums import JobStatus, Platform, PostStatus, VersionSource
 from app.models.organization import BrandProfile
 from app.models.post import Post, PostVersion
 from app.models.topic import ContentStrategy, PlatformRule, TopicCandidate
@@ -27,6 +29,7 @@ from app.models.trend import Trend
 from app.services.alignment.context import load_context
 from app.services.alignment.engines import passages_for_query, top_mentions
 from app.services.alignment.result import Passage
+from app.services.approvals.workflow import changes_scope
 from app.services.content import blog
 from app.services.content.copy import (
     InvalidCopy,
@@ -45,17 +48,13 @@ STALE_AFTER = timedelta(minutes=15)
 KINDS = ("generate", "regenerate", "variant")
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 async def active_job(db: AsyncSession, post_id: uuid.UUID) -> AIGenerationJob | None:
     return await db.scalar(
         select(AIGenerationJob).where(
             AIGenerationJob.entity_id == post_id,
             AIGenerationJob.type == JOB_TYPE,
             AIGenerationJob.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]),
-            AIGenerationJob.created_at >= _now() - STALE_AFTER,
+            AIGenerationJob.created_at >= utcnow() - STALE_AFTER,
         )
     )
 
@@ -84,7 +83,8 @@ async def start(
     source_post_id: uuid.UUID | None = None,
 ) -> AIGenerationJob:
     """Queue generation for `post` (one at a time per post) and commit."""
-    assert kind in KINDS
+    if kind not in KINDS:
+        raise ValueError(f"unknown generation kind {kind!r}")
     if await active_job(db, post.id):
         raise Conflict("This post is already being generated. Wait for it to finish.")
     provider = get_ai_provider(workflow=JOB_TYPE)
@@ -143,8 +143,8 @@ def build_prompt(
     ]
     topic_lines = (
         [
-            _line("Title", topic.title),
-            _line("Summary", topic.summary),
+            _line("Title", untrusted(topic.title)),
+            _line("Summary", untrusted(topic.summary) if topic.summary else None),
             _line("Why it matters to the organization", topic.relevance_reason),
             _line("Related services", ", ".join(topic.matched_services)),
             _line("Claims to avoid", "; ".join(topic.unsupported_claims) or "none listed"),
@@ -154,8 +154,9 @@ def build_prompt(
     )
     knowledge = (
         "\n".join(
-            f'<passage id="{p.ref}" page="{p.title or p.url}" section="{p.heading or ""}">\n'
-            f"{p.content}\n</passage>"
+            f'<passage id="{p.ref}" page="{untrusted_attr(p.title or p.url)}" '
+            f'section="{untrusted_attr(p.heading or "")}">\n'
+            f"{untrusted(p.content)}\n</passage>"
             for p in passages
         )
         or "(No matching passages in the organization's knowledge base. Make no specific "
@@ -167,9 +168,12 @@ def build_prompt(
         _line("Hashtag guidelines", brand.hashtag_guidelines) if brand else None,
     ]
     parts = [
+        UNTRUSTED_NOTICE,
         "<strategy>\n" + "\n".join(x for x in strategy_lines if x) + "\n</strategy>",
         "<topic>\n" + "\n".join(x for x in topic_lines if x) + "\n</topic>" if topic_lines else "",
-        "<recent_coverage>\n" + "\n".join(f"- {c}" for c in coverage) + "\n</recent_coverage>"
+        "<recent_coverage>\n"
+        + "\n".join(f"- {untrusted(c)}" for c in coverage)
+        + "\n</recent_coverage>"
         if coverage
         else "",
         f"<knowledge_passages>\n{knowledge}\n</knowledge_passages>",
@@ -266,7 +270,7 @@ async def run(job_id: uuid.UUID) -> None:
         except AIError as exc:
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
-            assert job is not None
+            job = require(job, "job")
             if await schedule_retry(db, job, exc, "content.generate"):
                 return
             logger.warning("Post generation job %s failed: %s", job_id, exc.message)
@@ -276,10 +280,20 @@ async def run(job_id: uuid.UUID) -> None:
             logger.exception("Post generation job %s crashed", job_id)
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
-            assert job is not None
+            job = require(job, "job")
             job.status, job.error = JobStatus.FAILED, "Generation failed unexpectedly."
-        job.completed_at = _now()
+        job.completed_at = utcnow()
         await db.commit()
+
+
+async def _copy_still_open(db: AsyncSession, post: Post) -> bool:
+    """Same rule as the studio's `copy_editable`: a draft, or a post sent back
+    with its copy (not only its design) to change."""
+    if post.status == PostStatus.DRAFT:
+        return True
+    if post.status != PostStatus.CHANGES_REQUESTED:
+        return False
+    return await changes_scope(db, post.id) in ("copy", "both")
 
 
 async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
@@ -386,6 +400,17 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
         meta["warnings"] += blog.check_blog(copy.blog, copy.hook, copy.body)
     if job.result.get("instructions"):
         meta["instructions"] = job.result["instructions"]
+
+    # The provider call above can take long, and a rate-limited job comes back
+    # up to an hour later. Re-read the post under a lock and only write if its
+    # copy is still open, so approved or moved-on copy is never replaced.
+    await db.refresh(post, with_for_update=True)
+    if not await _copy_still_open(db, post):
+        raise AIError(
+            AIErrorKind.BAD_REQUEST,
+            "The post's copy was locked while this was generating, so nothing was changed.",
+            public=True,
+        )
 
     number = post.current_version + 1
     db.add(

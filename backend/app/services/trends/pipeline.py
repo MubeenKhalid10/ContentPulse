@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.errors import require
 from app.models.trend import Trend, TrendMention
 from app.services.trends.clustering import Cluster, cluster_items, similar_keys
 from app.services.trends.scoring import (
@@ -193,7 +194,7 @@ async def ingest(
             known.append((trend_id, cluster.key))
         else:
             trend = await db.get(Trend, trend_id)
-            assert trend is not None
+            trend = require(trend, "trend")
             trend.keywords = list(dict.fromkeys([*trend.keywords, *cluster.keywords()]))[:12]
             stats.trends_updated += 1
         for item in cluster.items:

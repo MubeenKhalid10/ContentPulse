@@ -38,6 +38,18 @@ async def prune_provider_cache() -> int:
     return deleted
 
 
+async def heal_design_tasks() -> int:
+    """Posts waiting in design always have an open task (this used to happen
+    as a side effect of listing tasks)."""
+    from app.services.design.service import ensure_briefs
+
+    async with SessionLocal() as db:
+        healed = await ensure_briefs(db)
+    if healed:
+        logger.info("Opened %d missing design task(s)", healed)
+    return healed
+
+
 async def run_housekeeping(now: datetime | None = None) -> dict[str, int]:
     """Every clean-up task (hourly from the in-process scheduler and Celery beat)."""
     from app.sources.quota import prune_hashtags
@@ -46,4 +58,5 @@ async def run_housekeeping(now: datetime | None = None) -> dict[str, int]:
         "llm_requests": await prune_llm_requests(now),
         "provider_cache": await prune_provider_cache(),
         "instagram_hashtags": await prune_hashtags(),
+        "design_tasks": await heal_design_tasks(),
     }

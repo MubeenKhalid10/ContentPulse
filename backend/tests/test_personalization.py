@@ -190,7 +190,8 @@ async def test_shared_public_items_are_scored_per_organization(client, shared_in
     level = {k: {t: v["relevance_level"] for t, v in m.items()} for k, m in trends.items()}
     assert level["software"]["ai agents"] in ("relevant", "highly_relevant")
     assert level["clinic"]["ai agents"] == "not_relevant"
-    assert level["clinic"]["digital health app"] in ("relevant", "highly_relevant")
+    # Industry adjacency alone isn't a tie to the clinic's own offering.
+    assert level["clinic"]["digital health app"] == "weakly_relevant"
     assert level["agency"]["celebrity wedding"] == "not_relevant"
 
     # Dashboards only show each organization's own, relevant trends.

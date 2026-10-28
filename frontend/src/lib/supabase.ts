@@ -58,7 +58,17 @@ export function authRedirect(path: string, next?: string): string {
 
 /** Only same-site relative paths are allowed as post-auth destinations. */
 export function safeNext(next: string | null | undefined, fallback = "/dashboard"): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : fallback;
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) {
+    return fallback;
+  }
+  // Resolve it as a browser will (it strips tabs/newlines and reads `\` as `/`)
+  // and require it to stay on this origin.
+  const base = "http://same-origin.invalid";
+  try {
+    return new URL(next, base).origin === base ? next : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 /** Friendlier wording for common Supabase Auth errors. */

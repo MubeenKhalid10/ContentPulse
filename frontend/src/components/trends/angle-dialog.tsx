@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { stripCitations, timeAgo } from "@/lib/format";
+import { safeUrl } from "@/lib/safe-url";
 import { sourceName } from "@/lib/trends";
 import type {
   ContentAngle,
@@ -81,8 +82,6 @@ function headlinesFor(
     .map(({ m }) => m);
 }
 
-const safeUrl = (url: string | null | undefined) =>
-  url && /^https?:\/\//i.test(url) ? url : null;
 
 function Section({
   title,

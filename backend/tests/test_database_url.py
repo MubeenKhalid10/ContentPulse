@@ -70,3 +70,25 @@ def test_bad_port_error_hides_the_url():
     with pytest.raises(ValueError) as exc:
         async_database_url("postgresql://u:secret@host:notaport/db")
     assert "secret" not in str(exc.value)
+
+
+def test_database_url_can_be_built_from_parts(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.setenv("DB_HOST", "db.internal")
+    monkeypatch.setenv("DB_USER", "app")
+    monkeypatch.setenv("DB_PASSWORD", "p@ss/word:1")
+    monkeypatch.setenv("DB_NAME", "cp")
+    url = Settings(_env_file=None).database_url
+    assert url == "postgresql+asyncpg://app:p%40ss%2Fword%3A1@db.internal:5432/cp"
+    url, _ = async_database_url(url)
+    assert "p%40ss%2Fword%3A1" in url
+
+
+def test_database_url_is_untouched_without_parts(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.delenv("DB_HOST", raising=False)
+    monkeypatch.setenv("DB_PASSWORD", "only-a-password")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@h:1/d")
+    assert Settings(_env_file=None).database_url == "postgresql+asyncpg://u:p@h:1/d"

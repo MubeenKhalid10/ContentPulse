@@ -39,7 +39,6 @@ async def test_second_click_inside_window_reads_stored_trends(client, internet, 
     assert first.status_code == 202 and first.json()["started"] is True
     calls = len(internet.calls)
     assert calls > 0
-    trends_before = (await admin.get(API)).json()["total"]
 
     # Inside the window the button still runs the keyless sources, never the keyed ones.
     second = await _click(admin)

@@ -38,7 +38,7 @@ variable "certificate_arn" {
 # --- Application ------------------------------------------------------------------
 
 variable "image_tag" {
-  description = "Image tag the services run. deploy.sh pushes a commit tag and this one."
+  description = "Immutable release tag the services run. deploy.sh builds one per release, passes it here and remembers it in release.auto.tfvars. The default only matters for the first apply, before any release exists; to roll back, apply with a previous release tag."
   type        = string
   default     = "latest"
 }

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKnowledgeSearch } from "@/hooks/use-knowledge";
 import { errorMessage } from "@/lib/api";
+import { safeUrl } from "@/lib/safe-url";
 
 const START = "⟦";
 const END = "⟧";
@@ -118,9 +119,11 @@ export function KnowledgeSearch({ onOpenDocument }: { onOpenDocument: (id: strin
 
 export function SourceLink({ url, documentType }: { url: string; documentType: string }) {
   if (documentType === "manual") return <span className="text-xs text-muted-foreground">Added manually</span>;
+  const href = safeUrl(url);
+  if (!href) return <span className="truncate text-xs text-muted-foreground">{url}</span>;
   return (
     <a
-      href={url}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex max-w-full items-center gap-1 truncate text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"

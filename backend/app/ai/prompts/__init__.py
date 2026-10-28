@@ -6,6 +6,7 @@ records exactly which prompt produced it (`prompt_templates` + the
 `ai_generation_jobs.prompt_template_id` link).
 """
 
+import re
 import uuid
 from dataclasses import dataclass
 from functools import cache
@@ -15,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import require
 from app.models.ai import PromptTemplate
 
 PROMPT_DIR = Path(__file__).parent
@@ -40,10 +42,10 @@ class Prompt:
     template: str
 
     def render(self, **values: str) -> str:
-        text = self.template
-        for key, value in values.items():
-            text = text.replace("{" + key + "}", value)
-        return text
+        # One pass over the template: a value that itself contains "{other}"
+        # (crawled text, an organization's own words) is never expanded again.
+        pattern = re.compile("|".join(re.escape("{" + key + "}") for key in values) or r"(?!)")
+        return pattern.sub(lambda m: values[m.group(0)[1:-1]], self.template)
 
 
 @cache
@@ -71,5 +73,5 @@ async def register(db: AsyncSession, prompt: Prompt, model: str | None) -> uuid.
             PromptTemplate.name == prompt.name, PromptTemplate.version == prompt.version
         )
     )
-    assert template_id is not None
+    template_id = require(template_id, "template_id")
     return template_id

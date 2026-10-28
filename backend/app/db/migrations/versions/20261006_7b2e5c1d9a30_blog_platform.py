@@ -47,7 +47,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("content_strategies", "details")
-    for table in TABLES:
-        op.execute(f"DELETE FROM {table} WHERE platform = 'blog'")
-    _replace_checks(OLD)
+    # Going back would delete every blog post, strategy and rule. That is data
+    # loss, not a schema change: restore a backup taken before 7b2e5c1d9a30
+    # (or delete the blog content yourself first and edit this migration).
+    raise RuntimeError(
+        "Irreversible migration: restore a backup taken before 7b2e5c1d9a30 to go back."
+    )

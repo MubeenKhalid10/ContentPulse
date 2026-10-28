@@ -37,10 +37,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Creators become content managers (the broader of the two old roles).
-    op.execute(f"ALTER TABLE organization_members DROP CONSTRAINT {CONSTRAINT}")
-    op.execute("UPDATE organization_members SET role = 'content_manager' WHERE role = 'creator'")
-    op.execute(
-        f"ALTER TABLE organization_members ADD CONSTRAINT {CONSTRAINT} "
-        "CHECK (role IN ('admin', 'content_manager', 'designer', 'viewer'))"
+    # The upgrade merges roles and moves posts between statuses; which creator
+    # was a content manager or a designer, and which post was in review, is not
+    # recorded. Guessing (everyone to content_manager) would silently promote
+    # people, so going back requires a database backup instead.
+    raise RuntimeError(
+        "Irreversible migration: restore a backup taken before 5d8a2f4c7e91 to go back."
     )

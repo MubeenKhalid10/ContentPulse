@@ -3,20 +3,21 @@
 changes), so every round records exactly what was reviewed."""
 
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import InvalidStateTransition
 from app.models.approval import ApprovalComment, ApprovalRequest
-from app.models.design import CreativeAsset, DesignBrief
-from app.models.enums import ApprovalStatus, DesignBriefStatus, PostStatus
+from app.models.design import CreativeAsset
+from app.models.enums import ApprovalStatus, PostStatus
 from app.models.post import Post
 from app.models.user import User
 from app.schemas.design import Person, ReviewComment, ReviewSummary
 from app.services import audit
 from app.services.audit import AuditAction
+from app.services.design import brief_state
+from app.services.design.lookup import current_brief
 from app.services.workflow import transition_post
 
 SUBMITTABLE = (PostStatus.DESIGN_UPLOADED, PostStatus.CHANGES_REQUESTED)
@@ -74,14 +75,9 @@ async def submit_post(
                 kind="resubmitted",
             )
         )
-    brief = await db.scalar(
-        select(DesignBrief)
-        .where(DesignBrief.post_id == post.id, DesignBrief.status != DesignBriefStatus.CANCELLED)
-        .order_by(DesignBrief.created_at.desc())
-        .limit(1)
-    )
+    brief = await current_brief(db, post.id)
     if brief is not None:
-        brief.status, brief.submitted_at = DesignBriefStatus.SUBMITTED, datetime.now(UTC)
+        brief_state.mark_submitted(brief)
     audit.record(
         db,
         organization_id=post.organization_id,
@@ -168,20 +164,17 @@ async def withdraw_design(db: AsyncSession, post: Post) -> None:
 
 async def changes_scope(db: AsyncSession, post_id: uuid.UUID) -> str:
     """What the latest change request opened: "copy", "design" or "both"
-    (requests from before scopes were recorded count as "both")."""
-    from app.models.audit import AuditLog
-
-    value = await db.scalar(
-        select(AuditLog.new_value)
+    (requests with no recorded scope count as "both")."""
+    scope = await db.scalar(
+        select(ApprovalRequest.scope)
         .where(
-            AuditLog.entity_type == "post",
-            AuditLog.entity_id == post_id,
-            AuditLog.action == AuditAction.CHANGES_REQUESTED,
+            ApprovalRequest.post_id == post_id,
+            ApprovalRequest.status == ApprovalStatus.CHANGES_REQUESTED,
         )
-        .order_by(AuditLog.created_at.desc())
+        .order_by(ApprovalRequest.reviewed_at.desc(), ApprovalRequest.created_at.desc())
         .limit(1)
     )
-    return (value or {}).get("scope") or "both"
+    return scope or "both"
 
 
 async def latest_review(db: AsyncSession, post_id: uuid.UUID) -> ReviewSummary | None:

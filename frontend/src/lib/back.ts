@@ -17,7 +17,14 @@ const SECTIONS: Record<string, [list: string, detail: string]> = {
 export function safeFrom(raw: string | null): string | null {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\"))
     return null;
-  return raw;
+  // Browsers strip tabs/newlines and treat `\` as `/`, so also resolve it the
+  // way they will and require it to stay on this origin.
+  const base = "http://same-origin.invalid";
+  try {
+    return new URL(raw, base).origin === base ? raw : null;
+  } catch {
+    return null;
+  }
 }
 
 export function backLabel(from: string): string {

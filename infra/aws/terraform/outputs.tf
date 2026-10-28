@@ -40,6 +40,11 @@ output "app_security_group" {
   value = aws_security_group.app.id
 }
 
+output "secret_keys" {
+  description = "Keys the containers expect in the app secret (deploy.sh adds any that are missing)."
+  value       = join(" ", local.secret_keys)
+}
+
 output "app_secret_arn" {
   description = "Put LLM_API_KEY and other optional keys in this secret."
   value       = aws_secretsmanager_secret.app.arn

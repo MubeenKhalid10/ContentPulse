@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import require
 from app.models.enums import Platform
 from app.models.organization import (
     BrandProfile,
@@ -36,7 +37,7 @@ def _line(label: str, value: str | None) -> str | None:
 
 async def load_context(db: AsyncSession, organization_id: uuid.UUID) -> AlignmentContext:
     org = await db.get(Organization, organization_id)
-    assert org is not None
+    org = require(org, "org")
     settings = await db.scalar(
         select(OrganizationSettings).where(OrganizationSettings.organization_id == organization_id)
     )
