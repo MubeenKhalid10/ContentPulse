@@ -139,7 +139,8 @@ export interface Member {
 
 export interface InviteResponse {
   member: Member;
-  invite_url: string;
+  /** Only present when the invitation could not be emailed (then share it yourself). */
+  invite_url: string | null;
   /** True when the invitation was emailed to the invitee. */
   email_sent: boolean;
 }

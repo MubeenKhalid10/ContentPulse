@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useForm } from "react-hook-form";
 
 import { fieldAria, FormField } from "@/components/shared/form-field";
@@ -23,9 +24,30 @@ import { Input } from "@/components/ui/input";
 import { api, errorMessage } from "@/lib/api";
 import { type ResetPasswordValues, resetPasswordSchema } from "@/schemas/auth";
 
-/** Reached from the reset email in local sign-in mode (?token=…). */
+/**
+ * Reached from the reset email in local sign-in mode. The token travels in the
+ * URL fragment (#token=…), which browsers never send to servers or in Referer
+ * headers; links emailed before that (?token=…) still work. Either way the
+ * token is removed from the address bar once read.
+ */
 export function LocalResetForm() {
-  const token = useSearchParams().get("token");
+  const query = useSearchParams().get("token");
+  // False while rendering on the server (the fragment isn't visible there), true in the browser.
+  const inBrowser = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  // Read once: the token is removed from the address bar right after.
+  const [token] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.hash.replace(/^#/, "")).get("token") ?? query;
+  });
+  useEffect(() => {
+    if (window.location.hash || window.location.search) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
   const router = useRouter();
   const queryClient = useQueryClient();
   const form = useForm<ResetPasswordValues>({
@@ -48,6 +70,7 @@ export function LocalResetForm() {
     },
   });
 
+  if (!inBrowser) return null;
   if (!token) {
     return (
       <Card>

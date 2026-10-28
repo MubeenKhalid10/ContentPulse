@@ -28,9 +28,19 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Each tab keeps its own active organization (sessionStorage), so switching
+ * client workspaces in one tab can never redirect another tab's writes. The
+ * last choice is also remembered across tabs (localStorage) only as the
+ * starting point for a tab that has no choice of its own yet.
+ */
 export function getActiveOrgId(): string | null {
   try {
-    return window.localStorage.getItem(ACTIVE_ORG_KEY);
+    const own = window.sessionStorage.getItem(ACTIVE_ORG_KEY);
+    if (own) return own;
+    const lastUsed = window.localStorage.getItem(ACTIVE_ORG_KEY);
+    if (lastUsed) window.sessionStorage.setItem(ACTIVE_ORG_KEY, lastUsed);
+    return lastUsed;
   } catch {
     return null;
   }
@@ -38,8 +48,13 @@ export function getActiveOrgId(): string | null {
 
 export function setActiveOrgId(id: string | null) {
   try {
-    if (id) window.localStorage.setItem(ACTIVE_ORG_KEY, id);
-    else window.localStorage.removeItem(ACTIVE_ORG_KEY);
+    if (id) {
+      window.sessionStorage.setItem(ACTIVE_ORG_KEY, id);
+      window.localStorage.setItem(ACTIVE_ORG_KEY, id);
+    } else {
+      window.sessionStorage.removeItem(ACTIVE_ORG_KEY);
+      window.localStorage.removeItem(ACTIVE_ORG_KEY);
+    }
   } catch {
     // Storage unavailable (private mode): fall back to the backend default org.
   }

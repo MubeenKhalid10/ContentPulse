@@ -1,6 +1,7 @@
 import { ExternalLinkIcon } from "lucide-react";
 
 import { formatDateTime, timeAgo } from "@/lib/format";
+import { safeUrl } from "@/lib/safe-url";
 import { marketLabel } from "@/lib/trends";
 import type { TrendMention } from "@/types/api";
 
@@ -21,11 +22,12 @@ export function MentionItem({
   marketNames: Map<string, string>;
 }) {
   const when = m.published_at ?? m.detected_at;
+  const url = safeUrl(m.source_url);
   return (
     <li className="grid gap-0.5 rounded-lg border p-3">
-      {m.source_url ? (
+      {url ? (
         <a
-          href={m.source_url}
+          href={url}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-start gap-1 text-sm font-medium underline-offset-4 hover:underline"

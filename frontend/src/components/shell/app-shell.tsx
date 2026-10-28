@@ -36,7 +36,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (unauthenticated) {
       // Clear stale/expired sessions first, or the proxy would bounce /login back here.
       signOutEverywhere().finally(() =>
-        router.replace(`/login?next=${encodeURIComponent(pathname)}`),
+        router.replace(
+          `/login?next=${encodeURIComponent(pathname + window.location.search)}`,
+        ),
       );
     } else if (needsOrganization) {
       router.replace("/onboarding");
