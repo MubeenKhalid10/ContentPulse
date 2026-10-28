@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import prompts
 from app.ai.provider import AIError, AIErrorKind, get_ai_provider
+from app.core.errors import require
 from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.models.ai import AIGenerationJob
@@ -266,7 +267,7 @@ async def run_ai_brief(job_id: uuid.UUID) -> None:
             if brief is None or provider is None:
                 raise AIError(AIErrorKind.NOT_CONFIGURED, "Nothing to do.", public=True)
             post = await db.get(Post, brief.post_id)
-            assert post is not None
+            post = require(post, "post")
             version = await db.scalar(
                 select(PostVersion).where(
                     PostVersion.post_id == post.id,
@@ -325,7 +326,7 @@ async def run_ai_brief(job_id: uuid.UUID) -> None:
         except AIError as exc:
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
-            assert job is not None
+            job = require(job, "job")
             if await schedule_retry(db, job, exc, "design.brief"):
                 return
             logger.warning("Design brief job %s failed: %s", job_id, exc.message)
@@ -335,7 +336,7 @@ async def run_ai_brief(job_id: uuid.UUID) -> None:
             logger.exception("Design brief job %s crashed", job_id)
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
-            assert job is not None
+            job = require(job, "job")
             job.status, job.error = JobStatus.FAILED, "Brief generation failed unexpectedly."
         job.completed_at = datetime.now(UTC)
         await db.commit()

@@ -208,9 +208,10 @@ class InviteCreate(BaseModel):
 
 class InviteResponse(BaseModel):
     member: MemberRead
-    # Returned once; only its hash is stored. Shown to the admin to share
-    # when it could not be emailed.
-    invite_url: str
+    # Returned once; only its hash is stored. Given to the admin only when the
+    # invitation could not be emailed, so they can pass it on themselves. When
+    # it was emailed, the link goes to the invitee alone.
+    invite_url: str | None = None
     # True when the invitation was emailed (SMTP configured and accepted).
     email_sent: bool = False
 

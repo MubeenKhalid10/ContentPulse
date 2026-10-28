@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.api.deps import DB, AppSettings, CurrentUser, OrgContext, org_permission
 from app.core.errors import AppError, ErrorCode, Forbidden
 from app.core.permissions import Permission, Role
+from app.core.ratelimit import INVITE_SEND_PER_ORG, INVITE_SEND_PER_USER, limiter
 from app.models.audit import AuditLog
 from app.models.enums import TrendFrequency
 from app.models.user import User
@@ -218,6 +219,8 @@ async def list_members(ctx: CanRead, db: DB):
     status_code=status.HTTP_201_CREATED,
 )
 async def invite_member(data: InviteCreate, ctx: CanManageUsers, db: DB, settings: AppSettings):
+    await limiter.check(INVITE_SEND_PER_USER, str(ctx.user.id))
+    await limiter.check(INVITE_SEND_PER_ORG, str(ctx.organization_id))
     return await team_service.invite_member(
         db,
         organization_id=ctx.organization_id,

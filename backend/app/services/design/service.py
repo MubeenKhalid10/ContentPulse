@@ -6,15 +6,23 @@ are never replaced.
 """
 
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select, true
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.images import get_image_provider
+from app.core.clock import utcnow
 from app.core.config import get_settings
-from app.core.errors import AppError, ErrorCode, Forbidden, InvalidStateTransition, NotFound
+from app.core.errors import (
+    AppError,
+    ErrorCode,
+    Forbidden,
+    InvalidStateTransition,
+    NotFound,
+    require,
+)
 from app.core.logging import logger
 from app.core.permissions import Permission, has_permission
 from app.models.ai import AIGenerationJob
@@ -39,14 +47,14 @@ from app.schemas.design import (
 from app.services import audit
 from app.services.approvals import workflow as approvals
 from app.services.audit import AuditAction
-from app.services.design import briefs
+from app.services.design import brief_state, briefs
+from app.services.design.lookup import latest_brief
 from app.services.workflow import transition_post
 from app.storage import ALLOWED_TYPES, get_storage, guess_type, safe_filename, storage_provider
 from app.storage.s3 import StorageUnavailable
 
 B = DesignBriefStatus
 ACTIVE = (B.OPEN, B.ASSIGNED, B.IN_PROGRESS)
-EDITABLE_BRIEF = (B.OPEN, B.ASSIGNED, B.IN_PROGRESS)
 FILTERS: dict[str, list[DesignBriefStatus] | None] = {
     "todo": [B.OPEN, B.ASSIGNED, B.IN_PROGRESS],
     # Sent back by the approver: active again while its post waits on changes.
@@ -83,27 +91,18 @@ UPLOADABLE = (
 )
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 # --- Brief lifecycle (called from the content workflow) ---------------------------------
 
 
 async def open_brief(db: AsyncSession, post: Post, user_id: uuid.UUID) -> DesignBrief:
     """A post was sent to design: create its brief (the designer's task).
     The previous designer of this post, if any, gets it again."""
-    previous = await db.scalar(
-        select(DesignBrief)
-        .where(DesignBrief.post_id == post.id, DesignBrief.assignee_id.is_not(None))
-        .order_by(DesignBrief.created_at.desc())
-        .limit(1)
-    )
+    previous = await latest_brief(db, post.id, DesignBrief.assignee_id.is_not(None))
     brief = await briefs.build_brief(db, post)
     if previous is not None:
         brief.assignee_id, brief.assigned_at, brief.status = (
             previous.assignee_id,
-            _now(),
+            utcnow(),
             B.ASSIGNED,
         )
     db.add(brief)
@@ -111,15 +110,28 @@ async def open_brief(db: AsyncSession, post: Post, user_id: uuid.UUID) -> Design
     return brief
 
 
-async def ensure_briefs(db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID) -> None:
+async def _lock_post(db: AsyncSession, brief: DesignBrief) -> Post:
+    """Lock the task's post (always before approval rows, the same order every
+    service uses) and re-read the task, so a double click or a concurrent
+    reviewer waits and then sees the current state."""
+    post = await db.get(Post, brief.post_id, with_for_update=True, populate_existing=True)
+    post = require(post, "post")
+    await db.refresh(brief)
+    return post
+
+
+async def ensure_briefs(db: AsyncSession, organization_id: uuid.UUID | None = None) -> int:
     """Posts waiting in design must have an open task. Heals posts that reached
-    design without one, so the dashboard count and the task list agree."""
+    design without one, so the dashboard count and the task list agree.
+    Run by housekeeping (never from a GET); `organization_id` None = every org.
+    Returns how many tasks were opened."""
     has_task = select(DesignBrief.post_id).where(
         DesignBrief.status.in_([*ACTIVE, B.SUBMITTED]),
     )
     orphans = await db.scalars(
-        select(Post).where(
-            Post.organization_id == organization_id,
+        select(Post)
+        .where(
+            *([Post.organization_id == organization_id] if organization_id else []),
             Post.status.in_(
                 [
                     PostStatus.DESIGN_PENDING,
@@ -129,31 +141,20 @@ async def ensure_briefs(db: AsyncSession, organization_id: uuid.UUID, user_id: u
             ),
             Post.id.not_in(has_task),
         )
+        # A post another request is working on (or healing) is left to it.
+        .with_for_update(skip_locked=True)
     )
-    healed = False
-    for post in orphans:
-        await open_brief(db, post, user_id)
-        healed = True
+    healed = 0
+    for post in list(orphans):
+        try:
+            async with db.begin_nested():
+                await open_brief(db, post, post.created_by)
+        except IntegrityError:
+            continue  # a concurrent request opened the task first
+        healed += 1
     if healed:
         await db.commit()
-
-
-async def cancel_briefs(db: AsyncSession, post: Post) -> None:
-    """The post left design (back to draft, archived): close its open task."""
-    rows = await db.scalars(
-        select(DesignBrief).where(DesignBrief.post_id == post.id, DesignBrief.status.in_(ACTIVE))
-    )
-    for brief in rows:
-        brief.status = B.CANCELLED
-
-
-async def current_brief(db: AsyncSession, post_id: uuid.UUID) -> DesignBrief | None:
-    return await db.scalar(
-        select(DesignBrief)
-        .where(DesignBrief.post_id == post_id, DesignBrief.status != B.CANCELLED)
-        .order_by(DesignBrief.created_at.desc())
-        .limit(1)
-    )
+    return healed
 
 
 # --- Reading -----------------------------------------------------------------------
@@ -255,7 +256,6 @@ async def list_tasks(
     limit: int,
     offset: int,
 ) -> TaskPage:
-    await ensure_briefs(db, organization_id, user_id)
     filters = [DesignBrief.organization_id == organization_id]
     if mine:
         filters.append(DesignBrief.assignee_id == user_id)
@@ -342,7 +342,7 @@ async def task_detail(
     brief = await _get(db, organization_id, task_id)
     [item] = await _items(db, [brief])
     post = await db.get(Post, brief.post_id)
-    assert post is not None
+    post = require(post, "post")
     version = await db.scalar(
         select(PostVersion).where(
             PostVersion.post_id == post.id, PostVersion.version_number == post.current_version
@@ -443,7 +443,7 @@ async def update_brief(
     changes: dict[str, Any],
 ) -> TaskDetail:
     brief = await _get(db, organization_id, task_id)
-    if brief.status not in EDITABLE_BRIEF:
+    if brief.status not in ACTIVE:
         raise InvalidStateTransition(
             "This brief can no longer be changed.", details={"status": brief.status.value}
         )
@@ -536,7 +536,7 @@ async def assign(
             )
     old = {"assignee_id": brief.assignee_id}
     brief.assignee_id = assignee_id
-    brief.assigned_at = _now() if assignee_id else None
+    brief.assigned_at = utcnow() if assignee_id else None
     if brief.status != B.IN_PROGRESS:
         brief.status = B.ASSIGNED if assignee_id else B.OPEN
     _record(db, brief, user_id, AuditAction.DESIGN_TASK_ASSIGNED, {"assignee_id": assignee_id}, old)
@@ -553,16 +553,15 @@ async def _workable(
     brief = await _get(db, organization_id, task_id)
     if brief.assignee_id not in (None, user_id) and not _can_manage(role):
         raise Forbidden("This task is assigned to someone else. Ask an admin to reassign it.")
+    post = await _lock_post(db, brief)
     if brief.status not in ACTIVE:
         raise InvalidStateTransition("This task is closed.", details={"status": brief.status.value})
-    post = await db.get(Post, brief.post_id)
-    assert post is not None
     if post.status not in UPLOADABLE:
         raise InvalidStateTransition(
             "The post isn't waiting for a design.", details={"status": post.status.value}
         )
     if brief.assignee_id is None:
-        brief.assignee_id, brief.assigned_at = user_id, _now()
+        brief.assignee_id, brief.assigned_at = user_id, utcnow()
     return brief, post
 
 
@@ -765,7 +764,7 @@ async def delete_design(
     request changes first (or delete the post)."""
     brief = await _get(db, organization_id, task_id)
     post = await db.get(Post, brief.post_id)
-    assert post is not None
+    post = require(post, "post")
     if post.status not in DELETABLE_DESIGN:
         raise InvalidStateTransition(
             "This design is waiting for approval or already approved. Request changes first, "
@@ -812,8 +811,7 @@ async def withdraw(
     brief = await _get(db, organization_id, task_id)
     if brief.assignee_id not in (None, user_id) and not _can_manage(role):
         raise Forbidden("This task is assigned to someone else.")
-    post = await db.get(Post, brief.post_id)
-    assert post is not None
+    post = await _lock_post(db, brief)
     if brief.status != B.SUBMITTED or post.status != PostStatus.PENDING_APPROVAL:
         raise InvalidStateTransition(
             "Only a design that is waiting for approval can be withdrawn.",
@@ -821,7 +819,7 @@ async def withdraw(
         )
     await approvals.withdraw_design(db, post)
     await transition_post(db, post, PostStatus.DESIGN_UPLOADED, user_id=user_id)
-    brief.status, brief.submitted_at = B.IN_PROGRESS, None
+    brief_state.mark_withdrawn(brief)
     await db.commit()
     return await task_detail(db, organization_id, brief.id)
 
@@ -837,14 +835,13 @@ async def submit(
     """Spec §30: DESIGN_UPLOADED → PENDING_APPROVAL (also after a change
     request, re-submitting the latest creative). Refused without a creative."""
     brief = await _get(db, organization_id, task_id)
+    post = await _lock_post(db, brief)  # a double click waits here, then sees "submitted"
     if brief.status not in ACTIVE:
         raise InvalidStateTransition(
             "This task was already submitted or closed.", details={"status": brief.status.value}
         )
     if brief.assignee_id not in (None, user_id) and not _can_manage(role):
         raise Forbidden("This task is assigned to someone else.")
-    post = await db.get(Post, brief.post_id)
-    assert post is not None
     await approvals.submit_post(db, post, user_id, note)
     await db.commit()
     return await task_detail(db, organization_id, brief.id)

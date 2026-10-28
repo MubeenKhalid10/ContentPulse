@@ -13,6 +13,12 @@ from app.storage.local import InvalidToken, LocalStorage
 
 router = APIRouter(prefix="/storage/local", tags=["storage"])
 
+# Types a browser can execute script from. Still stored and shown as images in
+# the app (<img> never runs script); opened directly they download instead.
+ACTIVE_CONTENT_TYPES = frozenset(
+    {"image/svg+xml", "text/html", "application/xhtml+xml", "text/xml", "application/xml"}
+)
+
 
 def _discard(path: Path) -> None:
     path.unlink(missing_ok=True)
@@ -74,9 +80,19 @@ async def download(token: str) -> FileResponse:
     info = await storage.head(claims["key"])
     if info is None:
         raise NotFound("File")
+    # Files are served from the app's own origin (the frontend proxies this
+    # path), so anything that can carry script must never render inline here.
+    content_type = (info.content_type or "").split(";")[0].strip().lower()
+    active = content_type in ACTIVE_CONTENT_TYPES
+    headers = {"X-Content-Type-Options": "nosniff"}
+    if active:
+        headers["Content-Security-Policy"] = "sandbox; default-src 'none'"
     return FileResponse(
         storage.path(claims["key"]),
         media_type=info.content_type,
         filename=claims.get("fn"),
-        content_disposition_type="inline" if claims.get("in", True) else "attachment",
+        content_disposition_type=(
+            "inline" if claims.get("in", True) and not active else "attachment"
+        ),
+        headers=headers,
     )

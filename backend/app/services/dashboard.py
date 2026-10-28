@@ -5,10 +5,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.approval import ApprovalRequest
 from app.models.audit import AuditLog
 from app.models.enums import (
-    ApprovalStatus,
     PostStatus,
     RelevanceLevel,
     TopicStatus,
@@ -29,6 +27,7 @@ from app.schemas.dashboard import (
     TopTrend,
     TrendingTopic,
 )
+from app.services.audit import AuditAction
 from app.services.trends import visibility
 
 
@@ -255,12 +254,17 @@ async def overview(
         **window,
     )
     posts_generated = await _metric(db, Post.created_at, [Post.organization_id == org], **window)
+    # Final (design-stage) approvals, counted from the audit trail: the copy
+    # review isn't a finished post, and reopening approved work rewrites the
+    # request row but never the fact that it was approved.
     approved_posts = await _metric(
         db,
-        ApprovalRequest.reviewed_at,
+        AuditLog.created_at,
         [
-            ApprovalRequest.organization_id == org,
-            ApprovalRequest.status == ApprovalStatus.APPROVED,
+            AuditLog.organization_id == org,
+            AuditLog.action == AuditAction.APPROVED,
+            AuditLog.entity_type == "post",
+            AuditLog.new_value["stage"].astext.is_(None),
         ],
         **window,
     )

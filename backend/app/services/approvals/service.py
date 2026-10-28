@@ -2,13 +2,13 @@
 the decisions that move a post to APPROVED, CHANGES_REQUESTED or REJECTED."""
 
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.core.errors import InvalidStateTransition, NotFound
+from app.core.clock import utcnow
+from app.core.errors import InvalidStateTransition, NotFound, require
 from app.models.approval import ApprovalComment, ApprovalRequest
 from app.models.design import CreativeAsset, DesignBrief
 from app.models.enums import ApprovalStatus, DesignBriefStatus, PostStatus
@@ -29,8 +29,10 @@ from app.schemas.approval import (
 from app.schemas.content import VersionRead
 from app.services import audit
 from app.services.audit import AuditAction
+from app.services.design import brief_state
 from app.services.design import briefs as design_briefs
 from app.services.design import service as design
+from app.services.design.lookup import current_brief, latest_brief
 from app.services.design.service import creative_versions, person
 from app.services.workflow import transition_post
 from app.storage import get_storage
@@ -46,10 +48,6 @@ FILTERS: dict[str, list[ApprovalStatus] | None] = {
 }
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 async def _get(
     db: AsyncSession, organization_id: uuid.UUID, request_id: uuid.UUID
 ) -> ApprovalRequest:
@@ -61,6 +59,26 @@ async def _get(
     if request is None:
         raise NotFound("Approval")
     return request
+
+
+async def _lock(
+    db: AsyncSession, organization_id: uuid.UUID, request_id: uuid.UUID
+) -> tuple[ApprovalRequest, Post]:
+    """The request and its post, both locked and freshly read, so two reviewers
+    (or a double click) can't both act on the same pending round. The post is
+    always locked first, the same order the content and design services use."""
+    request = await _get(db, organization_id, request_id)
+    post = await db.get(Post, request.post_id, with_for_update=True, populate_existing=True)
+    post = require(post, "post")
+    request = await db.scalar(
+        select(ApprovalRequest)
+        .where(ApprovalRequest.id == request_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if request is None:  # withdrawn while we waited for the lock
+        raise NotFound("Approval")
+    return request, post
 
 
 async def _users(db: AsyncSession, ids: set) -> dict[uuid.UUID, User]:
@@ -296,7 +314,7 @@ async def approval_detail(
     request = await _get(db, organization_id, request_id)
     [item] = await _items(db, [request])
     post = await db.get(Post, request.post_id)
-    assert post is not None
+    post = require(post, "post")
     versions = [
         VersionRead.model_validate(v)
         for v in await db.scalars(
@@ -307,12 +325,7 @@ async def approval_detail(
     ]
     submitted = next((v for v in versions if v.version_number == request.post_version), None)
     creatives = await creative_versions(db, post.id)
-    brief = await db.scalar(
-        select(DesignBrief)
-        .where(DesignBrief.post_id == post.id, DesignBrief.status != DesignBriefStatus.CANCELLED)
-        .order_by(DesignBrief.created_at.desc())
-        .limit(1)
-    )
+    brief = await current_brief(db, post.id)
     all_rounds = list(
         await db.scalars(
             select(ApprovalRequest)
@@ -406,14 +419,12 @@ async def decide(
     comment: str | None,
     scope: str = "both",
 ) -> ApprovalDetail:
-    request = await _get(db, organization_id, request_id)
+    request, post = await _lock(db, organization_id, request_id)
     if request.status != A.PENDING:
         raise InvalidStateTransition(
             "This submission has already been reviewed.",
             details={"status": request.status.value},
         )
-    post = await db.get(Post, request.post_id)
-    assert post is not None
     target, action, kind = DECISIONS[decision]
     copy_stage = request.creative_version is None
     ai_brief = None
@@ -428,31 +439,20 @@ async def decide(
         # One click: approved posts are locked and ready to publish.
         await transition_post(db, post, PostStatus.FINAL, user_id=user_id)
 
-    request.status, request.reviewer_id, request.reviewed_at = decision, user_id, _now()
+    request.status, request.reviewer_id, request.reviewed_at = decision, user_id, utcnow()
     request.comments = comment
+    if decision == A.CHANGES_REQUESTED and not copy_stage:
+        request.scope = scope
     if comment:
         db.add(_comment(request, user_id, comment, kind))
 
     brief = (
         None
         if copy_stage
-        else await db.scalar(
-            select(DesignBrief)
-            .where(
-                DesignBrief.post_id == post.id, DesignBrief.status == DesignBriefStatus.SUBMITTED
-            )
-            .order_by(DesignBrief.created_at.desc())
-            .limit(1)
-        )
+        else await latest_brief(db, post.id, DesignBrief.status == DesignBriefStatus.SUBMITTED)
     )
     if brief is not None:
-        if decision == A.APPROVED:
-            brief.status = DesignBriefStatus.COMPLETED
-        elif decision == A.REJECTED:
-            brief.status = DesignBriefStatus.CANCELLED
-        elif scope in ("design", "both"):
-            # Back on the designer's to-do list, with the same assignee.
-            brief.status = DesignBriefStatus.IN_PROGRESS
+        brief_state.apply_decision(brief, decision, scope)
     audit.record(
         db,
         organization_id=organization_id,
@@ -477,9 +477,7 @@ async def finalize(
     db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, request_id: uuid.UUID
 ) -> ApprovalDetail:
     """Spec §32/§54: APPROVED → FINAL, the post is locked and ready to publish."""
-    request = await _get(db, organization_id, request_id)
-    post = await db.get(Post, request.post_id)
-    assert post is not None
+    request, post = await _lock(db, organization_id, request_id)
     if request.status != A.APPROVED:
         raise InvalidStateTransition("Only an approved submission can be marked final.")
     await transition_post(db, post, PostStatus.FINAL, user_id=user_id)
@@ -509,7 +507,7 @@ async def reopen(
     Copy approval (post in design): the post goes back to draft and its design
     task is cancelled. Final approval: the post goes to "changes requested",
     with the copy, the design or both open (`scope`), then is resubmitted."""
-    request = await _get(db, organization_id, request_id)
+    request, post = await _lock(db, organization_id, request_id)
     if request.status != A.APPROVED:
         raise InvalidStateTransition("Only approved work can be reopened.")
     latest = await db.scalar(
@@ -520,8 +518,6 @@ async def reopen(
     )
     if latest != request.id:
         raise InvalidStateTransition("This post has a newer submission. Reopen that one instead.")
-    post = await db.get(Post, request.post_id)
-    assert post is not None
     copy_stage = request.creative_version is None
     if copy_stage:
         if post.status not in COPY_REOPENABLE:
@@ -529,7 +525,7 @@ async def reopen(
                 "This post has moved on from design.", details={"status": post.status.value}
             )
         await transition_post(db, post, PostStatus.DRAFT, user_id=user_id)
-        await design.cancel_briefs(db, post)
+        await brief_state.cancel_open(db, post.id)
     else:
         if post.status not in (PostStatus.APPROVED, PostStatus.FINAL):
             raise InvalidStateTransition(
@@ -537,23 +533,18 @@ async def reopen(
             )
         await transition_post(db, post, PostStatus.CHANGES_REQUESTED, user_id=user_id)
         if scope in ("design", "both"):
-            brief = await db.scalar(
-                select(DesignBrief)
-                .where(
-                    DesignBrief.post_id == post.id,
-                    DesignBrief.status == DesignBriefStatus.COMPLETED,
-                )
-                .order_by(DesignBrief.created_at.desc())
-                .limit(1)
+            brief = await latest_brief(
+                db, post.id, DesignBrief.status == DesignBriefStatus.COMPLETED
             )
             if brief is not None:
-                brief.status = DesignBriefStatus.IN_PROGRESS
+                brief_state.reopen_for_designer(brief)
     request.status, request.reviewer_id, request.reviewed_at = (
         A.CHANGES_REQUESTED,
         user_id,
-        _now(),
+        utcnow(),
     )
     request.comments = comment
+    request.scope = None if copy_stage else scope
     db.add(_comment(request, user_id, comment, "changes_requested"))
     audit.record(
         db,

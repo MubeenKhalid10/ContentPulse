@@ -3,14 +3,16 @@
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import httpx
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.embeddings import EmbeddingError, EmbeddingProvider, get_embedding_provider
+from app.core.clock import utcnow
 from app.core.config import Settings, get_settings
+from app.core.errors import require
 from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.models.enums import CrawlStatus, KnowledgeJobStatus
@@ -52,14 +54,13 @@ class _EmbeddingState:
 
     def disable(self, error: EmbeddingError) -> None:
         self.provider = None
+        # The provider's own message can carry account or endpoint details:
+        # it goes to the server log, never into a warning tenants can read.
+        logger.warning("Embedding provider failed during indexing: %s", error)
         self.warning = (
-            f"Semantic indexing paused ({error}). Pages were indexed for keyword search; "
-            "re-index once the embedding provider is working."
+            "Semantic indexing paused: the embedding provider is not responding. Pages were "
+            "indexed for keyword search; re-index once the embedding provider is working."
         )
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 async def _finish(
@@ -77,7 +78,7 @@ async def _finish(
         job.error = error
         if warning and warning not in job.warnings:
             job.warnings = [*job.warnings, warning]
-        job.finished_at = _now()
+        job.finished_at = utcnow()
         job.heartbeat_at = job.finished_at
         await db.commit()
 
@@ -89,13 +90,37 @@ async def _start(job_id: uuid.UUID) -> KnowledgeCrawlJob | None:
             return None
         if job.cancel_requested:
             job.status = KnowledgeJobStatus.CANCELLED
-            job.finished_at = _now()
+            job.finished_at = utcnow()
             await db.commit()
             return None
         job.status = KnowledgeJobStatus.RUNNING
-        job.started_at = job.heartbeat_at = _now()
+        job.started_at = job.heartbeat_at = utcnow()
         await db.commit()
         return job
+
+
+HEARTBEAT_EVERY = 30.0  # seconds; well inside STALE_AFTER
+
+
+async def _heartbeat(job_id: uuid.UUID) -> None:
+    """Keep the job's heartbeat fresh while it works. The per-page checkpoint
+    alone goes quiet during a slow page, a big sitemap or an embedding call,
+    and a quiet job is taken for dead (and a second crawl may then start)."""
+    while True:
+        await asyncio.sleep(HEARTBEAT_EVERY)
+        try:
+            async with SessionLocal() as db:
+                await db.execute(
+                    update(KnowledgeCrawlJob)
+                    .where(
+                        KnowledgeCrawlJob.id == job_id,
+                        KnowledgeCrawlJob.status == KnowledgeJobStatus.RUNNING,
+                    )
+                    .values(heartbeat_at=utcnow())
+                )
+                await db.commit()
+        except Exception:  # noqa: BLE001 - a missed beat must not kill the crawl
+            logger.warning("Could not record heartbeat for knowledge job %s", job_id)
 
 
 async def _run(
@@ -105,6 +130,7 @@ async def _run(
     job = await _start(job_id)
     if job is None:
         return
+    beat = asyncio.create_task(_heartbeat(job_id))
     try:
         warning = await body(job)
     except _Cancelled:
@@ -121,6 +147,8 @@ async def _run(
         await _finish(job_id, KnowledgeJobStatus.FAILED, error="The job failed unexpectedly.")
     else:
         await _finish(job_id, KnowledgeJobStatus.SUCCEEDED, warning=warning)
+    finally:
+        beat.cancel()
 
 
 async def _checkpoint(db: AsyncSession, job: KnowledgeCrawlJob) -> None:
@@ -128,7 +156,7 @@ async def _checkpoint(db: AsyncSession, job: KnowledgeCrawlJob) -> None:
     await db.refresh(job, attribute_names=["cancel_requested"])
     if job.cancel_requested:
         raise _Cancelled
-    job.heartbeat_at = _now()
+    job.heartbeat_at = utcnow()
 
 
 # --- Crawl ----------------------------------------------------------------
@@ -190,7 +218,7 @@ async def _store_page(
         doc.crawl_status == CrawlStatus.EMBEDDED
         or (doc.crawl_status == CrawlStatus.EXTRACTED and embeddings.provider is None)
     ):
-        doc.last_crawled_at = _now()
+        doc.last_crawled_at = utcnow()
         doc.last_crawl_job_id = job.id
         return "unchanged"
 
@@ -205,7 +233,7 @@ async def _store_page(
         "fetched_url": url,
         "http_status": result.status_code,
     }
-    doc.last_crawled_at = _now()
+    doc.last_crawled_at = utcnow()
     doc.last_crawl_job_id = job.id
     outcome = await index_document(db, doc, embeddings.provider)
     if outcome.embedding_error:
@@ -240,7 +268,7 @@ async def _crawl(job: KnowledgeCrawlJob) -> str | None:
         async for result in crawler.crawl():
             async with SessionLocal() as db:
                 current = await db.get(KnowledgeCrawlJob, job.id)
-                assert current is not None
+                current = require(current, "current")
                 await _checkpoint(db, current)
                 outcome = await _store_page(db, current, result, embeddings)
                 current.pages_crawled += 1
@@ -258,7 +286,7 @@ async def _crawl(job: KnowledgeCrawlJob) -> str | None:
 
     async with SessionLocal() as db:
         final = await db.get(KnowledgeCrawlJob, job.id)
-        assert final is not None
+        final = require(final, "final")
         final.pages_discovered = crawler.stats.discovered
         if crawler.stats.warnings:
             final.warnings = [*final.warnings, *crawler.stats.warnings]
@@ -292,7 +320,7 @@ async def _reindex(job: KnowledgeCrawlJob) -> str | None:
             )
         )
         current = await db.get(KnowledgeCrawlJob, job.id)
-        assert current is not None
+        current = require(current, "current")
         current.pages_discovered = len(ids)
         await db.commit()
 
@@ -300,7 +328,7 @@ async def _reindex(job: KnowledgeCrawlJob) -> str | None:
         async with SessionLocal() as db:
             current = await db.get(KnowledgeCrawlJob, job.id)
             doc = await db.get(KnowledgeDocument, doc_id)
-            assert current is not None
+            current = require(current, "current")
             await _checkpoint(db, current)
             if doc is not None:
                 outcome = await index_document(db, doc, embeddings.provider)
@@ -319,7 +347,7 @@ async def run_reindex_job(job_id: uuid.UUID) -> None:
 
 # --- Recovery ---------------------------------------------------------------
 def stale_condition():
-    cutoff = _now() - STALE_AFTER
+    cutoff = utcnow() - STALE_AFTER
     return or_(
         KnowledgeCrawlJob.heartbeat_at < cutoff,
         (KnowledgeCrawlJob.heartbeat_at.is_(None)) & (KnowledgeCrawlJob.created_at < cutoff),
@@ -340,7 +368,7 @@ async def recover_stale_jobs() -> int:
             .values(
                 status=KnowledgeJobStatus.FAILED,
                 error="Interrupted: the server restarted. Start the crawl again.",
-                finished_at=_now(),
+                finished_at=utcnow(),
             )
         )
         await db.commit()

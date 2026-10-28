@@ -66,7 +66,9 @@ def default_sources(industry: str | None) -> list[str]:
 # Sources that need no API key or token (they read public feeds). Calling them
 # costs nothing, so "Discover New Trends" may run them on every click.
 KEYLESS_SOURCES = frozenset(
-    key for key, source in SOURCES.items() if not source.env_vars and source.pricing != "unavailable"
+    key
+    for key, source in SOURCES.items()
+    if not source.env_vars and source.pricing != "unavailable"
 )
 
 

@@ -89,6 +89,21 @@ async def authenticate(db: AsyncSession, email: str, password: str, settings: Se
     return user
 
 
+async def end_sessions(db: AsyncSession, token: str | None, settings: Settings) -> None:
+    """Sign-out: the session behind `token` (and every other one) stops working.
+    Never fails: a missing, expired or invalid token has nothing left to end."""
+    if not token or settings.auth_provider != "local":
+        return
+    try:
+        claims = decode_local_token(token, settings)
+        user = await db.get(User, uuid.UUID(claims["sub"]))
+    except (Unauthorized, ValueError):
+        return
+    if user is not None and claims.get("ver", 0) == user.token_version:
+        user.token_version += 1
+        await db.commit()
+
+
 async def update_profile(db: AsyncSession, user: User, full_name: str) -> User:
     user.full_name = full_name
     await db.commit()
@@ -109,6 +124,7 @@ async def change_password(
             ErrorCode.VALIDATION_ERROR, "Choose a password different from your current one."
         )
     user.password_hash = hash_password(new)
+    user.token_version += 1  # every other session ends; the caller issues this one a new token
     await db.commit()
 
 
@@ -120,7 +136,7 @@ async def request_password_reset(db: AsyncSession, email: str, settings: Setting
     if user is None or user.password_hash is None or not user.is_active:
         return
     token = create_password_reset_token(user.id, user.password_hash, settings)
-    link = f"{settings.frontend_url.rstrip('/')}/reset-password?token={token}"
+    link = f"{settings.frontend_url.rstrip('/')}/reset-password#token={token}"
     minutes = settings.password_reset_ttl_minutes
     await send_email(
         settings,
@@ -147,6 +163,7 @@ async def reset_password(db: AsyncSession, token: str, password: str, settings: 
     ):
         raise Unauthorized("This reset link is invalid or has expired. Ask for a new one.")
     user.password_hash = hash_password(password)
+    user.token_version += 1  # a reset ends every session signed in with the old password
     user.last_login_at = datetime.now(UTC)
     await db.commit()
     return user
@@ -159,6 +176,10 @@ async def user_from_token(db: AsyncSession, token: str, settings: Settings) -> U
             user = await db.get(User, uuid.UUID(claims["sub"]))
         except ValueError as exc:
             raise Unauthorized("Invalid authentication token.") from exc
+        # Sessions issued before the password changed, or before sign-out, are over.
+        # (Tokens from before versions existed carry none, which counts as 0.)
+        if user is not None and claims.get("ver", 0) != user.token_version:
+            raise Unauthorized("Session expired. Please sign in again.")
     else:
         claims = await verify_supabase_token(token, settings)
         user = await _resolve_supabase_user(db, claims)
@@ -182,6 +203,13 @@ async def _resolve_supabase_user(db: AsyncSession, claims: dict) -> User:
     if user is None:
         user = User(email=normalize_email(email), auth_provider=AuthProvider.SUPABASE)
         db.add(user)
+    else:
+        # An existing account (with its orgs and roles) is only claimed by the
+        # holder of its mailbox, and never taken from another identity.
+        if user.external_auth_id and user.external_auth_id != subject:
+            raise Unauthorized("This email is already linked to another sign-in.")
+        if not (claims.get("user_metadata") or {}).get("email_verified"):
+            raise Unauthorized("Confirm your email first: check your inbox for the link.")
     user.external_auth_id = subject
     user.auth_provider = AuthProvider.SUPABASE
     if not user.full_name:

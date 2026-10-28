@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     false,
+    text,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -44,6 +45,14 @@ class KnowledgeCrawlJob(UUIDPk, CreatedAt, OrgScoped, Base):
     __tablename__ = "knowledge_crawl_jobs"
     __table_args__ = (
         Index("ix_knowledge_crawl_jobs_org_created", "organization_id", "created_at"),
+        # One queued/running crawl or re-index per organization, even if two
+        # requests race or a slow worker is taken for dead.
+        Index(
+            "uq_knowledge_crawl_jobs_one_active",
+            "organization_id",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+        ),
     )
 
     kind: Mapped[KnowledgeJobKind] = mapped_column(

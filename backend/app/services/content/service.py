@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select, true
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import (
@@ -48,7 +49,9 @@ from app.services.approvals import workflow as approvals
 from app.services.audit import AuditAction
 from app.services.content import blog, generation
 from app.services.content.copy import check_copy
+from app.services.design import brief_state
 from app.services.design import service as design
+from app.services.design.lookup import current_brief
 from app.services.topics.platforms import PLATFORM_LABELS, get_rules
 from app.services.workflow import transition_post
 from app.storage import get_storage
@@ -149,10 +152,15 @@ def _generation(job: AIGenerationJob | None) -> GenerationStatus | None:
     )
 
 
-async def _get_post(db: AsyncSession, organization_id: uuid.UUID, post_id: uuid.UUID) -> Post:
-    post = await db.scalar(
-        select(Post).where(Post.id == post_id, Post.organization_id == organization_id)
-    )
+async def _get_post(
+    db: AsyncSession, organization_id: uuid.UUID, post_id: uuid.UUID, *, lock: bool = False
+) -> Post:
+    """`lock` holds the row until commit: use it when the status is checked and
+    then changed, so a double click or a second admin waits and sees the result."""
+    query = select(Post).where(Post.id == post_id, Post.organization_id == organization_id)
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    post = await db.scalar(query)
     if post is None:
         raise NotFound("Post")
     return post
@@ -284,7 +292,7 @@ async def post_detail(
         )
     )
     rule = (await get_rules(db, organization_id))[Platform(post.platform)]
-    brief = await design.current_brief(db, post.id)
+    brief = await current_brief(db, post.id)
     await db.commit()  # keep seeded platform rules
     return PostDetail(
         **item.model_dump(),
@@ -469,10 +477,11 @@ async def update_post(
     post_id: uuid.UUID,
     data: dict[str, Any],
 ) -> PostDetail:
-    post = await _get_post(db, organization_id, post_id)
+    post = await _get_post(db, organization_id, post_id, lock=True)
     base = data.pop("base_version")
     note = data.pop("change_note", None)
     if "title" in data and data["title"] != post.title:
+        await _require_editable(db, post)  # a title is copy: locked with it
         old, new = audit.diff(post, {"title": data["title"]})
         post.title = data["title"]
         _record(db, post, user_id, AuditAction.CONTENT_EDITED, new, old)
@@ -510,7 +519,11 @@ async def update_post(
             await _add_version(
                 db, post, user_id, fields, meta, note or _describe(changed, changed_meta)
             )
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:  # two saves raced for the same version number
+        await db.rollback()
+        raise Conflict("Someone saved this post while you were editing. Reload to see it.") from exc
     return await post_detail(db, organization_id, post.id)
 
 
@@ -618,11 +631,14 @@ async def transition(
     *,
     can_review: bool = False,
 ) -> PostDetail:
-    post = await _get_post(db, organization_id, post_id)
+    post = await _get_post(db, organization_id, post_id, lock=True)
     target = ACTIONS[action]
     if target == P.DRAFT and post.status not in (*EDITABLE, P.CONTENT_REVIEW) and not can_review:
         # Back to draft reopens approved copy: an admin's call.
         raise Forbidden("Only an admin can reopen approved copy.")
+    if target == P.ARCHIVED and post.status not in (*EDITABLE, P.CONTENT_REVIEW) and not can_review:
+        # Archiving is terminal: past review it discards approved work.
+        raise Forbidden("Only an admin can archive approved content.")
     if target == P.CONTENT_REVIEW:
         if not post.current_version:
             raise InvalidStateTransition("Generate or write the post before moving it on.")
@@ -635,8 +651,9 @@ async def transition(
         await transition_post(db, post, target, user_id=user_id)
         if previous == P.CONTENT_REVIEW:
             await approvals.withdraw_copy(db, post)
-        elif previous in DESIGN_STATUSES:
-            await design.cancel_briefs(db, post)
+        elif previous in (*DESIGN_STATUSES, P.CHANGES_REQUESTED):
+            # A post sent back for design changes has an open task too.
+            await brief_state.cancel_open(db, post.id)
     await db.commit()
     return await post_detail(db, organization_id, post.id)
 
@@ -650,7 +667,7 @@ async def resubmit(
 ) -> PostDetail:
     """After copy-only changes: send the post back for approval with its
     existing creative (spec §32 "Re-submit")."""
-    post = await _get_post(db, organization_id, post_id)
+    post = await _get_post(db, organization_id, post_id, lock=True)
     if await generation.active_job(db, post.id):
         raise Conflict("This post is being generated. Wait for it to finish.")
     await approvals.submit_post(db, post, user_id, note)

@@ -9,6 +9,7 @@ from app.ai import prompts
 from app.ai.embeddings import get_embedding_provider
 from app.ai.gateway import LLMGateway
 from app.ai.provider import AIError, AIErrorKind, StructuredResult
+from app.ai.untrusted import UNTRUSTED_NOTICE, untrusted, untrusted_attr
 from app.core.config import get_settings
 from app.models.enums import RelevanceLevel
 from app.models.trend import Trend, TrendMention
@@ -87,31 +88,33 @@ def _title(text: str | None) -> str:
 
 def trend_prompt(trend: Trend, mentions: list[TrendMention], passages: list[Passage]) -> str:
     signals = "\n".join(
-        f"- {key.replace('_', ' ')}: {value['score']} ({value['detail']})"
+        f"- {key.replace('_', ' ')}: {value['score']} ({untrusted(value['detail'])})"
         for key, value in trend.signals.items()
         if key not in ("organization_fit", "audience_relevance")
     )
     # No relative timestamps ("5h ago"): the prompt stays identical for the
     # same coverage, so the cache answers repeat analyses.
     coverage = "\n".join(
-        f"- [{SOURCE_LABELS.get(m.source, m.source)}] {_title(m.title)}"
-        + (f" ({m.author})" if m.author else "")
+        f"- [{SOURCE_LABELS.get(m.source, m.source)}] {untrusted(_title(m.title))}"
+        + (f" ({untrusted(m.author)})" if m.author else "")
         + (f", {m.engagement_label}" if m.engagement_label else "")
         for m in mentions
     )
     if passages:
         knowledge = "\n".join(
-            f'<passage id="{p.ref}" page="{p.title or p.url}" section="{p.heading or ""}">\n'
-            f"{p.content}\n</passage>"
+            f'<passage id="{p.ref}" page="{untrusted_attr(p.title or p.url)}" '
+            f'section="{untrusted_attr(p.heading or "")}">\n'
+            f"{untrusted(p.content)}\n</passage>"
             for p in passages
         )
     else:
         knowledge = "(No passages in the organization's knowledge base match this trend.)"
     return (
+        f"{UNTRUSTED_NOTICE}\n\n"
         "<trend>\n"
-        f"Topic: {trend.topic}\n"
-        f"Related keywords: {', '.join(trend.keywords) or 'none'}\n"
-        f"Seen in: {', '.join(trend.locations)}\n"
+        f"Topic: {untrusted(trend.topic)}\n"
+        f"Related keywords: {untrusted(', '.join(trend.keywords) or 'none')}\n"
+        f"Seen in: {untrusted(', '.join(trend.locations))}\n"
         f"Signals:\n{signals}\n"
         f"Recent coverage:\n{coverage}\n"
         "</trend>\n\n"

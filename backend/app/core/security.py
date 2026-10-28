@@ -23,13 +23,17 @@ def verify_password(password: str, password_hash: str | None) -> bool:
     return _password_hash.verify(password, password_hash)
 
 
-def create_access_token(user_id: uuid.UUID, settings: Settings) -> tuple[str, datetime]:
+def create_access_token(
+    user_id: uuid.UUID, settings: Settings, version: int = 0
+) -> tuple[str, datetime]:
+    """`version` is the user's token_version: bumping it later ends this session."""
     expires_at = datetime.now(UTC) + timedelta(minutes=settings.access_token_ttl_minutes)
     payload = {
         "sub": str(user_id),
         "iss": "contentpulse",
         "iat": datetime.now(UTC),
         "exp": expires_at,
+        "ver": version,
     }
     token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
     return token, expires_at

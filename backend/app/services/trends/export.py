@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import utcnow
 from app.models.organization import Organization
 from app.models.trend import Trend, TrendMention
 
@@ -44,10 +45,6 @@ COLUMNS = (
 
 # A cell starting with one of these is a formula in Excel / Sheets / LibreOffice.
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 def _zone(name: str | None) -> tuple[str, tzinfo]:
@@ -97,7 +94,7 @@ async def export_window(
 ) -> ExportWindow:
     org = await db.get(Organization, organization_id)
     name, tz = _zone(org.timezone if org else None)
-    end = (end or _now()).astimezone(UTC)
+    end = (end or utcnow()).astimezone(UTC)
     return ExportWindow(
         organization_id=organization_id,
         organization_name=org.name if org else "",

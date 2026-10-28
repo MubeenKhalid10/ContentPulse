@@ -30,14 +30,15 @@ import json
 import random
 import time
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 from app.ai import limits
 from app.ai.limits import QuotaExceeded, QuotaLimiter, estimate_tokens, quota_limiter
 from app.ai.metrics import metrics
 from app.ai.provider import AIError, AIErrorKind, AIProvider, StructuredResult
+from app.core.clock import utcnow
 from app.core.config import Settings
+from app.core.errors import require
 from app.core.logging import logger
 
 CACHE_VERSION = 1
@@ -184,10 +185,6 @@ async def record(**row: Any) -> None:
     )
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 def _total(a: int | None, b: int | None) -> int | None:
     return None if a is None and b is None else (a or 0) + (b or 0)
 
@@ -204,7 +201,8 @@ class LLMGateway:
         settings: Settings,
         limiter: QuotaLimiter | None = None,
     ) -> None:
-        assert adapters, "the gateway needs at least one model"
+        if not adapters:
+            raise ValueError("the gateway needs at least one model")
         self.adapters = adapters
         self.settings = settings
         self.limiter = limiter or quota_limiter
@@ -255,7 +253,7 @@ class LLMGateway:
             hit = await llm_cache.get(cache_key)
             if hit is not None:
                 metrics.inc("llm_cache_hits_total", workflow=workflow)
-                now = _now()
+                now = utcnow()
                 await record(
                     **base,
                     provider=hit["provider"],
@@ -293,7 +291,7 @@ class LLMGateway:
         for index, adapter in enumerate(self.adapters):
             fallback_used = index > 0
             if fallback_used:
-                assert last_error is not None
+                last_error = require(last_error, "last_error")
                 logger.warning(
                     "%s: %s/%s failed (%s); falling back to %s/%s",
                     workflow,
@@ -346,7 +344,7 @@ class LLMGateway:
                 metrics.observe("llm_queue_wait_seconds", waited, **labels)
                 metrics.inc("llm_requests_total", **labels)
                 metrics.gauge("llm_concurrency", 1, provider=adapter.name, model=adapter.model)
-                started_at, started = _now(), limits.monotonic()
+                started_at, started = utcnow(), limits.monotonic()
                 row = {
                     **base,
                     "provider": adapter.name,
@@ -375,7 +373,7 @@ class LLMGateway:
                         error_kind=exc.kind.value,
                         error_detail=exc.message,
                         latency_ms=int(elapsed * 1000),
-                        completed_at=_now(),
+                        completed_at=utcnow(),
                         usage_unavailable=True,
                     )
                     last_error = exc
@@ -446,7 +444,7 @@ class LLMGateway:
                         error_kind="application_error",
                         error_detail=type(exc).__name__,
                         latency_ms=int(elapsed * 1000),
-                        completed_at=_now(),
+                        completed_at=utcnow(),
                         usage_unavailable=True,
                     )
                     raise
@@ -467,7 +465,7 @@ class LLMGateway:
                     **row,
                     status="succeeded",
                     latency_ms=int(elapsed * 1000),
-                    completed_at=_now(),
+                    completed_at=utcnow(),
                     input_tokens=result.input_tokens,
                     output_tokens=result.output_tokens,
                     total_tokens=total,
@@ -485,7 +483,7 @@ class LLMGateway:
                     )
                 return result
 
-        assert last_error is not None
+        last_error = require(last_error, "last_error")
         if len(self.adapters) > 1:
             raise AIError(
                 last_error.kind,

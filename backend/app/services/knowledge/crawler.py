@@ -7,15 +7,16 @@ are spread across a small number of concurrent workers with a polite delay.
 """
 
 import asyncio
-import gzip
 import heapq
 import itertools
+import zlib
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from urllib.robotparser import RobotFileParser
 
 from bs4 import BeautifulSoup
 
+from app.core.errors import require
 from app.core.logging import logger
 from app.services.knowledge.extractor import ExtractedPage, extract_page
 from app.services.knowledge.fetcher import FetchError, SafeFetcher
@@ -23,6 +24,31 @@ from app.services.knowledge.urls import in_scope, normalize_url, path_depth, sho
 
 MAX_SITEMAP_FILES = 10
 MAX_SITEMAP_URLS = 5000
+# The sitemap protocol's own limit on an uncompressed file.
+MAX_SITEMAP_BYTES = 50 * 1024 * 1024
+# Links remembered per crawl: a page farm can't grow the queue without bound.
+MAX_KNOWN_URLS = 50_000
+
+
+def _parse_sitemap(body: bytes) -> tuple[list[str], list[str]] | None:
+    """(nested sitemap locs, page locs), or None if unreadable or too large.
+    Blocking (decompression + XML parsing): call it off the event loop."""
+    if body[:2] == b"\x1f\x8b":
+        # Bounded output: a few MB of gzip can otherwise expand to gigabytes.
+        inflater = zlib.decompressobj(wbits=31)
+        try:
+            body = inflater.decompress(body, MAX_SITEMAP_BYTES + 1)
+        except zlib.error:
+            return None
+        if len(body) > MAX_SITEMAP_BYTES or inflater.unconsumed_tail:
+            return None
+    soup = BeautifulSoup(body, "xml")
+    return (
+        [loc.get_text(strip=True) for loc in soup.select("sitemap > loc")],
+        [loc.get_text(strip=True) for loc in soup.select("url > loc")],
+    )
+
+
 DEFAULT_DELAY = 0.25
 MAX_DELAY = 5.0
 
@@ -77,7 +103,8 @@ class SiteCrawler:
     def _enqueue(self, raw: str, base: str | None = None) -> None:
         url = normalize_url(raw, base)
         if (
-            url is None
+            len(self._seen) >= MAX_KNOWN_URLS
+            or url is None
             or url in self._seen
             or not in_scope(url, self.root)
             or should_skip(url)
@@ -92,7 +119,7 @@ class SiteCrawler:
     async def _load_robots(self) -> list[str]:
         """Parse robots.txt; return the sitemap URLs it declares."""
         robots_url = normalize_url("/robots.txt", self.root)
-        assert robots_url
+        robots_url = require(robots_url, "robots.txt URL")
         try:
             result = await self.fetcher.get(robots_url)
         except FetchError:
@@ -122,16 +149,12 @@ class SiteCrawler:
                 continue
             if result.status_code != 200:
                 continue
-            body = result.content
-            if body[:2] == b"\x1f\x8b":
-                try:
-                    body = gzip.decompress(body)
-                except OSError:
-                    continue
-            soup = BeautifulSoup(body, "xml")
-            for loc in soup.select("sitemap > loc"):
-                pending.append(loc.get_text(strip=True))
-            found.extend(loc.get_text(strip=True) for loc in soup.select("url > loc"))
+            parsed = await asyncio.to_thread(_parse_sitemap, result.content)
+            if parsed is None:
+                continue
+            nested, urls = parsed
+            pending.extend(nested)
+            found.extend(urls)
         return found[:MAX_SITEMAP_URLS]
 
     # -- fetching ------------------------------------------------------------

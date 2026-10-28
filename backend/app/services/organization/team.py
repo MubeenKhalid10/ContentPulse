@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -129,7 +129,11 @@ async def invite_member(
         body=text,
         html=html,
     )
-    return InviteResponse(member=to_read(member), invite_url=invite_url, email_sent=email_sent)
+    return InviteResponse(
+        member=to_read(member),
+        invite_url=None if email_sent else invite_url,
+        email_sent=email_sent,
+    )
 
 
 async def _ensure_admin_remains(
@@ -213,5 +217,21 @@ async def remove_member(
         entity_id=member.id,
         old_value={"email": member.user.email, "role": member.role, "status": member.status},
     )
+    invitee = member.user
+    pending_invite = member.status == MemberStatus.INVITED
     await db.delete(member)
+    await db.flush()
+    # Withdrawing an invitation also removes the password-less placeholder it
+    # created, or that address could never register on its own.
+    if (
+        pending_invite
+        and invitee.password_hash is None
+        and invitee.external_auth_id is None
+        and not await db.scalar(
+            select(func.count())
+            .select_from(OrganizationMember)
+            .where(OrganizationMember.user_id == invitee.id)
+        )
+    ):
+        await db.delete(invitee)
     await db.commit()
