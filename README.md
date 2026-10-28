@@ -59,7 +59,7 @@ This repository follows the MVP → production technical specification.
 
 ## Quick start
 
-Prerequisites: Docker, [uv](https://docs.astral.sh/uv/), Node 20+.
+Prerequisites: Docker, [uv](https://docs.astral.sh/uv/), Node 22.
 
 ```bash
 cp .env.example .env                 # defaults work for local dev
@@ -108,7 +108,8 @@ endpoint returning 1536-dim vectors works via `EMBEDDING_BASE_URL`), then click
 ## Tests
 
 ```bash
-cd backend && uv run pytest          # 201 tests (hermetic: ignores your .env keys)
+cd backend && uv run pytest          # ~700 tests (hermetic: ignores your .env keys; needs a local
+                                     # Postgres whose database name contains "test")
 
 # E2E: API + web must be running. Start the API with
 #   CRAWLER_ALLOW_PRIVATE_NETWORKS=true  (knowledge spec crawls a local fixture site)
@@ -120,7 +121,33 @@ cd backend && uv run pytest          # 201 tests (hermetic: ignores your .env ke
 cd frontend && npx playwright install chromium && npm run test:e2e   # one spec at a time; E2E_WORKERS=3 to parallelize
 ```
 
-Backend tests run real migrations (down + up) against Postgres and cover auth, tenant
+Also start the E2E API with `RATE_LIMIT_BACKEND=memory` and `EMBEDDING_PROVIDER=none`
+(repeated sign-ups otherwise hit the sign-up limit, and the specs need no embeddings).
+
+The backend suite points at `TEST_DATABASE_URL` (default
+`postgresql+asyncpg://contentpulse:contentpulse@localhost:5434/contentpulse_test`, the
+database the Docker Compose Postgres creates).
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`:
+
+| Job | Checks |
+|-----|--------|
+| Backend | `ruff check`, `ruff format --check`, the full `pytest` suite on a `pgvector` Postgres |
+| Frontend | `npm run lint`, `npm run typecheck`, `npm run build` |
+| Terraform | `terraform fmt -check` and `terraform validate` (no cloud access) |
+
+The Playwright E2E specs need the whole stack running, so they are run by hand (above).
+Run the same checks locally before opening a pull request:
+
+```bash
+cd backend && uv run ruff check . && uv run ruff format --check . && uv run pytest
+cd frontend && npm run lint && npm run typecheck && npm run build
+```
+
+Backend tests reset a throwaway Postgres schema and run every migration against it. They
+refuse to run against a non-local or non-test database. They cover auth, tenant
 isolation, RBAC, invitations, the last-admin guard, audit diffs and the state machine. The
 E2E test drives signup → onboarding → profile/services/brand/settings → invite → designer
 accepts → read-only RBAC → activity log → sign out. The knowledge E2E crawls a fixture
@@ -136,19 +163,25 @@ fake embedder, so the real pgvector and full-text queries run without network ac
 backend/
   app/
     ai/             LLM gateway, provider adapters, quotas, metrics, embeddings (spec §57)
-    api/v1/         auth, organizations (incl. team + audit), knowledge, dashboard
-    core/           config, errors (spec §55 envelope), security, permissions (RBAC)
+    api/v1/         HTTP routes: auth, organizations (team, audit), knowledge, trends,
+                    topics, content, design, approvals, dashboard, storage
+    core/           config, errors (spec §55 envelope), security, permissions (RBAC),
+                    rate limits, clock
     models/         all core tables (§72) + prompt_templates
     schemas/        Pydantic request/response models
-    services/       auth, organization/team, audit, workflow (state machines), dashboard
+    services/       auth, organization/team, audit, workflow (state machines), dashboard,
+                    trends, alignment, topics, content, design, approvals
+      design/       design tasks; lookup + brief_state keep a brief's status rules in one place
       knowledge/    urls, fetcher (SSRF-safe), crawler, extractor, chunker, indexer, search
     workers/        job dispatch (in-process or Celery), Celery app + beat, crawl/trend jobs, scheduler
     storage/        creative storage: S3 or local signed URLs
     db/migrations/  Alembic
   tests/
-frontend/           see frontend/README.md
+frontend/           Next.js app (see frontend/README.md); e2e/ holds the Playwright specs
 infra/postgres/     DB init (pgvector, test and E2E databases)
 infra/aws/          optional AWS deployment: Terraform + deploy.sh (see its README)
+docs/               deployment, production checklist, LLM gateway, provider cache, cron
+.github/            CI workflow and pull request template
 docker-compose.yml  infrastructure by default; `--profile app` for the full container stack
 ```
 
@@ -227,16 +260,19 @@ below mention content managers and designers: both are now the Creator role (mig
   | Limit | Window | Key |
   |-------|--------|-----|
   | Every `/api` request: 600 (`API_RATE_LIMIT_PER_MINUTE`) | 1 min | client IP |
-  | Sign-in: 30 per IP, 10 per account | 15 min | IP / email |
+  | Sign-in: 30 per IP, 10 per account and IP, 100 per account from anywhere | 15 min | IP / email |
   | Sign-up: 20 | 1 hour | IP |
+  | Password reset: 10 per IP, 3 per account | 1 hour | IP / email |
   | Accepting invitations: 30 | 1 hour | IP |
+  | Sending invitations: 20 per admin, 50 per organization | 1 hour | user / organization |
   | AI and heavy jobs (generate, regenerate, variants, strategy drafts, analyze, discover): 30 | 1 min | user |
 
   Over a limit, the API returns `429 RATE_LIMITED` with a `Retry-After` header. Client IPs
   come from `X-Forwarded-For` only for the number of trusted proxy hops
   (`TRUSTED_PROXY_COUNT`, counted from the right), so clients can't choose their own bucket.
-- **Health:** `/health/live` checks that the process is up; `/health` checks that the
-  database answers (the load balancer uses it).
+- **Health:** `/health/live` checks that the process is up (the load balancer and the
+  container health check use it); `/health` also checks that the database answers.
+  `/health/metrics` is off in production unless `METRICS_TOKEN` is set.
 - **Images:** one backend image (the API by default; the worker and beat override the
   command) and a standalone Next.js image. Migrations run as their own step, never on every
   container start.
@@ -244,13 +280,18 @@ below mention content managers and designers: both are now the Creator role (mig
 ### Authentication modes
 
 - **`AUTH_PROVIDER=local`** (default): email/password with an httpOnly session cookie.
+  Sessions carry a version (`users.token_version`): changing or resetting the password, or
+  signing out, ends every session issued before. Password-reset links carry the token in
+  the URL fragment (`/reset-password#token=...`), so it never reaches server logs.
 - **`AUTH_PROVIDER=supabase`:** the web app reads `GET /auth/config` at runtime and signs in
   through Supabase Auth (`@supabase/ssr`, session in `sb-*-auth-token` cookies), so it needs
   no separate config. Each API call sends the Supabase access token as a Bearer token. The
   API verifies it against the project's JWKS (ES256/RS256, cached, refetched on key
   rotation), checking audience `authenticated` and the project issuer. The legacy HS256
   secret is also accepted. The first request provisions or links the ContentPulse user (by
-  Supabase user id, then email), and the API's password endpoints return 403. To accept an
+  Supabase user id, then by email only when Supabase reports that email as verified), and
+  the API's password endpoints return 403. Turn on "Confirm email" in Supabase so invited
+  addresses can be claimed. To accept an
   invitation, you need a Supabase session for the invited email address.
 - If CAPTCHA protection is enabled in Supabase Auth, set `TURNSTILE_SITE_KEY` to the
   Cloudflare Turnstile site key from the same Auth settings. The frontend renders the
@@ -530,6 +571,11 @@ goes through `app/ai/gateway.py`. Full guide: [docs/llm-gateway.md](docs/llm-gat
   spec's "Services, Products, Expertise" without three tables.
 - Trends are organization-scoped (each org tracks its own markets and keywords).
 - Post statuses add `final` after `approved`, per the §54 state machine.
+
+## Contributing
+
+Work on a branch, open a pull request and wait for CI to pass: see
+[CONTRIBUTING.md](CONTRIBUTING.md) for the branch and commit-message conventions.
 
 ## Going to production
 
