@@ -2,8 +2,8 @@
 # image, and a one-off migration task that deploy.sh runs before each rollout.
 
 resource "aws_ecr_repository" "repo" {
-  for_each             = toset(["api", "web"])
-  name                 = "${local.name}-${each.key}"
+  for_each = toset(["api", "web"])
+  name     = "${local.name}-${each.key}"
   # A tag always names the same image: deploy.sh pushes one release tag per
   # build, so a rollback goes to a different image, never a re-pushed one.
   image_tag_mutability = "IMMUTABLE"
