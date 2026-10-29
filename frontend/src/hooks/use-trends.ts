@@ -145,10 +145,38 @@ export function useDiscover() {
   });
 }
 
-export const useToggleSource = () =>
-  useTrendMutation(({ key, enabled }: { key: string; enabled: boolean }) =>
-    api<TrendSourceInfo[]>(`/trends/sources/${key}`, { method: "PATCH", body: { enabled } }),
-  );
+/** Flips the switch straight away and rolls back if the save fails (it used to wait for the
+ * save and the refetch after it, so the switch lagged a few seconds behind the click). */
+export function useToggleSource() {
+  const orgId = useOrgId();
+  const queryClient = useQueryClient();
+  const sourcesKey = [...root(orgId ?? "none"), "sources"];
+  return useMutation({
+    mutationFn: ({ key, enabled }: { key: string; enabled: boolean }) =>
+      api<TrendSourceInfo[]>(`/trends/sources/${key}`, { method: "PATCH", body: { enabled } }),
+    onMutate: async ({ key, enabled }) => {
+      await queryClient.cancelQueries({ queryKey: sourcesKey });
+      const previous = queryClient.getQueryData<TrendSourceInfo[]>(sourcesKey);
+      queryClient.setQueryData<TrendSourceInfo[]>(sourcesKey, (list) =>
+        list?.map((s) => (s.key === key ? { ...s, enabled } : s)),
+      );
+      return { previous };
+    },
+    onError: (_e, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(sourcesKey, context.previous);
+    },
+    onSuccess: (sources) => {
+      queryClient.setQueryData(sourcesKey, sources);
+      // The feed, topics and dashboard depend on which sources are on.
+      queryClient.invalidateQueries({
+        queryKey: root(orgId!),
+        predicate: (q) => q.queryKey[root(orgId!).length] !== "sources",
+      });
+      queryClient.invalidateQueries({ queryKey: ["org", orgId, "topics"] });
+      queryClient.invalidateQueries({ queryKey: ["org", orgId, "dashboard"] });
+    },
+  });
+}
 
 export const useTrendAction = () =>
   useTrendMutation(({ id, action }: { id: string; action: "shortlist" | "reject" | "restore" }) =>
