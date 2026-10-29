@@ -40,11 +40,11 @@ export function SidebarNav({
   const pathname = usePathname();
   const current = activeHref(pathname);
   const counts = useAttention().data;
-  // How many things are waiting on this person, shown as a badge on the step.
+  // How many things are waiting on this person, shown as a badge on the step. Find trends has
+  // none: its count (relevant trends awaiting a decision) matched none of the Trends tabs.
   const can = (p: string) => me.permissions.includes(p as Me["permissions"][number]);
   const attention: Record<string, number> = counts
     ? {
-        "/trends": can("trends.manage") || can("topics.manage") ? counts.to_review : 0,
         "/design": can("design.upload") ? counts.design : 0,
         "/approvals": can("approval.manage") ? counts.approvals : 0,
       }
