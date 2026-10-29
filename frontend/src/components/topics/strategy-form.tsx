@@ -103,6 +103,8 @@ export function StrategyForm({
   // Editing a plan that already has its post: just save.
   const hasPost = !!editing && (topicPosts.data?.items ?? []).some((p) => p.content_strategy_id === editing.id);
   const saving = create.isPending || update.isPending || generate.isPending;
+  // Which footer button started the save, so only that one spins.
+  const [writing, setWriting] = useState(false);
   const failure = create.error ?? update.error;
 
   const select = (next: Platform[]) => {
@@ -174,6 +176,7 @@ export function StrategyForm({
 
   // "Write post": save the plan, then write the post from it right away.
   const submitWith = (write: boolean) => form.handleSubmit(async (values) => {
+    setWriting(write);
     if (multi) {
       const saved: Strategy[] = [];
       const all = { ...drafts, [platform]: values };
@@ -313,7 +316,7 @@ export function StrategyForm({
           />
         </FormField>
         )}
-        <Button type="button" variant="outline" onClick={multi ? runSuggestAll : runSuggest} disabled={suggest.isPending}>
+        <Button type="button" variant="outline" onClick={multi ? runSuggestAll : runSuggest} disabled={suggest.isPending} pending={suggest.isPending}>
           {ai.data?.engine === "ai" ? <SparklesIcon /> : <WandSparklesIcon />}
           {suggest.isPending
             ? "Drafting…"
@@ -508,10 +511,10 @@ export function StrategyForm({
         </Button>
         {canGenerate && !hasPost ? (
           <>
-            <Button type="button" variant="outline" disabled={saving} onClick={submitWith(false)}>
+            <Button type="button" variant="outline" disabled={saving} pending={saving && !writing} onClick={submitWith(false)}>
               {editing ? "Save changes" : multi ? "Save Plan Drafts" : "Save Plan Draft"}
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving} pending={saving && writing}>
               <SparklesIcon />
               {generate.isPending ? "Starting…" : saving ? "Saving…" : multi ? `Write ${selected.length} posts` : isBlog ? "Write article" : "Write post"}
             </Button>

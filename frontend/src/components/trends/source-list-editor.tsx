@@ -124,6 +124,7 @@ function ListForm({
             type="button"
             size="sm"
             disabled={update.isPending}
+            pending={update.isPending}
             onClick={save}
           >
             {update.isPending ? "Saving…" : "Save"}

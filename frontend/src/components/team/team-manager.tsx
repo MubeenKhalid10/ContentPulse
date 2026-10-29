@@ -259,6 +259,7 @@ function RemoveMemberDialog({ member, onClose }: { member: Member | undefined; o
           <AlertDialogAction
             variant="destructive"
             disabled={remove.isPending}
+            pending={remove.isPending}
             onClick={() =>
               member &&
               remove.mutate(member.id, {

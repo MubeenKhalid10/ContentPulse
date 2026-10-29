@@ -99,6 +99,7 @@ export function DangerZone() {
             <AlertDialogAction
               variant="destructive"
               disabled={remove.isPending || !confirmed}
+              pending={remove.isPending}
               onClick={() =>
                 remove.mutate(undefined, {
                   onSuccess: async () => {

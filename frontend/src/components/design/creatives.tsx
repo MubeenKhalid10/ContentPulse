@@ -79,8 +79,10 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
     task.creatives.length > 0 &&
     ["design_pending", "design_in_progress", "design_uploaded", "changes_requested"].includes(task.post.status);
   const busy = upload.isPending || submit.isPending;
+  const [submitting, setSubmitting] = useState(false);
 
   const send = async (andSubmit: boolean) => {
+    setSubmitting(andSubmit);
     try {
       if (files.length) {
         await upload.mutateAsync({ taskId: task.id, files, note: note.trim() || undefined, onProgress: setProgress });
@@ -187,7 +189,7 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
         )}
         {canSubmit ? (
           <div className="grid gap-1.5">
-            <Button onClick={() => send(true)} disabled={busy || (!files.length && !canResubmitCurrent)}>
+            <Button onClick={() => send(true)} disabled={busy || (!files.length && !canResubmitCurrent)} pending={busy && submitting}>
               <SendIcon />
               {upload.isPending
                 ? "Uploading…"
@@ -202,14 +204,14 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
               Submitting locks the design until an admin approves it or asks for changes.
             </p>
             {files.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => send(false)} disabled={busy}>
+              <Button variant="ghost" size="sm" onClick={() => send(false)} disabled={busy} pending={busy && !submitting}>
                 <UploadCloudIcon />
                 Upload only (don&apos;t submit yet)
               </Button>
             )}
           </div>
         ) : (
-          <Button onClick={() => send(false)} disabled={!files.length || busy}>
+          <Button onClick={() => send(false)} disabled={!files.length || busy} pending={busy}>
             <UploadCloudIcon />
             {upload.isPending ? "Uploading…" : "Upload"}
           </Button>
@@ -312,6 +314,7 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
                 variant="outline"
                 className="w-fit"
                 disabled={use.isPending}
+                pending={use.isPending && use.variables?.version === v.version}
                 onClick={() =>
                   use.mutate(
                     { id: task.id, version: v.version },

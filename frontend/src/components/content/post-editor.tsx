@@ -295,7 +295,7 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
           <Button type="button" variant="outline" disabled={!isDirty || update.isPending} onClick={() => setDiscardOpen(true)}>
             Discard
           </Button>
-          <Button type="submit" disabled={!isDirty || update.isPending}>
+          <Button type="submit" disabled={!isDirty || update.isPending} pending={update.isPending}>
             <SaveIcon />
             {update.isPending ? "Saving…" : "Save version"}
           </Button>

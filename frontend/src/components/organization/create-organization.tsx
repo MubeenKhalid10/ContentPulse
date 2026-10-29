@@ -200,7 +200,7 @@ export function CreateOrganization() {
                 )}
               />
             </FormField>
-            <Button type="submit" size="lg" disabled={create.isPending}>
+            <Button type="submit" size="lg" disabled={create.isPending} pending={create.isPending}>
               {create.isPending ? "Creating…" : "Create organization"}
             </Button>
           </form>

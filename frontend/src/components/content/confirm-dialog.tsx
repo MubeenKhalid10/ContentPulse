@@ -43,6 +43,7 @@ export function ConfirmDialog({
           <AlertDialogAction
             variant={destructive ? "destructive" : "default"}
             disabled={pending}
+            pending={pending}
             onClick={() => {
               onOpenChange(false);
               onConfirm();

@@ -172,7 +172,7 @@ function ProfileCard({ me }: { me: Me }) {
             >
               Reset
             </Button>
-            <Button type="submit" disabled={!isDirty || save.isPending}>
+            <Button type="submit" disabled={!isDirty || save.isPending} pending={save.isPending}>
               {save.isPending ? "Saving…" : "Save changes"}
             </Button>
           </div>
@@ -324,7 +324,7 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
               {show ? <EyeOffIcon /> : <EyeIcon />}
               {show ? "Hide passwords" : "Show passwords"}
             </Button>
-            <Button type="submit" disabled={change.isPending}>
+            <Button type="submit" disabled={change.isPending} pending={change.isPending}>
               {change.isPending ? "Changing…" : "Change password"}
             </Button>
           </div>
@@ -475,6 +475,7 @@ function SessionCard() {
           variant="outline"
           onClick={() => logout.mutate()}
           disabled={logout.isPending}
+          pending={logout.isPending}
         >
           <LogOutIcon /> Sign out on this device
         </Button>

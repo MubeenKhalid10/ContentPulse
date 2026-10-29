@@ -175,6 +175,7 @@ export function TrendsExplorer() {
           canDiscover && (
             <Button
               disabled={running || discover.isPending || enabledCount === 0}
+              pending={running || discover.isPending}
               title={
                 enabledCount === 0
                   ? "Turn on at least one source in Discovery Sources first."
@@ -233,6 +234,7 @@ export function TrendsExplorer() {
                 <Button
                   onClick={runDiscovery}
                   disabled={discover.isPending}
+                  pending={discover.isPending}
                 >
                   <RadarIcon />
                   Check for new trends

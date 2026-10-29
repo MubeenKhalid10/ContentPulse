@@ -195,6 +195,7 @@ function SupabaseAcceptForm({
           size="sm"
           onClick={signOut}
           disabled={signingOut}
+          pending={signingOut}
           className="mt-3 block"
         >
           {signingOut ? "Signing out…" : "Sign out"}
@@ -272,7 +273,7 @@ function ConfirmJoin({
               />
             </FormField>
           )}
-          <Button type="submit" size="lg" disabled={join.isPending}>
+          <Button type="submit" size="lg" disabled={join.isPending} pending={join.isPending}>
             {join.isPending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>
         </form>
@@ -408,7 +409,7 @@ function SupabaseIdentityForm({
             />
           </FormField>
           <AuthCaptcha key={captchaKey} onToken={setCaptchaToken} />
-          <Button type="submit" size="lg" disabled={pending}>
+          <Button type="submit" size="lg" disabled={pending} pending={pending}>
             {pending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
@@ -493,7 +494,7 @@ function AcceptForm({
               {...form.register("password")}
             />
           </FormField>
-          <Button type="submit" size="lg" disabled={accept.isPending}>
+          <Button type="submit" size="lg" disabled={accept.isPending} pending={accept.isPending}>
             {accept.isPending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>
         </form>

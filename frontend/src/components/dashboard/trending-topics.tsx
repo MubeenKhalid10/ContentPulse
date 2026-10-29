@@ -245,6 +245,7 @@ function TrendingRow({ topic: t }: { topic: DashboardTrendingTopic }) {
             variant="outline"
             size="sm"
             disabled={action.isPending && action.variables?.id === t.id}
+            pending={action.isPending && action.variables?.id === t.id}
             aria-label={`Shortlist ${t.topic}`}
             onClick={() =>
               action.mutate(

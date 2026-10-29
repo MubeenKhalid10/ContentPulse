@@ -37,19 +37,21 @@ function RejectButton({
   title,
   variant,
   disabled,
+  pending = false,
   onConfirm,
   ariaLabel,
 }: {
   title: string;
   variant: "ghost" | "outline";
   disabled: boolean;
+  pending?: boolean;
   onConfirm: () => void;
   ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" variant={variant} disabled={disabled} aria-label={ariaLabel} onClick={() => setOpen(true)}>
+      <Button size="sm" variant={variant} disabled={disabled} pending={pending} aria-label={ariaLabel} onClick={() => setOpen(true)}>
         <XIcon />
         Reject
       </Button>
@@ -93,11 +95,13 @@ export function TopicActions({ topic, compact = false }: { topic: Topic; compact
       },
     );
   const busy = action.isPending || remove.isPending;
+  const running = (kind: TopicAction) => action.isPending && action.variables?.action === kind;
   const deleteButton = (
     <DeleteButton
       title={`Delete “${topic.title}”?`}
       description="This permanently deletes the topic, its post plans and its trend. Posts already written for it are kept. This can't be undone."
-      pending={busy}
+      pending={remove.isPending}
+      disabled={action.isPending}
       onConfirm={() =>
         remove.mutate(topic.id, {
           onSuccess: () => {
@@ -114,7 +118,7 @@ export function TopicActions({ topic, compact = false }: { topic: Topic; compact
   if (topic.status === "rejected") {
     return (
       <div className="flex flex-wrap gap-1.5">
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => run("restore")}>
+        <Button variant="outline" size="sm" disabled={busy} pending={running("restore")} onClick={() => run("restore")}>
           <RotateCcwIcon />
           Restore
         </Button>
@@ -135,7 +139,7 @@ export function TopicActions({ topic, compact = false }: { topic: Topic; compact
     return (
       <div className="flex flex-wrap gap-1.5">
         {topic.strategy_count === 0 ? (
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => run("review")}>
+          <Button size="sm" variant="outline" disabled={busy} pending={running("review")} onClick={() => run("review")}>
             <Undo2Icon />
             Remove from shortlist
           </Button>
@@ -147,14 +151,21 @@ export function TopicActions({ topic, compact = false }: { topic: Topic; compact
             </Button>
           </span>
         )}
-        <RejectButton title={topic.title} variant="ghost" disabled={busy} onConfirm={() => run("reject")} />
+        <RejectButton title={topic.title} variant="ghost" disabled={busy} pending={running("reject")} onConfirm={() => run("reject")} />
         {deleteButton}
       </div>
     );
   }
   return (
     <div className="flex flex-wrap gap-1.5">
-      <Button size="sm" variant="success" disabled={busy} aria-label={`Shortlist ${topic.title}`} onClick={() => run("shortlist")}>
+      <Button
+        size="sm"
+        variant="success"
+        disabled={busy}
+        pending={running("shortlist")}
+        aria-label={`Shortlist ${topic.title}`}
+        onClick={() => run("shortlist")}
+      >
         <CheckIcon />
         Shortlist
       </Button>
@@ -162,6 +173,7 @@ export function TopicActions({ topic, compact = false }: { topic: Topic; compact
         title={topic.title}
         variant="ghost"
         disabled={busy}
+        pending={running("reject")}
         ariaLabel={`Reject ${topic.title}`}
         onConfirm={() => run("reject")}
       />

@@ -251,6 +251,7 @@ function DeleteDocumentDialog({ doc, onClose }: { doc?: KnowledgeDocument; onClo
           <AlertDialogAction
             variant="destructive"
             disabled={remove.isPending}
+            pending={remove.isPending}
             onClick={() =>
               doc &&
               remove.mutate(doc.id, {

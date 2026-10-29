@@ -104,7 +104,7 @@ function CrawlForm({ websiteUrl, onClose }: { websiteUrl: string | null; onClose
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={start.isPending}>
+        <Button type="submit" disabled={start.isPending} pending={start.isPending}>
           {start.isPending ? "Starting…" : "Start crawl"}
         </Button>
       </DialogFooter>
@@ -192,7 +192,7 @@ function DocumentForm({ editing, onClose }: { editing: KnowledgeDocumentDetail |
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending} pending={pending}>
           {pending ? "Saving…" : editing ? "Save" : "Add document"}
         </Button>
       </DialogFooter>

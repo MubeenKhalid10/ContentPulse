@@ -33,7 +33,8 @@ export function TrendActions({
     <DeleteButton
       title={`Delete “${trend.topic}”?`}
       description="This permanently deletes the trend, its evidence and its topic with any post plans. Posts already written for it are kept. This can't be undone."
-      pending={action.isPending || remove.isPending}
+      pending={remove.isPending}
+      disabled={action.isPending}
       onConfirm={() =>
         remove.mutate(trend.id, {
           onSuccess: () => {
@@ -54,6 +55,7 @@ export function TrendActions({
           variant="outline"
           size="sm"
           disabled={action.isPending}
+          pending={action.isPending}
           title="Move this trend back to To review"
           onClick={() =>
             action.mutate(
@@ -86,6 +88,7 @@ export function TrendActions({
         size="sm"
         variant="success"
         disabled={action.isPending}
+        pending={action.isPending && action.variables?.action === "shortlist"}
         aria-label={`Shortlist ${trend.topic}`}
         onClick={() =>
           action.mutate(
@@ -112,6 +115,7 @@ export function TrendActions({
           size="sm"
           variant="ghost"
           disabled={action.isPending}
+          pending={action.isPending && action.variables?.action === "reject"}
           aria-label={`Reject ${trend.topic}`}
           onClick={() =>
             action.mutate(

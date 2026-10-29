@@ -62,7 +62,7 @@ export function KnowledgeSearch({ onOpenDocument }: { onOpenDocument: (id: strin
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <Button type="submit" variant="outline" disabled={!query.trim() || search.isPending}>
+          <Button type="submit" variant="outline" disabled={!query.trim() || search.isPending} pending={search.isPending}>
             <SearchIcon />
             {search.isPending ? "Searching…" : "Search"}
           </Button>

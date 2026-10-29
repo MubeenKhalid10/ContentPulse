@@ -136,7 +136,7 @@ export default function RegisterPage() {
             />
           </FormField>
           <AuthCaptcha key={captchaKey} onToken={setCaptchaToken} />
-          <Button type="submit" size="lg" disabled={register.isPending}>
+          <Button type="submit" size="lg" disabled={register.isPending} pending={register.isPending}>
             {register.isPending ? "Creating account…" : "Create account"}
           </Button>
           <p className="text-center text-sm text-muted-foreground">

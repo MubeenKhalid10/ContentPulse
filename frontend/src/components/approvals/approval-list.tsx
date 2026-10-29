@@ -268,6 +268,7 @@ export function ApprovalList() {
             className="ml-auto"
             size="sm"
             disabled={approveAll.isPending}
+            pending={approveAll.isPending}
             onClick={() => setConfirmOpen(true)}
           >
             <CheckIcon />

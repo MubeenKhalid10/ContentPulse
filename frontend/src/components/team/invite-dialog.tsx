@@ -105,7 +105,7 @@ function InviteFlow({
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={invite.isPending}>
+        <Button type="submit" disabled={invite.isPending} pending={invite.isPending}>
           {invite.isPending ? "Creating…" : initial ? "Create new link" : "Create invite link"}
         </Button>
       </DialogFooter>

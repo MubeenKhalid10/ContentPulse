@@ -102,6 +102,7 @@ export function ChangesDialog({
           {/* A plain button: the dialog stays open if the request fails. */}
           <Button
             disabled={!note.trim() || mutation.isPending}
+            pending={mutation.isPending}
             onClick={() =>
               mutation.mutate(
                 { id: a.id, comment: note.trim(), scope: copyStage ? "both" : scope },

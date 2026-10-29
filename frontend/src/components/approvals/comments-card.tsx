@@ -61,7 +61,7 @@ export function CommentsCard({ approval: a }: { approval: ApprovalDetail }) {
           >
             <Textarea aria-label="Add a comment" rows={2} maxLength={4000} placeholder="Add a comment" value={body} onChange={(e) => setBody(e.target.value)} />
             <p className="text-right text-xs tabular-nums text-muted-foreground">{body.length} / 4000</p>
-            <Button type="submit" size="sm" variant="outline" className="justify-self-end" disabled={!body.trim() || add.isPending}>
+            <Button type="submit" size="sm" variant="outline" className="justify-self-end" disabled={!body.trim() || add.isPending} pending={add.isPending}>
               <MessageSquarePlusIcon />
               {add.isPending ? "Posting…" : "Comment"}
             </Button>

@@ -145,6 +145,7 @@ export function PostColors({
             type="button"
             size="sm"
             disabled={update.isPending || tooLong}
+            pending={update.isPending}
             onClick={() =>
               save(
                 cleaned.length ? cleaned : null,
@@ -174,6 +175,7 @@ export function PostColors({
                 variant="ghost"
                 size="sm"
                 disabled={update.isPending}
+                pending={update.isPending}
                 onClick={() => save(null, "Back to your brand colors")}
               >
                 <RotateCcwIcon /> Use brand colors

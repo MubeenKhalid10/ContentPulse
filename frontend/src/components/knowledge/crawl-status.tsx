@@ -53,6 +53,7 @@ export function ActiveJob({ job, canManage }: { job: KnowledgeJob; canManage: bo
               variant="outline"
               size="sm"
               disabled={cancel.isPending}
+              pending={cancel.isPending}
               onClick={() => cancel.mutate(job.id, { onError: (e) => toast.error(errorMessage(e)) })}
             >
               Stop crawl

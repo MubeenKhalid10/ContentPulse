@@ -148,7 +148,7 @@ function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => v
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={update.isPending}>
+        <Button type="submit" disabled={update.isPending} pending={update.isPending}>
           {update.isPending ? "Saving…" : "Save brief"}
         </Button>
       </DialogFooter>
