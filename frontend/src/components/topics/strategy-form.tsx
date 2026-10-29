@@ -1,11 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SparklesIcon, WandSparklesIcon } from "lucide-react";
+import { LoaderCircleIcon, SparklesIcon, WandSparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { toast } from "sonner";
 
 import { fieldAria, FormField } from "@/components/shared/form-field";
@@ -162,6 +162,15 @@ export function StrategyForm({
       },
     );
 
+  // A failed check is otherwise only shown next to its field, which may be scrolled out of
+  // view (or hidden, like Post type with several platforms), so the button seemed to do nothing.
+  const onInvalid = (invalid: FieldErrors<Values>) => {
+    const [field, error] = Object.entries(invalid)[0] ?? [];
+    if (!field) return;
+    toast.error(error?.message ?? "Check the highlighted fields.");
+    document.querySelector<HTMLElement>(`[name="${field}"], #strategy-${field.replace("_", "-")}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
+
   // "Write post": save the plan, then write the post from it right away.
   const submitWith = (write: boolean) => form.handleSubmit(async (values) => {
     if (multi) {
@@ -228,6 +237,7 @@ export function StrategyForm({
         onClose();
       },
       onError: (error: unknown) => {
+        toast.error(errorMessage(error));
         if (error instanceof ApiError) {
           for (const [field, message] of Object.entries(error.fieldErrors)) {
             const key = field.replace(/^details\./, "").split(".")[0];
@@ -238,7 +248,7 @@ export function StrategyForm({
     };
     if (editing) update.mutate({ topicId: topic.id, id: editing.id, ...body }, done);
     else create.mutate({ topicId: topic.id, source, ...body }, done);
-  });
+  }, onInvalid);
 
   return (
     <form noValidate className="grid gap-5" onSubmit={submitWith(canGenerate && !hasPost)}>
@@ -494,6 +504,7 @@ export function StrategyForm({
           </>
         ) : (
           <Button type="submit" disabled={saving}>
+            {saving && <LoaderCircleIcon className="animate-spin" />}
             {saving ? "Saving…" : editing ? "Save changes" : "Save Plan Draft"}
           </Button>
         )}
