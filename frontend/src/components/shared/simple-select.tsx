@@ -46,7 +46,8 @@ export function SimpleSelect<T extends string>({
       <SelectTrigger id={id} aria-label={ariaLabel} className={cn("w-full", className)}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent>
+      {/* Open below the trigger (not over it) and grow to fit long labels. */}
+      <SelectContent alignItemWithTrigger={false} align="start" className="w-auto min-w-(--anchor-width) max-w-80">
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {option.label}
