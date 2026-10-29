@@ -78,6 +78,51 @@ async def test_changes_requested_are_listed_apart(client, db):
     assert counts["todo"] == 1 and counts["changes"] == 1
 
 
+async def test_write_posts_lists_only_changes_that_open_the_copy(client, db):
+    admin = await register(client, "admin@acme.example.com")
+    org_id = uuid.UUID((await create_org(admin))["id"])
+    posts = {}
+    for title, status in (
+        ("Design only", PostStatus.CHANGES_REQUESTED),
+        ("Copy and design", PostStatus.CHANGES_REQUESTED),
+        ("Copy only", PostStatus.CHANGES_REQUESTED),
+        ("Copy at copy approval", PostStatus.DRAFT),
+    ):
+        posts[title] = Post(
+            organization_id=org_id, platform=Platform.LINKEDIN, title=title, status=status
+        )
+        db.add(posts[title])
+    await db.flush()
+    for title, scope in (
+        ("Design only", "design"),
+        ("Copy and design", "both"),
+        ("Copy only", "copy"),
+        ("Copy at copy approval", None),
+    ):
+        db.add(
+            ApprovalRequest(
+                organization_id=org_id,
+                post_id=posts[title].id,
+                post_version=1,
+                creative_version=None if scope is None else 1,
+                status=ApprovalStatus.CHANGES_REQUESTED,
+                scope=scope,
+            )
+        )
+    await db.commit()
+
+    body = (await admin.get("/api/v1/content?status=changes")).json()
+    # Design-only changes are the designer's: they aren't on Write posts.
+    assert {i["title"]: i["changes_scope"] for i in body["items"]} == {
+        "Copy and design": "both",
+        "Copy only": "copy",
+        "Copy at copy approval": "copy",
+    }
+    assert body["counts"]["changes"] == 3
+    everything = (await admin.get("/api/v1/content?status=all")).json()["items"]
+    assert {i["title"]: i["changes_scope"] for i in everything}["Design only"] == "design"
+
+
 async def test_only_a_post_with_nothing_written_can_be_deleted_by_a_writer(client, db):
     admin = await register(client, "admin@acme.example.com")
     org = await create_org(admin)

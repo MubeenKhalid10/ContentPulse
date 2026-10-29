@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useDeletePost, useRegenerate } from "@/hooks/use-content";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { POST_STATUS_LABEL } from "@/lib/content";
+import { postStatusLabel } from "@/lib/content";
 import { formatDateTime, timeAgo, timeOfDay } from "@/lib/format";
 import { PLATFORM_LABEL } from "@/lib/topics";
 import { cn } from "@/lib/utils";
@@ -146,7 +146,7 @@ export function PostRow({
           </Tag>
         ) : (
           <Tag tone={POST_STATUS_TONE[post.status]} dot>
-            {POST_STATUS_LABEL[post.status]}
+            {postStatusLabel(post)}
           </Tag>
         )}
         {post.variant_of_id && <Tag tone="neutral">Variant</Tag>}
