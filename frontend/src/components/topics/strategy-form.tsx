@@ -139,7 +139,8 @@ export function StrategyForm({
         selected.map(async (p) => [p, await suggest.mutateAsync({ topicId: topic.id, platform: p })] as const),
       );
       const next: Partial<Record<Platform, Values>> = {};
-      for (const [p, draft] of results) next[p] = toValues(p, draft);
+      // Post type is hidden with several platforms; an empty one falls back to the platform default.
+      for (const [p, draft] of results) next[p] = { ...toValues(p, draft), post_type: draft.post_type || AUTO_POST_TYPE };
       setDrafts(next);
       form.reset(next[selected[0]]);
       setSource(results[0][1].source);
@@ -177,6 +178,19 @@ export function StrategyForm({
       const saved: Strategy[] = [];
       const all = { ...drafts, [platform]: values };
       let failed: Platform | null = null;
+      // Only the draft on screen went through the form's checks; check the others too and
+      // open the first one that fails, instead of sending it and getting a bare 422.
+      for (const p of selected) {
+        const draft = all[p];
+        if (!draft || progress.plans[p]) continue;
+        const check = schema.safeParse({ ...draft, post_type: draft.post_type || AUTO_POST_TYPE });
+        if (check.success) continue;
+        const issue = check.error.issues[0];
+        if (p !== platform) viewDraft(p);
+        form.setError(issue.path[0] as keyof Values, { message: issue.message });
+        toast.error(`${PLATFORM_LABEL[p]}: ${issue.message}`);
+        return;
+      }
       try {
         for (const p of selected) {
           failed = p;
@@ -185,7 +199,7 @@ export function StrategyForm({
             const defaultType = rules.data?.find((r) => r.platform === p)?.post_types[0] ?? "Post";
             const draft = all[p];
             const v: Values = draft
-              ? { ...draft, platform: p, post_type: draft.post_type === AUTO_POST_TYPE ? defaultType : draft.post_type }
+              ? { ...draft, platform: p, post_type: !draft.post_type || draft.post_type === AUTO_POST_TYPE ? defaultType : draft.post_type }
               : { ...values, platform: p, post_type: defaultType, objective: "" };
             plan = await create.mutateAsync({ topicId: topic.id, source, ...toBody(v) });
             progress.plans[p] = plan;
