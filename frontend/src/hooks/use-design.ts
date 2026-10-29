@@ -3,7 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useOrgId } from "@/hooks/use-organization";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, apiList } from "@/lib/api";
 import type { LogoPosition } from "@/lib/logo";
 import type { DesignTaskDetail, DesignTaskFilter, DesignTaskPage, Platform, UploadTicket } from "@/types/api";
 import { pollOrRefresh, signedLinkQuery } from "@/lib/signed-links";
@@ -26,7 +26,7 @@ export function useDesignTasks(filters: DesignFilters, limit = 30) {
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return useQuery({
     queryKey: [...root(orgId ?? "none"), "list", params.toString()],
-    queryFn: () => api<DesignTaskPage>(`/design/tasks?${params}`),
+    queryFn: () => apiList<DesignTaskPage>("/design/tasks", params),
     enabled: !!orgId,
     placeholderData: keepPreviousData,
   });

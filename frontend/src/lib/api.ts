@@ -199,6 +199,27 @@ export async function apiDownload(path: string, accept = "text/csv"): Promise<Do
   return { blob: await response.blob(), filename, headers: response.headers };
 }
 
+/** Largest page the list endpoints accept (`limit` is capped at 100 server side). */
+const MAX_PAGE = 100;
+
+/**
+ * A list endpoint's first `limit` items. "Show more" grows `limit` past what one request may
+ * ask for (asking for 150 got a 422), so larger amounts are fetched in pages and joined.
+ */
+export async function apiList<T extends { items: unknown[] }>(path: string, params: URLSearchParams): Promise<T> {
+  const limit = Number(params.get("limit") ?? MAX_PAGE);
+  let page = null as T | null;
+  for (let offset = 0; offset < limit; offset += MAX_PAGE) {
+    const next = new URLSearchParams(params);
+    next.set("limit", String(Math.min(MAX_PAGE, limit - offset)));
+    if (offset) next.set("offset", String(offset));
+    const result: T = await api<T>(`${path}?${next}`);
+    page = page ? { ...page, items: [...page.items, ...result.items] } : result;
+    if (result.items.length < MAX_PAGE) break;
+  }
+  return page!;
+}
+
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   // Browser errors ("Failed to fetch", "Load failed") mean nothing to people.
