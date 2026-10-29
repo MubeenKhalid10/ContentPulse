@@ -9,13 +9,24 @@ export const POST_STATUS_LABEL: Record<PostStatus, string> = {
   design_in_progress: "Design in progress",
   design_uploaded: "Design uploaded, not yet submitted",
   pending_approval: "Waiting for design approval",
-  // Only design approval sends a post back with changes (content goes back to Draft).
+  // Design approval sending the post back; postStatusLabel names what was sent back.
   changes_requested: "Design changes requested",
   approved: "Design approved, almost ready to publish",
   final: "Ready to publish",
   rejected: "Rejected",
   archived: "Archived",
 };
+
+const CHANGES_LABEL = {
+  copy: "Copy changes requested",
+  design: "Design changes requested",
+  both: "Copy & design changes requested",
+} as const;
+
+/** The status tag, naming what was sent back (the copy, the design or both) when it can. */
+export function postStatusLabel(post: { status: PostStatus; changes_scope?: keyof typeof CHANGES_LABEL | null }) {
+  return post.changes_scope ? CHANGES_LABEL[post.changes_scope] : POST_STATUS_LABEL[post.status];
+}
 
 export const DESIGN_FORMAT_LABEL: Record<DesignFormat, string> = {
   text_only: "Text only",

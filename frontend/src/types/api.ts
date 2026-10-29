@@ -735,6 +735,8 @@ export interface Post {
   content_strategy_id: string | null;
   variant_of_id: string | null;
   generation: GenerationStatus | null;
+  /** What an approver sent back while the post waits on those changes; null otherwise. */
+  changes_scope: "copy" | "design" | "both" | null;
   created_at: string;
   updated_at: string;
 }

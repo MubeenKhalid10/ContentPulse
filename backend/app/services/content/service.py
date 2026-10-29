@@ -107,8 +107,22 @@ _LATEST_REVIEW = (
     .limit(1)
     .scalar_subquery()
 )
+# What the latest change request opened (no recorded scope counts as both), as in
+# approvals.changes_scope.
+_CHANGES_SCOPE = (
+    select(func.coalesce(ApprovalRequest.scope, "both"))
+    .where(
+        ApprovalRequest.post_id == Post.id,
+        ApprovalRequest.status == ApprovalStatus.CHANGES_REQUESTED,
+    )
+    .order_by(ApprovalRequest.reviewed_at.desc(), ApprovalRequest.created_at.desc())
+    .limit(1)
+    .scalar_subquery()
+)
+# Sent back with the copy to change. Design-only changes are the designer's work: they
+# show on Add designs, not here.
 SENT_BACK = or_(
-    Post.status == P.CHANGES_REQUESTED,
+    and_(Post.status == P.CHANGES_REQUESTED, _CHANGES_SCOPE.is_distinct_from("design")),
     # IS NOT DISTINCT FROM: a never-reviewed draft (no request, NULL) is not sent back.
     and_(
         Post.status == P.DRAFT,
@@ -195,6 +209,24 @@ async def _items(db: AsyncSession, posts: list[Post]) -> list[PostListItem]:
         if ids
         else {}
     )
+    sent_back = [p.id for p in posts if p.status in (P.DRAFT, P.CHANGES_REQUESTED)]
+    scopes: dict[uuid.UUID, str] = (
+        dict(
+            (
+                await db.execute(
+                    select(Post.id, _CHANGES_SCOPE).where(
+                        Post.id.in_(sent_back),
+                        or_(
+                            Post.status == P.CHANGES_REQUESTED,
+                            _LATEST_REVIEW == ApprovalStatus.CHANGES_REQUESTED,
+                        ),
+                    )
+                )
+            ).all()
+        )
+        if sent_back
+        else {}
+    )
     topic_ids = {p.topic_id for p in posts if p.topic_id}
     topics = {
         t.id: t
@@ -218,6 +250,10 @@ async def _items(db: AsyncSession, posts: list[Post]) -> list[PostListItem]:
             content_strategy_id=p.content_strategy_id,
             variant_of_id=p.variant_of_id,
             generation=_generation(jobs.get(p.id)),
+            # Copy sent back at copy approval puts the post back to draft: copy only.
+            changes_scope=("copy" if p.status == P.DRAFT else scopes[p.id])
+            if p.id in scopes
+            else None,
             created_at=p.created_at,
             updated_at=p.updated_at,
         )

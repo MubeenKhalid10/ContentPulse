@@ -54,7 +54,7 @@ import { useResubmitPost } from "@/hooks/use-approvals";
 import { type PostAction, useCreateVariant, useDeletePost, usePost, usePostAction, useRegenerate } from "@/hooks/use-content";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { POST_STATUS_LABEL } from "@/lib/content";
+import { postStatusLabel } from "@/lib/content";
 import { PLATFORM_LABEL } from "@/lib/topics";
 import type { PostDetail } from "@/types/api";
 
@@ -110,7 +110,7 @@ export function ContentStudio({ id }: { id: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">{p.title ?? "Untitled post"}</h1>
             <PlatformTag platform={p.platform} />
-            <Tag tone={POST_STATUS_TONE[p.status]} dot>{POST_STATUS_LABEL[p.status]}</Tag>
+            <Tag tone={POST_STATUS_TONE[p.status]} dot>{postStatusLabel(p)}</Tag>
             {p.variant_of_id && <Tag tone="neutral">Variant</Tag>}
           </div>
           <p className="text-sm text-muted-foreground">
