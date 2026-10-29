@@ -76,12 +76,74 @@ async function contextHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
+interface FieldIssue {
+  field: string;
+  message: string;
+  in?: string;
+}
+
+/** "String should have at most 60 characters" → "is too long (up to 60 characters)". */
+function plainIssue(message: string): string {
+  const max = /at most (\d+) (character|item)/.exec(message);
+  if (max) return `is too long (up to ${max[1]} ${max[2]}s)`;
+  if (/at least 1 (character|item)/.test(message)) return "can't be empty";
+  const min = /at least (\d+) (character|item)/.exec(message);
+  if (min) return `is too short (at least ${min[1]} ${min[2]}s)`;
+  if (message === "Field required") return "is required";
+  const le = /less than or equal to ([\d.]+)/.exec(message);
+  if (le) return `must be ${le[1]} or less`;
+  const ge = /greater than or equal to ([\d.]+)/.exec(message);
+  if (ge) return `must be ${ge[1]} or more`;
+  if (/valid email/i.test(message)) return "isn't a valid email address";
+  if (/valid URL/i.test(message)) return "isn't a valid web address";
+  if (/^Input should be /.test(message)) return "has a value that isn't allowed";
+  return message.replace(/^Value error, /, "").replace(/\.$/, "");
+}
+
+const fieldName = (field: string) => {
+  const last = field.split(".").filter((p) => !/^\d+$/.test(p)).pop() ?? field;
+  const name = last.replace(/_/g, " ");
+  return name.charAt(0).toUpperCase() + name.slice(1);
+};
+
+/**
+ * What went wrong, in words a person can act on. The API's own messages are already written
+ * for people; its generic ones ("Request validation failed.", "An unexpected error occurred.")
+ * and bare status codes are not, so those are replaced here, once, for every screen.
+ */
+function friendlyMessage(status: number, code: string, message: string | undefined, details: unknown): string {
+  if (code === "VALIDATION_ERROR" && Array.isArray(details) && details.length) {
+    const issues = details as FieldIssue[];
+    // A bad URL or query is the app's fault, not something the person typed.
+    if (issues.some((d) => d.in && d.in !== "body")) {
+      return "Something went wrong loading this. Refresh the page and try again; if it keeps happening, contact support.";
+    }
+    const [first] = issues;
+    const more = issues.length > 1 ? ` (and ${issues.length - 1} more)` : "";
+    return `Please check what you entered: ${fieldName(first.field)} ${plainIssue(first.message)}${more}.`;
+  }
+  const generic = !message || message === "Request validation failed." || message === "An unexpected error occurred.";
+  if (!generic) return message;
+  if (status === 401) return "Your session has ended. Sign in again to continue.";
+  if (status === 403) return "You don't have permission to do this. Ask an admin if you need access.";
+  if (status === 404) return "This item couldn't be found. It may have been deleted.";
+  if (status === 409) return "This changed while you were working on it. Refresh the page and try again.";
+  if (status === 413) return "This file is too large to upload.";
+  if (status === 422) return "Some of the details aren't valid. Check what you entered and try again.";
+  if (status === 429) return "Too many requests in a short time. Wait a moment and try again.";
+  if (status === 502 || status === 503 || status === 504) {
+    return "The server is busy or restarting. Wait a moment and try again.";
+  }
+  return "Something went wrong on our side. Try again in a moment; if it keeps happening, contact support.";
+}
+
 async function failure(response: Response): Promise<ApiError> {
   const error = (await response.json().catch(() => null))?.error;
+  const code = error?.code ?? "INTERNAL_ERROR";
   return new ApiError(
     response.status,
-    error?.code ?? "INTERNAL_ERROR",
-    error?.message ?? `Request failed (${response.status})`,
+    code,
+    friendlyMessage(response.status, code, error?.message, error?.details),
     error?.details,
   );
 }
@@ -139,6 +201,8 @@ export async function apiDownload(path: string, accept = "text/csv"): Promise<Do
 
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
-  if (error instanceof Error) return error.message;
-  return "Something went wrong.";
+  // Browser errors ("Failed to fetch", "Load failed") mean nothing to people.
+  if (error instanceof TypeError) return "Cannot reach the server. Check your connection and try again.";
+  if (error instanceof Error && error.message) return error.message;
+  return "Something went wrong. Please try again.";
 }
