@@ -25,6 +25,7 @@ from app.core.errors import (
 )
 from app.core.logging import logger
 from app.core.permissions import Permission, has_permission
+from app.core.search import ESCAPE, contains
 from app.models.ai import AIGenerationJob
 from app.models.design import CreativeAsset, DesignBrief
 from app.models.enums import DesignBriefStatus, JobStatus, MemberStatus, PostStatus
@@ -265,11 +266,13 @@ async def list_tasks(
         )
         filters.append(DesignBrief.post_id.in_(on_platform))
     if q:
-        pattern = f"%{q.strip()}%"
+        pattern = contains(q)
         titled = select(Post.id).where(
-            Post.organization_id == organization_id, Post.title.ilike(pattern)
+            Post.organization_id == organization_id, Post.title.ilike(pattern, escape=ESCAPE)
         )
-        filters.append(or_(DesignBrief.post_id.in_(titled), DesignBrief.headline.ilike(pattern)))
+        filters.append(
+            or_(DesignBrief.post_id.in_(titled), DesignBrief.headline.ilike(pattern, escape=ESCAPE))
+        )
     row = (
         await db.execute(
             select(*(func.count().filter(_filter_clause(n)) for n in FILTERS)).where(*filters)

@@ -58,6 +58,7 @@ export function KnowledgeSearch({ onOpenDocument }: { onOpenDocument: (id: strin
         >
           <Input
             aria-label="Search the knowledge base"
+            maxLength={500}
             placeholder="e.g. What do we offer, and who is it for?"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

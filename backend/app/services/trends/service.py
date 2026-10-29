@@ -5,12 +5,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import Text, cast, func, nulls_last, select
+from sqlalchemy import Text, cast, func, nulls_last, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.errors import AppError, ErrorCode, InvalidStateTransition, NotFound
+from app.core.search import ESCAPE, contains
 from app.models.ai import AIGenerationJob
 from app.models.enums import (
     DiscoveryRunStatus,
@@ -381,8 +382,15 @@ async def list_trends(
     if location:
         filters.append(Trend.locations.contains([location]))
     if q:
-        pattern = f"%{q.strip()}%"
-        filters.append(Trend.topic.ilike(pattern) | cast(Trend.keywords, Text).ilike(pattern))
+        pattern = contains(q)
+        # The headline too: it's what the list shows under the topic.
+        filters.append(
+            or_(
+                Trend.topic.ilike(pattern, escape=ESCAPE),
+                Trend.title.ilike(pattern, escape=ESCAPE),
+                cast(Trend.keywords, Text).ilike(pattern, escape=ESCAPE),
+            )
+        )
     if min_score is not None:
         filters.append(Trend.opportunity_score >= min_score)
     if seen_since is not None:

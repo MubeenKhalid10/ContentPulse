@@ -18,6 +18,7 @@ from app.core.errors import (
     NotFound,
 )
 from app.core.logging import logger
+from app.core.search import ESCAPE, contains
 from app.models.ai import AIGenerationJob
 from app.models.approval import ApprovalRequest
 from app.models.design import CreativeAsset
@@ -278,12 +279,17 @@ async def list_posts(
     if topic_id:
         filters.append(Post.topic_id == topic_id)
     if q:
-        pattern = f"%{q.strip()}%"
+        pattern = contains(q)
         matching_versions = select(PostVersion.post_id).where(
             PostVersion.organization_id == organization_id,
-            or_(PostVersion.hook.ilike(pattern), PostVersion.body.ilike(pattern)),
+            or_(
+                PostVersion.hook.ilike(pattern, escape=ESCAPE),
+                PostVersion.body.ilike(pattern, escape=ESCAPE),
+            ),
         )
-        filters.append(or_(Post.title.ilike(pattern), Post.id.in_(matching_versions)))
+        filters.append(
+            or_(Post.title.ilike(pattern, escape=ESCAPE), Post.id.in_(matching_versions))
+        )
     row = (
         await db.execute(
             select(*(func.count().filter(_group_clause(g)) for g in STATUS_GROUPS)).where(*filters)

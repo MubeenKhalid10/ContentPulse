@@ -6,6 +6,7 @@ from sqlalchemy import case, func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import InvalidStateTransition, NotFound
+from app.core.search import ESCAPE, contains
 from app.models.enums import RelevanceLevel, StrategyStatus, TopicStatus, TrendStatus
 from app.models.topic import ContentStrategy, TopicCandidate
 from app.models.trend import Trend
@@ -75,7 +76,7 @@ async def list_topics(
     if platform:
         filters.append(TopicCandidate.recommended_platforms.contains([platform]))
     if q:
-        filters.append(TopicCandidate.title.ilike(f"%{q.strip()}%"))
+        filters.append(TopicCandidate.title.ilike(contains(q), escape=ESCAPE))
 
     counts = dict(
         (
