@@ -332,7 +332,8 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
                 Use version {v.version} as newest
               </Button>
             )}
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {/* One file gets the panel's full width; carousel slides sit two to a row. */}
+            <ul className={v.files.length > 1 ? "grid grid-cols-2 gap-2" : "grid gap-2"}>
               {v.files.map((f) => (
                 <CreativeTile key={f.id} file={f} />
               ))}
@@ -354,10 +355,16 @@ export function CreativeTile({ file }: { file: CreativeFile }) {
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`Open ${file.file_name} in a new tab`}
-        className="block aspect-square bg-muted/50"
+        className={isImage ? "block min-w-0 bg-muted/50 p-1" : "block aspect-square bg-muted/50"}
       >
+        {/* Always the whole design, never cropped: it fills the tile's width and takes its
+            height from its own shape. A very tall one (a story) is scaled down to fit instead. */}
         {isImage ? (
-          <SignedImage src={file.url} alt={file.file_name} className="size-full object-contain" />
+          <SignedImage
+            src={file.url}
+            alt={file.file_name}
+            className="block h-auto max-h-[28rem] w-full rounded-sm object-contain"
+          />
         ) : (
           <span className="grid size-full place-items-center text-muted-foreground">
             {isVideo ? <FilmIcon className="size-8" /> : <FileTextIcon className="size-8" />}
