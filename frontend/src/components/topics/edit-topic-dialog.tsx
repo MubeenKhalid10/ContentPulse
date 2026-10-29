@@ -90,7 +90,7 @@ function EditForm({ topic, onClose }: { topic: TopicDetail; onClose: () => void 
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={update.isPending}>
+        <Button type="submit" disabled={update.isPending} pending={update.isPending}>
           {update.isPending ? "Saving…" : "Save"}
         </Button>
       </DialogFooter>

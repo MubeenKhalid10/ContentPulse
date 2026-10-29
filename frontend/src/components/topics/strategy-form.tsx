@@ -1,11 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SparklesIcon, WandSparklesIcon } from "lucide-react";
+import { LoaderCircleIcon, SparklesIcon, WandSparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { toast } from "sonner";
 
 import { fieldAria, FormField } from "@/components/shared/form-field";
@@ -103,6 +103,8 @@ export function StrategyForm({
   // Editing a plan that already has its post: just save.
   const hasPost = !!editing && (topicPosts.data?.items ?? []).some((p) => p.content_strategy_id === editing.id);
   const saving = create.isPending || update.isPending || generate.isPending;
+  // Which footer button started the save, so only that one spins.
+  const [writing, setWriting] = useState(false);
   const failure = create.error ?? update.error;
 
   const select = (next: Platform[]) => {
@@ -139,7 +141,8 @@ export function StrategyForm({
         selected.map(async (p) => [p, await suggest.mutateAsync({ topicId: topic.id, platform: p })] as const),
       );
       const next: Partial<Record<Platform, Values>> = {};
-      for (const [p, draft] of results) next[p] = toValues(p, draft);
+      // Post type is hidden with several platforms; an empty one falls back to the platform default.
+      for (const [p, draft] of results) next[p] = { ...toValues(p, draft), post_type: draft.post_type || AUTO_POST_TYPE };
       setDrafts(next);
       form.reset(next[selected[0]]);
       setSource(results[0][1].source);
@@ -162,12 +165,35 @@ export function StrategyForm({
       },
     );
 
+  // A failed check is otherwise only shown next to its field, which may be scrolled out of
+  // view (or hidden, like Post type with several platforms), so the button seemed to do nothing.
+  const onInvalid = (invalid: FieldErrors<Values>) => {
+    const [field, error] = Object.entries(invalid)[0] ?? [];
+    if (!field) return;
+    toast.error(error?.message ?? "Check the highlighted fields.");
+    document.querySelector<HTMLElement>(`[name="${field}"], #strategy-${field.replace("_", "-")}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
+
   // "Write post": save the plan, then write the post from it right away.
   const submitWith = (write: boolean) => form.handleSubmit(async (values) => {
+    setWriting(write);
     if (multi) {
       const saved: Strategy[] = [];
       const all = { ...drafts, [platform]: values };
       let failed: Platform | null = null;
+      // Only the draft on screen went through the form's checks; check the others too and
+      // open the first one that fails, instead of sending it and getting a bare 422.
+      for (const p of selected) {
+        const draft = all[p];
+        if (!draft || progress.plans[p]) continue;
+        const check = schema.safeParse({ ...draft, post_type: draft.post_type || AUTO_POST_TYPE });
+        if (check.success) continue;
+        const issue = check.error.issues[0];
+        if (p !== platform) viewDraft(p);
+        form.setError(issue.path[0] as keyof Values, { message: issue.message });
+        toast.error(`${PLATFORM_LABEL[p]}: ${issue.message}`);
+        return;
+      }
       try {
         for (const p of selected) {
           failed = p;
@@ -176,7 +202,7 @@ export function StrategyForm({
             const defaultType = rules.data?.find((r) => r.platform === p)?.post_types[0] ?? "Post";
             const draft = all[p];
             const v: Values = draft
-              ? { ...draft, platform: p, post_type: draft.post_type === AUTO_POST_TYPE ? defaultType : draft.post_type }
+              ? { ...draft, platform: p, post_type: !draft.post_type || draft.post_type === AUTO_POST_TYPE ? defaultType : draft.post_type }
               : { ...values, platform: p, post_type: defaultType, objective: "" };
             plan = await create.mutateAsync({ topicId: topic.id, source, ...toBody(v) });
             progress.plans[p] = plan;
@@ -228,6 +254,7 @@ export function StrategyForm({
         onClose();
       },
       onError: (error: unknown) => {
+        toast.error(errorMessage(error));
         if (error instanceof ApiError) {
           for (const [field, message] of Object.entries(error.fieldErrors)) {
             const key = field.replace(/^details\./, "").split(".")[0];
@@ -238,7 +265,7 @@ export function StrategyForm({
     };
     if (editing) update.mutate({ topicId: topic.id, id: editing.id, ...body }, done);
     else create.mutate({ topicId: topic.id, source, ...body }, done);
-  });
+  }, onInvalid);
 
   return (
     <form noValidate className="grid gap-5" onSubmit={submitWith(canGenerate && !hasPost)}>
@@ -289,7 +316,7 @@ export function StrategyForm({
           />
         </FormField>
         )}
-        <Button type="button" variant="outline" onClick={multi ? runSuggestAll : runSuggest} disabled={suggest.isPending}>
+        <Button type="button" variant="outline" onClick={multi ? runSuggestAll : runSuggest} disabled={suggest.isPending} pending={suggest.isPending}>
           {ai.data?.engine === "ai" ? <SparklesIcon /> : <WandSparklesIcon />}
           {suggest.isPending
             ? "Drafting…"
@@ -484,16 +511,17 @@ export function StrategyForm({
         </Button>
         {canGenerate && !hasPost ? (
           <>
-            <Button type="button" variant="outline" disabled={saving} onClick={submitWith(false)}>
+            <Button type="button" variant="outline" disabled={saving} pending={saving && !writing} onClick={submitWith(false)}>
               {editing ? "Save changes" : multi ? "Save Plan Drafts" : "Save Plan Draft"}
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving} pending={saving && writing}>
               <SparklesIcon />
               {generate.isPending ? "Starting…" : saving ? "Saving…" : multi ? `Write ${selected.length} posts` : isBlog ? "Write article" : "Write post"}
             </Button>
           </>
         ) : (
           <Button type="submit" disabled={saving}>
+            {saving && <LoaderCircleIcon className="animate-spin" />}
             {saving ? "Saving…" : editing ? "Save changes" : "Save Plan Draft"}
           </Button>
         )}

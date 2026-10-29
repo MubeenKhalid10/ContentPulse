@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { withFrom } from "@/lib/back";
 import { useCan } from "@/lib/auth";
-import { POST_STATUS_LABEL } from "@/lib/content";
+import { postStatusLabel } from "@/lib/content";
 import { timeAgo } from "@/lib/format";
 import { POST_STATUS_TONE } from "@/lib/tones";
 import { cn } from "@/lib/utils";
@@ -51,7 +51,7 @@ export function RecentContent({ data }: { data?: DashboardOverview }) {
                   <span className="flex flex-wrap items-center gap-2">
                     <PlatformTag platform={p.platform} />
                     <Tag tone={POST_STATUS_TONE[p.status]} dot>
-                      {POST_STATUS_LABEL[p.status]}
+                      {postStatusLabel(p)}
                     </Tag>
                     <time
                       dateTime={p.updated_at}

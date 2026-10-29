@@ -294,6 +294,7 @@ function RuleForm({
                 <AlertDialogAction
                   variant="destructive"
                   disabled={reset.isPending}
+                  pending={reset.isPending}
                   onClick={() =>
                     reset.mutate(rule.platform, {
                       onSuccess: () => {

@@ -117,6 +117,7 @@ export function LogoCard({
                 variant="outline"
                 size="sm"
                 disabled={upload.isPending}
+                pending={upload.isPending}
                 onClick={() => input.current?.click()}
               >
                 <ImageUpIcon />
@@ -132,6 +133,7 @@ export function LogoCard({
                   variant="ghost"
                   size="sm"
                   disabled={remove.isPending}
+                  pending={remove.isPending}
                   onClick={() => setConfirmRemove(true)}
                 >
                   <Trash2Icon /> Remove uploaded logo

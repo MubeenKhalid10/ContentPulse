@@ -58,6 +58,7 @@ export function StrategiesCard({
                   <Button
                     size="sm"
                     disabled={writeAll.isPending}
+                    pending={writeAll.isPending}
                     onClick={() =>
                       writeAll.mutate(
                         toWrite.map((s) => s.id),

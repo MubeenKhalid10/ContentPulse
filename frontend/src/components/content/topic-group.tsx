@@ -62,6 +62,7 @@ export function TopicGroup({
   onToggle,
   onSubmit,
   submitting,
+  submittingIds,
 }: {
   group: TopicPosts;
   selectable: boolean;
@@ -69,8 +70,12 @@ export function TopicGroup({
   onToggle: (ids: string[], on: boolean) => void;
   onSubmit: (ids: string[]) => void;
   submitting: boolean;
+  /** The posts being sent right now, so only the button that sent them spins. */
+  submittingIds?: string[];
 }) {
   const ready = group.posts.filter(canSubmit);
+  const sendingThese =
+    !!submittingIds && submittingIds.length === ready.length && ready.every((p) => submittingIds.includes(p.id));
   const pick = (post: Post) =>
     selectable && canSubmit(post)
       ? {
@@ -117,6 +122,7 @@ export function TopicGroup({
             size="sm"
             variant="outline"
             disabled={submitting}
+            pending={submitting && sendingThese}
             onClick={() => onSubmit(ready.map((p) => p.id))}
           >
             <SendIcon />

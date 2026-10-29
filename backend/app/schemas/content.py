@@ -80,6 +80,9 @@ class PostListItem(BaseModel):
     content_strategy_id: uuid.UUID | None
     variant_of_id: uuid.UUID | None
     generation: GenerationStatus | None
+    # What an approver sent back, while the post waits on those changes: the copy,
+    # the design or both. None when nothing was sent back.
+    changes_scope: Literal["copy", "design", "both"] | None = None
     created_at: datetime
     updated_at: datetime
 

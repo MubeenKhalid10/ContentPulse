@@ -118,8 +118,14 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+        # `in` says where the value came from: "body" is something the person typed, while
+        # "query" or "path" is a bad request from the app itself (shown as our fault).
         details = [
-            {"field": ".".join(str(p) for p in err["loc"][1:]), "message": err["msg"]}
+            {
+                "field": ".".join(str(p) for p in err["loc"][1:]),
+                "message": err["msg"],
+                "in": str(err["loc"][0]) if err["loc"] else "body",
+            }
             for err in exc.errors()
         ]
         return JSONResponse(

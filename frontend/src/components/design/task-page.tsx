@@ -206,7 +206,7 @@ function WithdrawButton({ taskId }: { taskId: string }) {
   const withdraw = useWithdrawDesign();
   return (
     <>
-      <Button size="sm" variant="outline" className="w-fit" onClick={() => setOpen(true)} disabled={withdraw.isPending}>
+      <Button size="sm" variant="outline" className="w-fit" onClick={() => setOpen(true)} disabled={withdraw.isPending} pending={withdraw.isPending}>
         <RotateCcwIcon />
         Withdraw to make changes
       </Button>
@@ -268,8 +268,8 @@ function TaskActions({ task, manager, mine }: { task: DesignTaskDetail; manager:
               { onSuccess: (t) => toast.success(t.assignee ? `Assigned to ${t.assignee.name ?? t.assignee.email}` : "Unassigned"), onError },
             )
           }
-          options={[{ value: "none", label: "Unassigned (anyone can take it)" }, ...people.map((m) => ({ value: m.user_id, label: m.full_name ?? m.email }))]}
-          className="w-48"
+          options={[{ value: "none", label: "Un-Assigned" }, ...people.map((m) => ({ value: m.user_id, label: m.full_name ?? m.email }))]}
+          className="w-60"
         />
       ) : (
         task.assignee && (

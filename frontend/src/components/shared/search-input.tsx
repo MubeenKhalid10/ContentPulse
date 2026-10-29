@@ -27,6 +27,8 @@ export function SearchInput({
       />
       <Input
         type="search"
+        // The list endpoints accept up to 200 characters.
+        maxLength={200}
         aria-label={ariaLabel}
         placeholder={placeholder}
         value={value}

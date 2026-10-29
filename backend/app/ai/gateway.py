@@ -111,6 +111,19 @@ class LLMCache:
                 self.memory.pop(next(iter(self.memory)))
         self.memory[key] = (time.monotonic() + ttl, raw)
 
+    async def delete(self, key: str | None) -> None:
+        """Drop an answer the caller couldn't use, so a retry asks the model again
+        instead of getting the same unusable answer back until it expires."""
+        if not key:
+            return
+        self.memory.pop(key, None)
+        try:
+            client = self._redis()
+            if client is not None:
+                await client.delete(key)
+        except Exception as exc:
+            logger.warning("LLM cache delete failed: %s", exc)
+
 
 llm_cache = LLMCache()
 
@@ -276,6 +289,7 @@ class LLMGateway:
                     provider=hit["provider"],
                     cached=True,
                     attempts=0,
+                    cache_key=cache_key,
                 )
 
         timeout = (
@@ -476,6 +490,7 @@ class LLMGateway:
                 result.attempts = attempt
                 result.fallback_used = fallback_used
                 if cache_key:
+                    result.cache_key = cache_key
                     await llm_cache.set(
                         cache_key,
                         {"data": result.data, "model": result.model, "provider": adapter.name},

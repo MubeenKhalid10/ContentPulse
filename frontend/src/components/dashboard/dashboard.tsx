@@ -11,7 +11,6 @@ import { useDashboard, useDashboardOverview, useOrganization } from "@/hooks/use
 import { useCan, useMe } from "@/lib/auth";
 
 import { HowItWorks } from "./how-it-works";
-import { TrendSearch } from "./trend-search";
 import { MetricCard } from "./metric-card";
 import { TrendingTopics } from "./trending-topics";
 import { RecentContent, NextStepCallout } from "./recent-content";
@@ -65,7 +64,6 @@ export function Dashboard() {
         }
         actions={
           <>
-            {can("trends.read") && <TrendSearch />}
             <SimpleSelect
               aria-label="Period"
               value={String(days)}

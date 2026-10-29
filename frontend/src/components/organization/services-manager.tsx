@@ -376,7 +376,7 @@ function ServiceForm({
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel
         </Button>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending} pending={pending}>
           {pending ? "Saving…" : service ? "Save" : "Add service"}
         </Button>
       </DialogFooter>
@@ -407,6 +407,7 @@ function DeleteServiceDialog({
           <AlertDialogAction
             variant="destructive"
             disabled={remove.isPending}
+            pending={remove.isPending}
             onClick={() =>
               service &&
               remove.mutate(service.id, {

@@ -79,8 +79,10 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
     task.creatives.length > 0 &&
     ["design_pending", "design_in_progress", "design_uploaded", "changes_requested"].includes(task.post.status);
   const busy = upload.isPending || submit.isPending;
+  const [submitting, setSubmitting] = useState(false);
 
   const send = async (andSubmit: boolean) => {
+    setSubmitting(andSubmit);
     try {
       if (files.length) {
         await upload.mutateAsync({ taskId: task.id, files, note: note.trim() || undefined, onProgress: setProgress });
@@ -187,7 +189,7 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
         )}
         {canSubmit ? (
           <div className="grid gap-1.5">
-            <Button onClick={() => send(true)} disabled={busy || (!files.length && !canResubmitCurrent)}>
+            <Button onClick={() => send(true)} disabled={busy || (!files.length && !canResubmitCurrent)} pending={busy && submitting}>
               <SendIcon />
               {upload.isPending
                 ? "Uploading…"
@@ -202,14 +204,14 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
               Submitting locks the design until an admin approves it or asks for changes.
             </p>
             {files.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => send(false)} disabled={busy}>
+              <Button variant="ghost" size="sm" onClick={() => send(false)} disabled={busy} pending={busy && !submitting}>
                 <UploadCloudIcon />
                 Upload only (don&apos;t submit yet)
               </Button>
             )}
           </div>
         ) : (
-          <Button onClick={() => send(false)} disabled={!files.length || busy}>
+          <Button onClick={() => send(false)} disabled={!files.length || busy} pending={busy}>
             <UploadCloudIcon />
             {upload.isPending ? "Uploading…" : "Upload"}
           </Button>
@@ -312,6 +314,7 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
                 variant="outline"
                 className="w-fit"
                 disabled={use.isPending}
+                pending={use.isPending && use.variables?.version === v.version}
                 onClick={() =>
                   use.mutate(
                     { id: task.id, version: v.version },
@@ -329,7 +332,8 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
                 Use version {v.version} as newest
               </Button>
             )}
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {/* One file gets the panel's full width; carousel slides sit two to a row. */}
+            <ul className={v.files.length > 1 ? "grid grid-cols-2 gap-2" : "grid gap-2"}>
               {v.files.map((f) => (
                 <CreativeTile key={f.id} file={f} />
               ))}
@@ -351,10 +355,16 @@ export function CreativeTile({ file }: { file: CreativeFile }) {
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`Open ${file.file_name} in a new tab`}
-        className="block aspect-square bg-muted/50"
+        className={isImage ? "block min-w-0 bg-muted/50 p-1" : "block aspect-square bg-muted/50"}
       >
+        {/* Always the whole design, never cropped: it fills the tile's width and takes its
+            height from its own shape. A very tall one (a story) is scaled down to fit instead. */}
         {isImage ? (
-          <SignedImage src={file.url} alt={file.file_name} className="size-full object-contain" />
+          <SignedImage
+            src={file.url}
+            alt={file.file_name}
+            className="block h-auto max-h-[28rem] w-full rounded-sm object-contain"
+          />
         ) : (
           <span className="grid size-full place-items-center text-muted-foreground">
             {isVideo ? <FilmIcon className="size-8" /> : <FileTextIcon className="size-8" />}

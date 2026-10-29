@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useDeletePost, useRegenerate } from "@/hooks/use-content";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { POST_STATUS_LABEL } from "@/lib/content";
+import { postStatusLabel } from "@/lib/content";
 import { formatDateTime, timeAgo, timeOfDay } from "@/lib/format";
 import { PLATFORM_LABEL } from "@/lib/topics";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,7 @@ function FailedPostActions({ post }: { post: Post }) {
           variant="outline"
           className="relative z-10"
           disabled={busy}
+          pending={regenerate.isPending}
           onClick={() =>
             regenerate.mutate(
               { id: post.id },
@@ -78,6 +79,7 @@ function FailedPostActions({ post }: { post: Post }) {
           variant="ghost"
           className="relative z-10 text-destructive"
           disabled={busy}
+          pending={remove.isPending}
           onClick={() => setConfirmOpen(true)}
         >
           <Trash2Icon />
@@ -146,7 +148,7 @@ export function PostRow({
           </Tag>
         ) : (
           <Tag tone={POST_STATUS_TONE[post.status]} dot>
-            {POST_STATUS_LABEL[post.status]}
+            {postStatusLabel(post)}
           </Tag>
         )}
         {post.variant_of_id && <Tag tone="neutral">Variant</Tag>}

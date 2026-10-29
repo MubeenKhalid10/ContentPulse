@@ -13,9 +13,10 @@ import { errorMessage } from "@/lib/api";
  * who works outside the app. `id` is the design task (brief) id.
  */
 export function HandoffButtons({ id, size = "sm" }: { id: string; size?: "sm" | "default" }) {
-  const [busy, setBusy] = useState(false);
+  // Only the clicked button waits; the other stays usable.
+  const [busy, setBusy] = useState<"copy" | "download" | null>(null);
   const run = async (mode: "copy" | "download") => {
-    setBusy(true);
+    setBusy(mode);
     try {
       const doc = await fetchHandoff(id);
       if (mode === "copy") {
@@ -38,16 +39,16 @@ export function HandoffButtons({ id, size = "sm" }: { id: string; size?: "sm" | 
     } catch (e) {
       toast.error(errorMessage(e));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
   return (
     <>
-      <Button size={size} variant="outline" onClick={() => run("copy")} disabled={busy}>
+      <Button size={size} variant="outline" onClick={() => run("copy")} disabled={busy === "copy"} pending={busy === "copy"}>
         <CopyIcon />
         Copy brief
       </Button>
-      <Button size={size} variant="outline" onClick={() => run("download")} disabled={busy}>
+      <Button size={size} variant="outline" onClick={() => run("download")} disabled={busy === "download"} pending={busy === "download"}>
         <DownloadIcon />
         Download brief (.md)
       </Button>
