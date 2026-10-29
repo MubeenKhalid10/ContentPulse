@@ -7,10 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import prompts
 from app.ai.embeddings import get_embedding_provider
-from app.ai.gateway import LLMGateway
+from app.ai.gateway import LLMGateway, llm_cache
 from app.ai.provider import AIError, AIErrorKind, StructuredResult
 from app.ai.untrusted import UNTRUSTED_NOTICE, untrusted, untrusted_attr
 from app.core.config import get_settings
+from app.core.logging import logger
 from app.models.enums import RelevanceLevel
 from app.models.trend import Trend, TrendMention
 from app.services.alignment.context import AlignmentContext
@@ -134,28 +135,47 @@ async def align_with_ai(
 ) -> tuple[AlignmentResult, StructuredResult]:
     prompt = prompts.load("organization_alignment")
     system = prompt.render(organization_name=ctx.name, organization_profile=ctx.profile_text)
-    result = await provider.generate_structured(
-        system=system,
-        prompt=trend_prompt(trend, mentions, passages),
-        schema=response_schema(ctx.platforms),
-        # Sized to the answer (~1k tokens) so Groq's per-minute token limit,
-        # which counts this allowance, fits more calls; a cut-off answer is
-        # retried once with double.
-        max_tokens=2000,
-        workflow="trend_alignment",
-        organization_id=trend.organization_id,
-        job_id=job_id,
-        # Same trend, coverage, knowledge passages, profile and prompt version
-        # give the same assessment: reuse it instead of spending a request.
-        cache=True,
-    )
-    try:
-        parsed = parse_ai_output(
-            result.data, service_names=ctx.service_names, passages=passages, platforms=ctx.platforms
-        )
-    except InvalidAlignment as exc:
-        raise AIError(AIErrorKind.BAD_OUTPUT, str(exc)) from exc
-    return parsed, result
+    # Models occasionally return an answer that can't be used (empty, broken JSON or missing
+    # fields). Asking once more usually works, so that happens before the run is failed.
+    for attempt in (1, 2):
+        try:
+            result = await provider.generate_structured(
+                system=system,
+                prompt=trend_prompt(trend, mentions, passages),
+                schema=response_schema(ctx.platforms),
+                # Sized to the answer (~1k tokens) so Groq's per-minute token limit,
+                # which counts this allowance, fits more calls; a cut-off answer is
+                # retried once with double.
+                max_tokens=2000,
+                workflow="trend_alignment",
+                organization_id=trend.organization_id,
+                job_id=job_id,
+                # Same trend, coverage, knowledge passages, profile and prompt version
+                # give the same assessment: reuse it instead of spending a request.
+                # Not on the second ask, which must reach the model.
+                cache=attempt == 1,
+            )
+        except AIError as exc:
+            if exc.kind == AIErrorKind.BAD_OUTPUT and attempt == 1:
+                logger.warning("Unusable alignment answer for trend %s: %s", trend.id, exc.message)
+                continue
+            raise
+        try:
+            parsed = parse_ai_output(
+                result.data,
+                service_names=ctx.service_names,
+                passages=passages,
+                platforms=ctx.platforms,
+            )
+        except InvalidAlignment as exc:
+            # Cached before it was checked: drop it, or "Try again" replays the same answer.
+            await llm_cache.delete(result.cache_key)
+            logger.warning("Unusable alignment answer for trend %s: %s", trend.id, exc)
+            if attempt == 1:
+                continue
+            raise AIError(AIErrorKind.BAD_OUTPUT, str(exc)) from exc
+        return parsed, result
+    raise AssertionError("unreachable")
 
 
 def _level(fit: int) -> RelevanceLevel:
