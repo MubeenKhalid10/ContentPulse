@@ -36,7 +36,7 @@ export function SaveBar({
       <Button type="button" variant="ghost" onClick={onReset} disabled={!dirty || pending}>
         Discard
       </Button>
-      <Button type="submit" disabled={!dirty || pending}>
+      <Button type="submit" disabled={!dirty || pending} pending={pending}>
         {pending ? "Saving…" : "Save changes"}
       </Button>
     </div>

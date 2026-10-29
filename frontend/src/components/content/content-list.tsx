@@ -240,6 +240,7 @@ export function ContentList() {
                       onToggle={toggle}
                       onSubmit={submitSelected}
                       submitting={submitAll.isPending}
+                      submittingIds={submitAll.isPending ? submitAll.variables : undefined}
                     />
                   )}
                 />
@@ -293,6 +294,11 @@ export function ContentList() {
             className="ml-auto"
             size="sm"
             disabled={submitAll.isPending}
+            pending={
+              submitAll.isPending &&
+              submitAll.variables.length === selected.length &&
+              selected.every((id) => submitAll.variables.includes(id))
+            }
             onClick={() => submitSelected(selected)}
           >
             <SendIcon />

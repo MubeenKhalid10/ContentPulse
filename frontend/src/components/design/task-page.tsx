@@ -206,7 +206,7 @@ function WithdrawButton({ taskId }: { taskId: string }) {
   const withdraw = useWithdrawDesign();
   return (
     <>
-      <Button size="sm" variant="outline" className="w-fit" onClick={() => setOpen(true)} disabled={withdraw.isPending}>
+      <Button size="sm" variant="outline" className="w-fit" onClick={() => setOpen(true)} disabled={withdraw.isPending} pending={withdraw.isPending}>
         <RotateCcwIcon />
         Withdraw to make changes
       </Button>

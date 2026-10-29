@@ -127,6 +127,7 @@ export function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
             <Button
               className="w-full"
               disabled={finalize.isPending}
+              pending={finalize.isPending}
               onClick={() => finalize.mutate(a.id, { onSuccess: () => toast.success("Ready to publish"), onError })}
             >
               <FlagIcon />
@@ -186,7 +187,7 @@ export function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
             <AlertDescription>Review the latest version before you approve.</AlertDescription>
           </Alert>
         )}
-        <Button disabled={busy} onClick={() => setApproveOpen(true)}>
+        <Button disabled={busy} pending={approve.isPending} onClick={() => setApproveOpen(true)}>
           <CheckIcon />
           {a.stage === "copy" ? "Approve content" : "Approve design and post"}
         </Button>
@@ -257,6 +258,7 @@ export function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
             <Button
               variant="destructive"
               disabled={busy}
+              pending={reject.isPending}
               onClick={() =>
                 reject.mutate(
                   { id: a.id, comment: rejectNote.trim() },

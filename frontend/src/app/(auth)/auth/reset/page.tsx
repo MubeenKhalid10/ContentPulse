@@ -102,7 +102,7 @@ export default function ResetPasswordPage() {
               {...form.register("confirm")}
             />
           </FormField>
-          <Button type="submit" size="lg" disabled={update.isPending}>
+          <Button type="submit" size="lg" disabled={update.isPending} pending={update.isPending}>
             {update.isPending ? "Saving…" : "Save password"}
           </Button>
         </form>

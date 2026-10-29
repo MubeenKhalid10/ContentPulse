@@ -50,6 +50,7 @@ export function WritePostButton({ strategy, size = "sm" }: { strategy: Strategy;
     <Button
       size={size}
       disabled={generate.isPending}
+      pending={generate.isPending}
       onClick={() =>
         generate.mutate(strategy.id, {
           onSuccess: (post) => router.push(`/content/${post.id}`),
@@ -130,6 +131,7 @@ export function StrategyCard({
               variant="ghost"
               aria-label={`Archive ${label}`}
               title="Archive plan: keep it for reference, but stop editing it"
+              pending={action.isPending}
               onClick={() => setConfirmArchive(true)}
             >
               <ArchiveIcon />

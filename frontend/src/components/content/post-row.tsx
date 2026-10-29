@@ -58,6 +58,7 @@ function FailedPostActions({ post }: { post: Post }) {
           variant="outline"
           className="relative z-10"
           disabled={busy}
+          pending={regenerate.isPending}
           onClick={() =>
             regenerate.mutate(
               { id: post.id },
@@ -78,6 +79,7 @@ function FailedPostActions({ post }: { post: Post }) {
           variant="ghost"
           className="relative z-10 text-destructive"
           disabled={busy}
+          pending={remove.isPending}
           onClick={() => setConfirmOpen(true)}
         >
           <Trash2Icon />

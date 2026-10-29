@@ -84,6 +84,7 @@ export function PostLogo({
                 variant="ghost"
                 size="sm"
                 disabled={update.isPending}
+                pending={update.isPending}
                 onClick={() => save(null, "Logo back to the brand position")}
               >
                 <RotateCcwIcon /> Use brand position
@@ -146,6 +147,7 @@ export function PostLogo({
               type="button"
               size="sm"
               disabled={update.isPending}
+              pending={update.isPending}
               onClick={() =>
                 save(
                   draft === brandDefault ? null : draft,

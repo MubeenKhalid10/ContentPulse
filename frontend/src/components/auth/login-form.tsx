@@ -109,7 +109,7 @@ export function LoginForm() {
             />
           </FormField>
           <AuthCaptcha key={captchaKey} onToken={setCaptchaToken} />
-          <Button type="submit" size="lg" disabled={login.isPending}>
+          <Button type="submit" size="lg" disabled={login.isPending} pending={login.isPending}>
             {login.isPending ? "Signing in…" : "Sign in"}
           </Button>
           <p className="text-center text-sm text-muted-foreground">

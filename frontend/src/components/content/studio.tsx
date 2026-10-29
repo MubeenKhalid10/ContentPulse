@@ -244,7 +244,7 @@ function ResubmitControl({ postId }: { postId: string }) {
         onChange={(e) => setNote(e.target.value)}
         className="min-w-48 flex-1 bg-background"
       />
-      <Button type="submit" size="sm" disabled={resubmit.isPending}>
+      <Button type="submit" size="sm" disabled={resubmit.isPending} pending={resubmit.isPending}>
         <SendIcon />
         {resubmit.isPending ? "Resubmitting…" : "Resubmit for approval"}
       </Button>
@@ -308,6 +308,7 @@ function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail;
                 size="sm"
                 variant="outline"
                 disabled={regenerate.isPending || remove.isPending}
+                pending={regenerate.isPending}
                 onClick={() => regenerate.mutate({ id: post.id }, { onError: (e) => toast.error(errorMessage(e)) })}
               >
                 <RefreshCwIcon />
@@ -320,7 +321,8 @@ function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail;
                 label="Delete post"
                 title="Delete this failed post?"
                 description="Nothing was written, so only this empty post is removed. Your plan and other posts are not affected. This can't be undone."
-                pending={regenerate.isPending || remove.isPending}
+                pending={remove.isPending}
+                disabled={regenerate.isPending}
                 onConfirm={() =>
                   remove.mutate(post.id, {
                     onSuccess: () => {
@@ -558,6 +560,7 @@ function RegenerateDialog({ post, open, onClose }: { post: PostDetail; open: boo
           </Button>
           <Button
             disabled={regenerate.isPending}
+            pending={regenerate.isPending}
             onClick={() =>
               regenerate.mutate(
                 { id: post.id, instructions: instructions.trim() || undefined },

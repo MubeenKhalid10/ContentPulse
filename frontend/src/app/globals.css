@@ -330,3 +330,23 @@
   background: transparent;
   border: 0;
 }
+
+/* The top activity bar (components/shared/activity-bar.tsx): a segment sliding across. */
+.activity-bar {
+  animation: activity-slide 1.1s ease-in-out infinite;
+}
+@keyframes activity-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-bar {
+    width: 100%;
+    animation: none;
+    opacity: 0.6;
+  }
+}

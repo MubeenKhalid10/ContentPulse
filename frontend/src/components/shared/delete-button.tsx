@@ -21,12 +21,15 @@ export function DeleteButton({
   title,
   description,
   pending = false,
+  disabled = false,
   onConfirm,
 }: {
   label?: string;
   title: string;
   description: string;
   pending?: boolean;
+  /** Can't be used right now (e.g. another action on the same item is running) — no spinner. */
+  disabled?: boolean;
   onConfirm: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -36,7 +39,8 @@ export function DeleteButton({
         size="sm"
         variant="ghost"
         className="text-destructive hover:text-destructive"
-        disabled={pending}
+        disabled={disabled}
+        pending={pending}
         onClick={() => setOpen(true)}
       >
         <Trash2Icon />

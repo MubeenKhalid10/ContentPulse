@@ -147,7 +147,7 @@ export function LocalResetForm() {
               {...form.register("confirm")}
             />
           </FormField>
-          <Button type="submit" size="lg" disabled={reset.isPending}>
+          <Button type="submit" size="lg" disabled={reset.isPending} pending={reset.isPending}>
             {reset.isPending ? "Saving…" : "Save password"}
           </Button>
         </form>

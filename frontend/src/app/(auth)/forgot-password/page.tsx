@@ -137,7 +137,7 @@ export default function ForgotPasswordPage() {
             />
           </FormField>
           <AuthCaptcha key={captchaKey} onToken={setCaptchaToken} />
-          <Button type="submit" size="lg" disabled={send.isPending}>
+          <Button type="submit" size="lg" disabled={send.isPending} pending={send.isPending}>
             {send.isPending ? "Sending…" : "Send reset link"}
           </Button>
           <p className="text-center text-sm text-muted-foreground">

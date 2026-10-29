@@ -91,6 +91,7 @@ export function AlignmentPanel({
               size="sm"
               onClick={runAnalysis}
               disabled={analyze.isPending}
+              pending={analyze.isPending}
             >
               <RefreshCwIcon />
               Re-analyze
@@ -140,6 +141,7 @@ export function AlignmentPanel({
                   className="justify-self-start"
                   onClick={runAnalysis}
                   disabled={analyze.isPending}
+                  pending={analyze.isPending}
                 >
                   Try again
                 </Button>
@@ -156,7 +158,7 @@ export function AlignmentPanel({
               {engineIsAI ? ", and suggests post ideas." : "."}
             </p>
             {canReview && (
-              <Button onClick={runAnalysis} disabled={analyze.isPending}>
+              <Button onClick={runAnalysis} disabled={analyze.isPending} pending={analyze.isPending}>
                 <SparklesIcon />
                 Analyze now
               </Button>

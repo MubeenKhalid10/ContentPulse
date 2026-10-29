@@ -99,6 +99,7 @@ export function TrendsExport() {
           variant="success"
           onClick={run}
           disabled={download.isPending || !info}
+          pending={download.isPending}
           className="shrink-0 self-start sm:self-center"
         >
           <DownloadIcon />

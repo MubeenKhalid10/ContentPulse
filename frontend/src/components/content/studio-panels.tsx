@@ -296,6 +296,7 @@ function VersionDialog({
               {canRestore && !isCurrent && (
                 <Button
                   disabled={restore.isPending}
+                  pending={restore.isPending}
                   onClick={() =>
                     restore.mutate(
                       { id: post.id, number: version.version_number, base: post.current_version },
