@@ -134,6 +134,8 @@ class StructuredResult:
     cached: bool = False
     attempts: int = 1
     fallback_used: bool = False
+    # Where the gateway cached this answer, so a caller that rejects it can drop it.
+    cache_key: str | None = None
 
 
 class AIProvider(Protocol):

@@ -660,3 +660,31 @@ def test_provider_selection_from_settings(monkeypatch):
         Settings(_env_file=None, llm_provider="gemini", llm_model="gemini-2.5-flash")
     )
     assert custom.chain == ["gemini/gemini-2.5-flash", "gemini/gemini-3.8-flash"]
+
+
+async def test_unusable_answer_is_dropped_from_cache_and_asked_again(monkeypatch):
+    from app.ai.gateway import llm_cache
+    from app.ai.provider import StructuredResult
+    from app.services.alignment import engines
+
+    monkeypatch.setattr(engines, "trend_prompt", lambda *a: "P")
+    llm_cache.memory["bad"] = (float("inf"), "{}")
+    calls: list[bool] = []
+
+    class Gateway:
+        async def generate_structured(self, *, cache: bool, **_):
+            calls.append(cache)
+            # First a cached answer missing its scores, then a good one from the model.
+            data = ai_output() if len(calls) == 2 else {**ai_output(), "organization_fit": None}
+            return StructuredResult(
+                data=data, model="m", input_tokens=1, output_tokens=1, cache_key="bad"
+            )
+
+    ctx = SimpleNamespace(
+        name="Acme", profile_text="", service_names=["AI Solutions"], platforms=["linkedin"]
+    )
+    trend = SimpleNamespace(id=uuid.uuid4(), organization_id=uuid.uuid4())
+    result, _ = await engines.align_with_ai(Gateway(), ctx, trend, [], passages())  # type: ignore[arg-type]
+    assert result.organization_fit == 88
+    assert calls == [True, False]  # the retry skips the cache
+    assert "bad" not in llm_cache.memory

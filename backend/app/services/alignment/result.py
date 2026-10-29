@@ -208,6 +208,8 @@ def parse_ai_output(
         raw_angles = list(data["possible_angles"])
         raw_evidence = list(data["evidence"])
         confidence = max(0.0, min(1.0, float(data["confidence"])))
+        organization_fit = _clamp_int(data["organization_fit"])
+        audience_relevance = _clamp_int(data["audience_relevance"])
     except (KeyError, TypeError, ValueError) as exc:
         raise InvalidAlignment(f"malformed alignment output: {exc}") from exc
     if not reason:
@@ -264,8 +266,8 @@ def parse_ai_output(
         engine="ai",
         classification=level,
         confidence=round(confidence, 2),
-        organization_fit=_clamp_int(data["organization_fit"]),
-        audience_relevance=_clamp_int(data["audience_relevance"]),
+        organization_fit=organization_fit,
+        audience_relevance=audience_relevance,
         matched_services=matched,
         reason=reason,
         angles=angles,
