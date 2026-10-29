@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 
 import { useOrgId } from "@/hooks/use-organization";
-import { api } from "@/lib/api";
+import { api, apiList } from "@/lib/api";
 import type {
   BlogMeta,
   DesignFormat,
@@ -45,7 +45,7 @@ export function usePosts(filters: ContentFilters, limit = 30) {
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return useQuery({
     queryKey: [...root(orgId ?? "none"), "list", params.toString()],
-    queryFn: () => api<PostPage>(`/content?${params}`),
+    queryFn: () => apiList<PostPage>("/content", params),
     enabled: !!orgId,
     placeholderData: keepPreviousData,
     // Poll while any listed post is still being written.

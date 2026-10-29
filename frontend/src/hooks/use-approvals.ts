@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 
 import { useOrgId } from "@/hooks/use-organization";
-import { api } from "@/lib/api";
+import { api, apiList } from "@/lib/api";
 import type {
   ApprovalDetail,
   ApprovalFilter,
@@ -33,7 +33,7 @@ export function useApprovals(
   if (platform) params.set("platform", platform);
   return useQuery({
     queryKey: [...root(orgId ?? "none"), "list", params.toString()],
-    queryFn: () => api<ApprovalPage>(`/approvals?${params}`),
+    queryFn: () => apiList<ApprovalPage>("/approvals", params),
     enabled: !!orgId,
     placeholderData: keepPreviousData,
     refetchInterval: SIGNED_LINK_REFRESH_MS,

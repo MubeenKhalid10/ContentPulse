@@ -3,7 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useOrgId } from "@/hooks/use-organization";
-import { api, apiDownload } from "@/lib/api";
+import { api, apiDownload, apiList } from "@/lib/api";
 import type {
   DiscoveryRun,
   DiscoveryWindow,
@@ -49,7 +49,7 @@ export function useTrends(filters: TrendFilters, limit: number) {
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return useQuery({
     queryKey: [...root(orgId ?? "none"), "list", params.toString()],
-    queryFn: () => api<TrendPage>(`/trends?${params}`),
+    queryFn: () => apiList<TrendPage>("/trends", params),
     enabled: !!orgId,
     placeholderData: keepPreviousData,
   });
