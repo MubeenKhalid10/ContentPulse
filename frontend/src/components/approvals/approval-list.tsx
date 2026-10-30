@@ -13,6 +13,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { APPROVAL_STATUS_TONE } from "@/lib/tones";
+import { isSwitchingList, ListLoading } from "@/components/shared/loading";
+import { ChangeRequestTag } from "@/components/approvals/change-request";
+import { ChangeRequestQueue } from "@/components/approvals/change-request-queue";
 import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { DayGroups } from "@/components/shared/day-groups";
@@ -21,7 +24,6 @@ import { SimpleSelect } from "@/components/shared/simple-select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useApproveAll, useApprovals } from "@/hooks/use-approvals";
@@ -30,7 +32,6 @@ import { useCan } from "@/lib/auth";
 import { approvalStatusLabel } from "@/lib/approvals";
 import { formatDateTime, timeAgo, timeOfDay } from "@/lib/format";
 import { PLATFORM_OPTIONS } from "@/lib/options";
-import { cn } from "@/lib/utils";
 import type {
   Approval,
   ApprovalFilter,
@@ -40,11 +41,12 @@ import type {
 
 const PAGE = 30;
 /** "ready" lists posts whose content and design are both approved. */
-type View = ApprovalStage | "ready";
+type View = ApprovalStage | "ready" | "requests";
 const VIEWS: { value: View; label: string }[] = [
   { value: "copy", label: "Content approval" },
   { value: "design", label: "Design approval" },
   { value: "ready", label: "Ready to publish" },
+  { value: "requests", label: "Change requests" },
 ];
 
 export function ApprovalList() {
@@ -57,7 +59,7 @@ export function ApprovalList() {
   const ready = view === "ready";
   // An approval tab lists what waits for a decision. Ready to publish is the
   // approved designs: a design is only approved after its content.
-  const stage: ApprovalStage = ready ? "design" : view;
+  const stage: ApprovalStage = view === "copy" || view === "requests" ? "copy" : "design";
   const shownStatus: ApprovalFilter = ready ? "approved" : "pending";
   const setStage = (stage: View) => setFilters((f) => ({ ...f, stage }));
   const setPlatform = (platform: "" | Platform) =>
@@ -114,42 +116,55 @@ export function ApprovalList() {
             }}
           >
             <TabsList variant="line">
-              {VIEWS.map((s) => (
-                <TabsTrigger
-                  key={s.value}
-                  value={s.value}
-                  className="text-base"
-                >
-                  {s.label}
-                  {s.value !== "ready" &&
-                    (approvals.data?.stage_pending?.[s.value] ?? 0) > 0 && (
+              {VIEWS.map((s) => {
+                const count =
+                  (s.value === "ready"
+                    ? approvals.data?.ready_count
+                    : s.value === "requests"
+                      ? approvals.data?.change_request_count
+                      : approvals.data?.stage_pending?.[s.value]) ?? 0;
+                return (
+                  <TabsTrigger
+                    key={s.value}
+                    value={s.value}
+                    className="text-base"
+                  >
+                    {s.label}
+                    {count > 0 && (
                       <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[11px] tabular-nums text-primary-foreground">
-                        {approvals.data?.stage_pending?.[s.value]}
+                        {count}
                       </span>
                     )}
-                </TabsTrigger>
-              ))}
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
           </Tabs>
-          <SimpleSelect
-            aria-label="Platform"
-            value={platform || "all"}
-            onChange={(v) => setPlatform(v === "all" ? "" : (v as Platform))}
-            options={[
-              { value: "all", label: "Any platform" },
-              ...PLATFORM_OPTIONS,
-            ]}
-            className="w-40 sm:ml-auto"
-          />
+          {view !== "requests" && (
+            <SimpleSelect
+              aria-label="Platform"
+              value={platform || "all"}
+              onChange={(v) => setPlatform(v === "all" ? "" : (v as Platform))}
+              options={[
+                { value: "all", label: "Any platform" },
+                ...PLATFORM_OPTIONS,
+              ]}
+              className="w-40 sm:ml-auto"
+            />
+          )}
         </div>
         <p className="-mt-3 text-sm text-muted-foreground">
-          {ready
+          {view === "requests"
+            ? "Creators asking to reopen locked content or designs. Accept to reopen only what they asked for, or decline with a reason."
+            : ready
             ? "Posts with both the content and the design approved. Open one to share it."
             : stage === "copy"
               ? "Check the written post. Approving it sends the post to design."
               : "Check the finished design with the copy. Approving the design also approves the post: it becomes Ready to publish."}
         </p>
-        {(ready ? counts?.approved : counts?.all) === 0 && !platform ? (
+        {view === "requests" ? (
+          <ChangeRequestQueue />
+        ) : (ready ? counts?.approved : counts?.all) === 0 && !platform ? (
           <Card>
             <CardContent className="grid justify-items-center gap-4 py-12 text-center">
               <span className="grid size-12 place-items-center rounded-full bg-muted">
@@ -175,12 +190,8 @@ export function ApprovalList() {
           </Card>
         ) : (
           <>
-            {approvals.isPending ? (
-              <div className="grid gap-3">
-                {Array.from({ length: 3 }, (_, i) => (
-                  <Skeleton key={i} className="h-24 w-full rounded-xl" />
-                ))}
-              </div>
+            {approvals.isPending || isSwitchingList(approvals, limit) ? (
+              <ListLoading label="Loading approvals…" rows={3} rowClassName="h-24" />
             ) : approvals.isError ? (
               <Alert variant="destructive">
                 <AlertTriangleIcon />
@@ -194,13 +205,7 @@ export function ApprovalList() {
               </Alert>
             ) : approvals.data?.items.length ? (
               <>
-                <div
-                  aria-busy={approvals.isPlaceholderData}
-                  className={cn(
-                    "transition-opacity",
-                    approvals.isPlaceholderData && "opacity-50",
-                  )}
-                >
+                <div aria-busy={approvals.isPlaceholderData}>
                   <DayGroups
                     items={approvals.data.items}
                     dateOf={eventAt}
@@ -225,10 +230,13 @@ export function ApprovalList() {
                   <Button
                     variant="outline"
                     className="justify-self-center"
+                    disabled={approvals.isPlaceholderData}
+                    pending={approvals.isPlaceholderData}
                     onClick={() => setLimit((n) => n + PAGE)}
                   >
-                    Show more (
-                    {approvals.data.total - approvals.data.items.length} left)
+                    {approvals.isPlaceholderData
+                      ? "Loading more…"
+                      : `Show more (${approvals.data.total - approvals.data.items.length} left)`}
                   </Button>
                 )}
               </>
@@ -338,6 +346,7 @@ function ApprovalRow({
             {approvalStatusLabel(a.status, a.stage)}
           </Tag>
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
+          <ChangeRequestTag request={a.change_request} />
         </div>
         {a.topic_title && (
           <p className="truncate text-xs font-medium text-muted-foreground">

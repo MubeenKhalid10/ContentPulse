@@ -84,13 +84,12 @@ test("approved copy is locked and the design button says one thing", async ({ pa
 
   await expect(page.getByText("Approved copy is locked")).toBeVisible();
   await expect(page.getByRole("link", { name: "Add design", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: /&/ })).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("link", { name: /&/ })).toHaveCount(0);
   await expect(page.getByLabel("Body", { exact: false }).first()).toBeDisabled();
-  // The admin's way back in: the approval, where changes can be requested.
-  await expect(page.getByRole("link", { name: "Request changes" })).toHaveAttribute(
-    "href",
-    new RegExp(`/approvals/${REQUEST_ID}`),
-  );
+  // The admin's way back in, right here: no trip to the approval.
+  await page.getByRole("button", { name: "Request changes" }).click();
+  await expect(page.getByRole("alertdialog").getByText("What should change?")).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe(`/content/${POST_ID}`);
 });
 
 test("an approved design is locked on its design page", async ({ page }) => {
@@ -150,5 +149,5 @@ test("an approved design is locked on its design page", async ({ page }) => {
 
   await expect(page.getByText("Approved design is locked")).toBeVisible();
   await expect(page.getByRole("button", { name: "Submit for approval" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Request changes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Request changes" })).toBeVisible();
 });

@@ -7,10 +7,12 @@ these transition tables, and invalid moves raise INVALID_STATE_TRANSITION.
 from collections.abc import Iterable, Mapping
 from enum import StrEnum
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import utcnow
 from app.core.errors import InvalidStateTransition
+from app.models.approval import PostChangeRequest
 from app.models.design import CreativeAsset
 from app.models.enums import PostStatus, StrategyStatus, TopicStatus, TrendStatus
 from app.models.post import Post
@@ -112,6 +114,14 @@ TREND_MACHINE: StateMachine[TrendStatus] = StateMachine(
 )
 
 
+_ENDS_CHANGE_REQUEST = {
+    PostStatus.DRAFT,
+    PostStatus.CHANGES_REQUESTED,
+    PostStatus.REJECTED,
+    PostStatus.ARCHIVED,
+}
+
+
 async def _has_creative(db: AsyncSession, post: Post) -> bool:
     count = await db.scalar(
         select(func.count()).select_from(CreativeAsset).where(CreativeAsset.post_id == post.id)
@@ -139,6 +149,15 @@ async def transition_post(
         )
 
     previous = post.status
+    # The work reopened or ended another way: a creator's open request has nothing left to do.
+    if target in _ENDS_CHANGE_REQUEST or (
+        previous == PostStatus.PENDING_APPROVAL and target == PostStatus.DESIGN_UPLOADED
+    ):
+        await db.execute(
+            update(PostChangeRequest)
+            .where(PostChangeRequest.post_id == post.id, PostChangeRequest.status == "pending")
+            .values(status="closed", decided_at=utcnow())
+        )
     post.status = target
     audit.record(
         db,

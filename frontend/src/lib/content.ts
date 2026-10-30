@@ -10,7 +10,7 @@ export const POST_STATUS_LABEL: Record<PostStatus, string> = {
   design_uploaded: "Design uploaded, not yet submitted",
   pending_approval: "Waiting for design approval",
   // Design approval sending the post back; postStatusLabel names what was sent back.
-  changes_requested: "Design changes requested",
+  changes_requested: "Changes requested",
   approved: "Design approved, almost ready to publish",
   final: "Ready to publish",
   rejected: "Rejected",
@@ -18,10 +18,24 @@ export const POST_STATUS_LABEL: Record<PostStatus, string> = {
 };
 
 const CHANGES_LABEL = {
-  copy: "Copy changes requested",
+  copy: "Content changes requested",
   design: "Design changes requested",
-  both: "Copy & design changes requested",
+  both: "Content & design changes requested",
 } as const;
+
+/** What a change is about, in words: a "content change", the "design". */
+export const SCOPE_NAME: Record<keyof typeof CHANGES_LABEL, string> = {
+  copy: "content",
+  design: "design",
+  both: "content and design",
+};
+
+/** The tag for a creator's change request: what they asked for, and where it stands. */
+export function changeRequestLabel(request: { scope: keyof typeof CHANGES_LABEL; status: string }) {
+  return request.status === "declined"
+    ? `Creator's ${SCOPE_NAME[request.scope]} change declined`
+    : `Creator requested ${SCOPE_NAME[request.scope]} change`;
+}
 
 /** The status tag, naming what was sent back (the copy, the design or both) when it can. */
 export function postStatusLabel(post: { status: PostStatus; changes_scope?: keyof typeof CHANGES_LABEL | null }) {

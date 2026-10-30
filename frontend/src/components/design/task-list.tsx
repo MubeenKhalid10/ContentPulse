@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
+import { ChangeRequestTag } from "@/components/approvals/change-request";
+import { isSwitchingList, ListLoading } from "@/components/shared/loading";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { DayGroups } from "@/components/shared/day-groups";
 import { PageHeader } from "@/components/shared/page-header";
@@ -19,13 +21,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SubTabs } from "@/components/shared/sub-tabs";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { type DesignFilters, useDesignTasks } from "@/hooks/use-design";
 import { useCan } from "@/lib/auth";
-import { POST_STATUS_LABEL } from "@/lib/content";
+import { postStatusLabel } from "@/lib/content";
 import { formatLabel } from "@/lib/design";
 import { timeOfDay } from "@/lib/format";
 import { PLATFORM_OPTIONS } from "@/lib/options";
@@ -167,21 +168,11 @@ export function DesignTaskList() {
             />
           )}
 
-          {tasks.isPending ? (
-            <div className="grid gap-3">
-              {Array.from({ length: 4 }, (_, i) => (
-                <Skeleton key={i} className="h-20 w-full rounded-xl" />
-              ))}
-            </div>
+          {tasks.isPending || isSwitchingList(tasks, limit) ? (
+            <ListLoading label="Loading design tasks…" />
           ) : tasks.data?.items.length ? (
             <>
-              <div
-                aria-busy={tasks.isPlaceholderData}
-                className={cn(
-                  "transition-opacity",
-                  tasks.isPlaceholderData && "opacity-50",
-                )}
-              >
+              <div aria-busy={tasks.isPlaceholderData}>
                 <DayGroups
                   items={tasks.data.items}
                   dateOf={(t) => t.updated_at}
@@ -194,9 +185,10 @@ export function DesignTaskList() {
                   variant="outline"
                   className="justify-self-center"
                   disabled={tasks.isPlaceholderData}
+                  pending={tasks.isPlaceholderData}
                   onClick={() => setLimit((n) => n + PAGE)}
                 >
-                  {tasks.isPlaceholderData ? "Loading…" : `Show more (${tasks.data.total - tasks.data.items.length} left)`}
+                  {tasks.isPlaceholderData ? "Loading more…" : `Show more (${tasks.data.total - tasks.data.items.length} left)`}
                 </Button>
               )}
             </>
@@ -230,9 +222,10 @@ function TaskRow({ task }: { task: DesignTask }) {
           </Tag>
         ) : (
           <Tag tone={POST_STATUS_TONE[task.post.status]} dot>
-            {POST_STATUS_LABEL[task.post.status]}
+            {postStatusLabel(task.post)}
           </Tag>
         )}
+        <ChangeRequestTag request={task.change_request} />
         <span className="ml-auto text-xs text-muted-foreground">
           {timeOfDay(task.updated_at)}
         </span>

@@ -20,6 +20,21 @@ class Person(BaseModel):
     email: str
 
 
+class ChangeRequestRead(BaseModel):
+    """A creator's request to reopen locked copy or a locked design."""
+
+    id: uuid.UUID
+    post_id: uuid.UUID
+    scope: Literal["copy", "design", "both"]
+    note: str
+    status: Literal["pending", "accepted", "declined", "closed"]
+    requested_by: Person | None
+    decided_by: Person | None
+    decided_at: datetime | None
+    decision_note: str | None
+    created_at: datetime
+
+
 class TaskPost(BaseModel):
     id: uuid.UUID
     title: str | None
@@ -27,6 +42,8 @@ class TaskPost(BaseModel):
     status: PostStatus
     current_version: int
     topic_title: str | None
+    # What an admin sent back, while it waits on those changes.
+    changes_scope: Literal["copy", "design", "both"] | None = None
 
 
 class TaskListItem(BaseModel):
@@ -42,6 +59,7 @@ class TaskListItem(BaseModel):
     created_at: datetime
     updated_at: datetime
     submitted_at: datetime | None
+    change_request: ChangeRequestRead | None = None
 
 
 class TaskPage(BaseModel):
@@ -137,6 +155,8 @@ class TaskDetail(TaskListItem):
     ai_images: bool = False
     image_job: ImageJob | None = None
     review: ReviewSummary | None = None
+    # What a creator can ask an admin to reopen right now.
+    change_request_scopes: list[Literal["copy", "design", "both"]] = []
 
 
 class HandoffDocument(BaseModel):

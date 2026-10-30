@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { LoadingNotice } from "@/components/shared/loading";
 import { TagInput } from "@/components/shared/tag-input";
 import { Button } from "@/components/ui/button";
 import { useOrgSettings, useUpdateSettings } from "@/hooks/use-organization";
@@ -41,7 +42,7 @@ export function SourceListEditor({
   canEdit: boolean;
 }) {
   const settings = useOrgSettings();
-  if (!settings.data) return null;
+  if (!settings.data) return settings.isPending ? <LoadingNotice label="Loading settings…" /> : null;
   return (
     <ListForm
       key={settings.data.updated_at}

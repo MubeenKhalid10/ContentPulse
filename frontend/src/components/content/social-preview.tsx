@@ -1,5 +1,6 @@
 "use client";
 
+import { FileSlider } from "@/components/shared/file-slider";
 import { SignedImage } from "@/components/shared/signed-image";
 import {
   BookmarkIcon,
@@ -92,7 +93,6 @@ function Caption({ text, platform, lead }: { text: string; platform: Social; lea
 
 /** The creative as the feed shows it: one image, or a swipeable carousel. */
 function Media({ files, square = false }: { files: CreativeFile[]; square?: boolean }) {
-  const [index, setIndex] = useState(0);
   if (!files.length) return null;
   const renderFile = (f: CreativeFile, n: number) =>
     f.file_type.startsWith("image/") ? (
@@ -108,37 +108,8 @@ function Media({ files, square = false }: { files: CreativeFile[]; square?: bool
     );
   if (files.length === 1) return <div className="overflow-hidden bg-muted">{renderFile(files[0], 0)}</div>;
   return (
-    <div className="relative">
-      <div
-        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        role="group"
-        aria-roledescription="carousel"
-        aria-label="Carousel, use the arrow keys to move between images"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-          e.preventDefault();
-          e.currentTarget.scrollBy({ left: (e.key === "ArrowRight" ? 1 : -1) * e.currentTarget.clientWidth, behavior: "smooth" });
-        }}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          setIndex(Math.round(el.scrollLeft / el.clientWidth));
-        }}
-      >
-        {files.map((f, n) => (
-          <div key={f.id} className="w-full shrink-0 snap-center">
-            {renderFile(f, n)}
-          </div>
-        ))}
-      </div>
-      <span className="absolute top-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
-        {index + 1}/{files.length}
-      </span>
-      <div className="flex justify-center gap-1 py-2" aria-hidden>
-        {files.map((f, i) => (
-          <span key={f.id} className={cn("size-1.5 rounded-full", i === index ? "bg-primary" : "bg-muted-foreground/30")} />
-        ))}
-      </div>
+    <div className="pb-2">
+      <FileSlider files={files} label="Carousel" renderSlide={renderFile} />
     </div>
   );
 }

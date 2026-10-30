@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.approval import PostChangeRequest
 from app.models.audit import AuditLog
 from app.models.enums import (
     PostStatus,
@@ -60,7 +61,18 @@ async def attention(db: AsyncSession, organization_id: uuid.UUID) -> Attention:
             )
         ),
         approvals=post_counts.get(PostStatus.PENDING_APPROVAL, 0)
-        + post_counts.get(PostStatus.CONTENT_REVIEW, 0),
+        + post_counts.get(PostStatus.CONTENT_REVIEW, 0)
+        + (
+            await db.scalar(
+                select(func.count())
+                .select_from(PostChangeRequest)
+                .where(
+                    PostChangeRequest.organization_id == organization_id,
+                    PostChangeRequest.status == "pending",
+                )
+            )
+            or 0
+        ),
     )
 
 

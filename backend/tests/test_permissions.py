@@ -22,10 +22,10 @@ def test_creator_finds_writes_designs_and_submits_but_never_approves():
         Permission.CONTENT_EDIT,
         Permission.DESIGN_UPLOAD,
         Permission.DESIGN_SUBMIT,
-        Permission.APPROVAL_READ,
     ):
         assert has_permission(Role.CREATOR, allowed), allowed
     for denied in (
+        Permission.APPROVAL_READ,
         Permission.APPROVAL_MANAGE,
         Permission.ORGANIZATION_WRITE,
         Permission.USERS_MANAGE,

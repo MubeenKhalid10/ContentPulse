@@ -70,7 +70,11 @@ async function contextHeaders(): Promise<Record<string, string>> {
   if (typeof window !== "undefined") {
     // Supabase mode: send the Supabase access token. Local mode uses the
     // httpOnly session cookie instead (token is null).
-    const token = await supabaseAccessToken().catch(() => null);
+    // Failing here is a connection problem. Sending the request without a token would
+    // get a 401, which the app shell takes as a finished session and signs out.
+    const token = await supabaseAccessToken().catch(() => {
+      throw new ApiError(0, "NETWORK_ERROR", "Cannot reach the server. Check your connection.");
+    });
     if (token) headers.Authorization = `Bearer ${token}`;
   }
   return headers;

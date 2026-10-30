@@ -16,16 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useReopen, useRequestChanges } from "@/hooks/use-approvals";
 import { errorMessage } from "@/lib/api";
-import { cn } from "@/lib/utils";
-import type { ApprovalDetail } from "@/types/api";
+import type { ApprovalStage, ApprovalStatus, ChangeScope } from "@/types/api";
 
-type Scope = "copy" | "design" | "both";
+import { ScopePicker } from "./change-request";
 
-const SCOPES: { value: Scope; label: string; help: string }[] = [
-  { value: "copy", label: "Copy", help: "The writer edits the text. The design stays as it is." },
-  { value: "design", label: "Design", help: "The designer revises. The copy stays locked." },
-  { value: "both", label: "Both", help: "The text and the design both reopen." },
-];
+const ALL_SCOPES: ChangeScope[] = ["copy", "design", "both"];
 
 /** Request changes: on a pending submission, or (reopen) on approved work. */
 export function ChangesDialog({
@@ -33,19 +28,19 @@ export function ChangesDialog({
   open,
   onOpenChange,
 }: {
-  approval: ApprovalDetail;
+  approval: { id: string; status: ApprovalStatus; stage: ApprovalStage };
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const changes = useRequestChanges();
   const reopen = useReopen();
   const [note, setNote] = useState("");
-  const [scope, setScope] = useState<Scope>("both");
+  const [scope, setScope] = useState<ChangeScope>("both");
   const approved = a.status === "approved";
   const mutation = approved ? reopen : changes;
   const copyStage = a.stage === "copy";
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>What should change?</AlertDialogTitle>
@@ -58,41 +53,14 @@ export function ChangesDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {!copyStage && (
-          <div role="radiogroup" aria-label="What needs changes" className="grid gap-1.5">
-            {SCOPES.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={scope === option.value}
-                tabIndex={scope === option.value ? 0 : -1}
-                onClick={() => setScope(option.value)}
-                onKeyDown={(e) => {
-                  const i = SCOPES.findIndex((o) => o.value === scope);
-                  if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-                    e.preventDefault();
-                    setScope(SCOPES[(i + 1) % SCOPES.length].value);
-                  } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setScope(SCOPES[(i + SCOPES.length - 1) % SCOPES.length].value);
-                  }
-                }}
-                className={cn(
-                  "grid rounded-lg border px-3 py-2 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                  scope === option.value ? "border-primary bg-primary/5" : "hover:bg-muted",
-                )}
-              >
-                <span className="font-medium">{option.label}</span>
-                <span className="text-xs text-muted-foreground">{option.help}</span>
-              </button>
-            ))}
-          </div>
+          <ScopePicker allowed={ALL_SCOPES} value={scope} onChange={setScope} disabled={mutation.isPending} />
         )}
         <Textarea
           aria-label="What should change"
           rows={4}
           maxLength={4000}
           placeholder="e.g. Shorten the headline and use the brand blue on slide 3."
+          disabled={mutation.isPending}
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />

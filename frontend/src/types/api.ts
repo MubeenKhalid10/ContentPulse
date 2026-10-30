@@ -737,6 +737,7 @@ export interface Post {
   generation: GenerationStatus | null;
   /** What an approver sent back while the post waits on those changes; null otherwise. */
   changes_scope: "copy" | "design" | "both" | null;
+  change_request?: ChangeRequest | null;
   created_at: string;
   updated_at: string;
 }
@@ -759,6 +760,7 @@ export interface PostPage {
 }
 
 export interface PostDetail extends Post {
+  change_request_scopes: ChangeScope[];
   current: PostVersion | null;
   strategy: Strategy | null;
   variants: Post[];
@@ -793,7 +795,9 @@ export interface DesignTask {
     status: PostStatus;
     current_version: number;
     topic_title: string | null;
+    changes_scope?: "copy" | "design" | "both" | null;
   };
+  change_request?: ChangeRequest | null;
   assignee: Person | null;
   creative_versions: number;
   source: "rules" | "ai" | "edited";
@@ -827,6 +831,7 @@ export interface CreativeVersion {
 }
 
 export interface DesignTaskDetail extends DesignTask {
+  change_request_scopes: ChangeScope[];
   visual_concept: string | null;
   supporting_text: string | null;
   slide_structure: string[];
@@ -895,6 +900,32 @@ export interface ReviewComment {
   created_at: string;
 }
 
+export type ChangeScope = "copy" | "design" | "both";
+
+/** A creator's request to reopen locked work; an admin decides. */
+export interface ChangeRequest {
+  id: string;
+  post_id: string;
+  scope: ChangeScope;
+  note: string;
+  status: "pending" | "accepted" | "declined" | "closed";
+  requested_by: Person | null;
+  decided_by: Person | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  created_at: string;
+}
+
+export interface ChangeRequestItem extends ChangeRequest {
+  post: { id: string; title: string | null; platform: Platform; status: PostStatus; current_version: number };
+  topic_title: string | null;
+}
+
+export interface ChangeRequestPage {
+  items: ChangeRequestItem[];
+  total: number;
+}
+
 export interface ReviewSummary {
   request_id: string;
   status: ApprovalStatus;
@@ -907,6 +938,7 @@ export interface ReviewSummary {
 }
 
 export interface Approval {
+  change_request?: ChangeRequest | null;
   id: string;
   /** "copy": the written post, before design. "design": the finished creative. */
   stage: "copy" | "design";
@@ -930,6 +962,8 @@ export interface ApprovalPage {
   counts: Record<ApprovalFilter, number>;
   /** Posts waiting for a decision, per stage. */
   stage_pending: Record<ApprovalStage, number>;
+  ready_count: number;
+  change_request_count: number;
 }
 
 export type ApprovalStage = "copy" | "design";

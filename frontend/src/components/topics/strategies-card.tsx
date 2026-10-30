@@ -1,12 +1,14 @@
 "use client";
 
-import { ClipboardListIcon, PlusIcon, SparklesIcon } from "lucide-react";
+import { ClipboardListIcon, PlusIcon, RefreshCwIcon, SparklesIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { ListLoading } from "@/components/shared/loading";
 import { StrategyCard } from "@/components/topics/strategy-card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { usePosts, useWriteAll } from "@/hooks/use-content";
+import { useTopicPosts, useWriteAll } from "@/hooks/use-content";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import type { Platform, Strategy, TopicDetail } from "@/types/api";
@@ -29,11 +31,13 @@ export function StrategiesCard({
     (a, b) => Number(a.status === "archived") - Number(b.status === "archived"),
   );
   // Same query as the Posts card below (shared cache): the post each plan led to.
-  const posts = usePosts(
-    { status: "all", platform: "", topicId: topic.id, q: "" },
-    50,
-  );
-  const canGenerate = useCan()("content.generate");
+  const posts = useTopicPosts(topic.id);
+  const can = useCan();
+  const canGenerate = can("content.generate");
+  // Which plans still need a post is unknown until the posts load, so none are offered yet.
+  const checking = posts.isPending || posts.isPlaceholderData;
+  // People who can't read posts get a 403 here and still see the plans.
+  const checkFailed = posts.isError && can("content.read");
   const writeAll = useWriteAll();
   // A plan that already has a post is shown in the Posts card instead.
   const unwritten = strategies.filter(
@@ -52,7 +56,7 @@ export function StrategiesCard({
           description="Each plan sets the platform, audience, message and goal of one post."
           badge={`${strategies.length} ${strategies.length === 1 ? "plan" : "plans"}`}
           actions={
-            hasPlans && canCreate && unwritten.length > 0 ? (
+            !checking && !checkFailed && hasPlans && canCreate && unwritten.length > 0 ? (
               <>
                 {canGenerate && toWrite.length > 1 && (
                   <Button
@@ -94,7 +98,19 @@ export function StrategiesCard({
         />
       </CardHeader>
       <CardContent className="grid gap-3">
-        {unwritten.length ? (
+        {hasPlans && checking ? (
+          <ListLoading label="Loading post plans…" rows={1} rowClassName="h-32" />
+        ) : hasPlans && checkFailed ? (
+          <Alert variant="destructive">
+            <AlertDescription className="grid gap-2">
+              <span>Couldn&apos;t check which plans already have a post. {errorMessage(posts.error)}</span>
+              <Button size="sm" variant="outline" className="w-fit" onClick={() => posts.refetch()}>
+                <RefreshCwIcon />
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : unwritten.length ? (
           unwritten.map((s) => (
             <StrategyCard
               key={s.id}

@@ -20,6 +20,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { LoadingNotice } from "@/components/shared/loading";
 import { Tag } from "@/components/shared/tag";
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { FormSkeleton } from "@/components/shared/form-skeleton";
@@ -202,7 +203,7 @@ const localPasswordSchema = z
 
 function PasswordCard() {
   const config = useAuthConfig();
-  if (!config.data) return null;
+  if (!config.data) return config.isPending ? <LoadingNotice label="Loading password settings…" /> : null;
   return <PasswordForm supabaseMode={config.data.provider === "supabase"} />;
 }
 

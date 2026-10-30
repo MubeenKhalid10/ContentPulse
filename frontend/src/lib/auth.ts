@@ -15,6 +15,12 @@ export function useMe() {
     queryFn: () => api<Me>("/auth/me"),
     retry: false,
     staleTime: 60_000,
+    // Reconnect by itself after an outage. The Supabase client refuses to renew a token
+    // for 60 seconds after a failed attempt, so one retry click may come too early.
+    refetchInterval: (query) => {
+      const error = query.state.error;
+      return error instanceof ApiError && (error.status === 0 || error.status >= 500) ? 15_000 : false;
+    },
   });
 }
 

@@ -77,6 +77,9 @@ const ACTIONS: Record<string, string> = {
   APPROVED: "approved a post",
   CHANGES_REQUESTED: "requested changes",
   REJECTED: "rejected a post",
+  CHANGE_REQUEST_CREATED: "asked to change a post",
+  CHANGE_REQUEST_ACCEPTED: "accepted a change request",
+  CHANGE_REQUEST_DECLINED: "declined a change request",
 };
 
 export function describeAction(action: string): string {

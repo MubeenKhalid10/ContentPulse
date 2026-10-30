@@ -7,9 +7,17 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
-import { BackLink, useFromHere } from "@/components/shared/back-link";
+import { PageLoading } from "@/components/shared/loading";
+import { BackLink } from "@/components/shared/back-link";
 import { PostProgress } from "@/components/shared/post-progress";
 import { PlatformTag, Tag } from "@/components/shared/tag";
+import {
+  AdminRequestChanges,
+  ChangeRequestNotice,
+  ChangeRequestTag,
+  RequestChangeButton,
+} from "@/components/approvals/change-request";
+import { PostComments } from "@/components/approvals/post-comments";
 import { ReviewBanner } from "@/components/approvals/review-banner";
 import { BriefDialog } from "@/components/design/brief-dialog";
 import { CreativeUploader, CreativeVersions } from "@/components/design/creatives";
@@ -19,9 +27,8 @@ import { DeleteButton } from "@/components/shared/delete-button";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ArticlePreview } from "@/components/content/article-preview";
 import { HandoffButtons } from "@/components/design/handoff-buttons";
 import { useDeletePost } from "@/hooks/use-content";
@@ -39,9 +46,8 @@ import {
 import { useMembers } from "@/hooks/use-organization";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan, useMe } from "@/lib/auth";
-import { POST_STATUS_LABEL, fullText } from "@/lib/content";
+import { fullText, postStatusLabel } from "@/lib/content";
 import { formatLabel } from "@/lib/design";
-import { cn } from "@/lib/utils";
 import type { DesignTaskDetail } from "@/types/api";
 
 const ACTIVE = ["open", "assigned", "in_progress"];
@@ -51,7 +57,6 @@ export function DesignTaskPage({ id }: { id: string }) {
   const task = useDesignTask(id);
   const me = useMe();
   const can = useCan();
-  const fromHere = useFromHere();
   const [editing, setEditing] = useState(false);
 
   const back = <BackLink href="/design" label="Design" />;
@@ -70,11 +75,7 @@ export function DesignTaskPage({ id }: { id: string }) {
     return (
       <>
         {back}
-        <Skeleton className="h-10 w-2/3" />
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <Skeleton className="h-[30rem] lg:col-span-2" />
-          <Skeleton className="h-72" />
-        </div>
+        <PageLoading label="Loading design task…" />
       </>
     );
   }
@@ -91,6 +92,7 @@ export function DesignTaskPage({ id }: { id: string }) {
   const canWithdraw =
     can("design.upload") && t.status === "submitted" && t.review?.status === "pending" && (mine || manager || !t.assignee);
   const canEditBrief = (can("content.edit") || manager) && active;
+  const ask = <RequestChangeButton postId={t.post.id} scopes={t.change_request_scopes} request={t.change_request} />;
 
   return (
     <>
@@ -100,7 +102,8 @@ export function DesignTaskPage({ id }: { id: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">{t.post.title ?? "Untitled post"}</h1>
             <PlatformTag platform={t.post.platform} />
-            <Tag tone={POST_STATUS_TONE[t.post.status]} dot>{POST_STATUS_LABEL[t.post.status]}</Tag>
+            <Tag tone={POST_STATUS_TONE[t.post.status]} dot>{postStatusLabel(t.post)}</Tag>
+            <ChangeRequestTag request={t.change_request} />
           </div>
           <p className="text-sm text-muted-foreground">
             {formatLabel(t.format)}
@@ -112,6 +115,7 @@ export function DesignTaskPage({ id }: { id: string }) {
 
       <PostProgress status={t.post.status} />
 
+      <ChangeRequestNotice request={t.change_request} />
       <ReviewBanner review={t.review} />
       {t.status === "submitted" && t.review?.status === "pending" && (
         <Alert className="mb-6">
@@ -123,6 +127,8 @@ export function DesignTaskPage({ id }: { id: string }) {
               {canWithdraw && " Need to change something first? Take it back and submit it again when you are done."}
             </span>
             {canWithdraw && <WithdrawButton taskId={t.id} />}
+            {ask}
+            <AdminRequestChanges review={t.review} />
           </AlertDescription>
         </Alert>
       )}
@@ -143,17 +149,10 @@ export function DesignTaskPage({ id }: { id: string }) {
             <span>
               {canReview
                 ? "Request changes to let the creator update the design again."
-                : "An admin can request changes to reopen it."}
+                : "Ask an admin to reopen it if something needs to change."}
             </span>
-            {canReview && t.review?.status === "approved" && (
-              <Link
-                href={fromHere(`/approvals/${t.review.request_id}`)}
-                className={cn(buttonVariants({ size: "sm", variant: "outline" }), "w-fit")}
-              >
-                <RotateCcwIcon />
-                Request changes
-              </Link>
-            )}
+            {ask}
+            <AdminRequestChanges review={t.review} />
           </AlertDescription>
         </Alert>
       )}
@@ -185,6 +184,7 @@ export function DesignTaskPage({ id }: { id: string }) {
             <div className="grid min-w-0 grid-cols-1 content-start gap-6">
               {canWork && <CreativeUploader task={t} canSubmit={can("design.submit")} />}
               <CreativeVersions task={t} canUse={canWork} />
+              {t.review && <PostComments postId={t.post.id} currentRound={t.review.request_id} />}
               {!canWork && !t.creatives.length && (
                 <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                   No design files uploaded yet.
@@ -363,7 +363,7 @@ function BriefCard({ task: t, canEdit, onEdit }: { task: DesignTaskDetail; canEd
             .map(([label, value]) => (
               <div key={label} className="contents">
                 <dt className="text-muted-foreground">{label}</dt>
-                <dd className="whitespace-pre-wrap">{value}</dd>
+                <dd className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{value}</dd>
               </div>
             ))}
         </dl>

@@ -237,6 +237,7 @@ async def _items(db: AsyncSession, posts: list[Post]) -> list[PostListItem]:
             else []
         )
     }
+    change_requests = await approvals.current_change_requests(db, posts)
     return [
         PostListItem(
             id=p.id,
@@ -255,6 +256,7 @@ async def _items(db: AsyncSession, posts: list[Post]) -> list[PostListItem]:
             changes_scope=("copy" if p.status == P.DRAFT else scopes[p.id])
             if p.id in scopes
             else None,
+            change_request=change_requests.get(p.id),
             created_at=p.created_at,
             updated_at=p.updated_at,
         )
@@ -297,7 +299,6 @@ async def list_posts(
     ).one()
     counts = dict(zip(STATUS_GROUPS, row, strict=True))
     filters.append(_group_clause(status))
-    total = await db.scalar(select(func.count()).select_from(Post).where(*filters))
     posts = list(
         await db.scalars(
             select(Post)
@@ -307,7 +308,7 @@ async def list_posts(
             .offset(offset)
         )
     )
-    return PostPage(items=await _items(db, posts), total=total or 0, counts=counts)
+    return PostPage(items=await _items(db, posts), total=counts[status], counts=counts)
 
 
 async def post_detail(
@@ -346,6 +347,7 @@ async def post_detail(
         design_task=DesignTaskRef(id=brief.id, status=brief.status) if brief else None,
         review=await approvals.latest_review(db, post.id),
         creatives=await design.creative_versions(db, post.id),
+        change_request_scopes=await approvals.change_request_scopes(db, post),
     )
 
 

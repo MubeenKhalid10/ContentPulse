@@ -255,7 +255,11 @@ export function AlignmentPanel({
               </div>
             )}
 
-
+            {showIdeas && !showFit && !running && !a.possible_angles?.length && (
+              <p className="text-sm text-muted-foreground">
+                The analysis didn&apos;t suggest any post ideas for this trend.
+              </p>
+            )}
           </>
         )}
       </CardContent>

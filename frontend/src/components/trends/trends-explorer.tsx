@@ -4,6 +4,7 @@ import { RadarIcon, SlidersHorizontalIcon, TrendingUpIcon, XIcon } from "lucide-
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { isSwitchingList, ListLoading } from "@/components/shared/loading";
 import { FILTER_SEARCH, FILTER_SELECT, FilterBar } from "@/components/shared/filter-bar";
 import { PageHeader } from "@/components/shared/page-header";
 import { SearchInput } from "@/components/shared/search-input";
@@ -13,7 +14,6 @@ import { TrendRow } from "@/components/trends/trend-row";
 import { TrendsExport } from "@/components/trends/trends-export";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useOrgSettings } from "@/hooks/use-organization";
@@ -31,7 +31,6 @@ import {
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { sourceName } from "@/lib/trends";
-import { cn } from "@/lib/utils";
 
 import { onDiscoverStarted, onDiscoverError, useRunCompletion } from "./use-run-completion";
 import { DiscoveryStatus } from "./discovery-status";
@@ -379,12 +378,8 @@ export function TrendsExplorer() {
                   Retry
                 </Button>
               </div>
-            ) : trends.isPending ? (
-              <div className="grid gap-3">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
-                ))}
-              </div>
+            ) : trends.isPending || isSwitchingList(trends, limit) ? (
+              <ListLoading label="Loading trends…" rows={5} />
             ) : trends.data?.items.length ? (
               <>
                 <p className="text-sm text-muted-foreground">
@@ -393,10 +388,7 @@ export function TrendsExplorer() {
                   {filters.relevance === "relevant" && ", the ones that fit your business"}.
                 </p>
                 <ul
-                  className={cn(
-                    "grid min-w-0 grid-cols-1 gap-3 transition-opacity",
-                    trends.isPlaceholderData && "opacity-50",
-                  )}
+                  className="grid min-w-0 grid-cols-1 gap-3"
                   aria-label="Trends"
                   aria-busy={trends.isPlaceholderData}
                 >
@@ -406,6 +398,7 @@ export function TrendsExplorer() {
                       trend={trend}
                       canReview={canReview}
                       marketNames={marketNames}
+                      hideShortlistedTag={filters.status === "shortlisted"}
                     />
                   ))}
                 </ul>
@@ -413,10 +406,13 @@ export function TrendsExplorer() {
                   <Button
                     variant="outline"
                     className="justify-self-center"
+                    disabled={trends.isPlaceholderData}
+                    pending={trends.isPlaceholderData}
                     onClick={() => setLimit((n) => n + PAGE)}
                   >
-                    Show more ({trends.data.total - trends.data.items.length}{" "}
-                    left)
+                    {trends.isPlaceholderData
+                      ? "Loading more…"
+                      : `Show more (${trends.data.total - trends.data.items.length} left)`}
                   </Button>
                 )}
               </>

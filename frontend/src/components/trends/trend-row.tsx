@@ -139,10 +139,13 @@ export function TrendRow({
   trend,
   canReview,
   marketNames,
+  hideShortlistedTag = false,
 }: {
   trend: Trend;
   canReview: boolean;
   marketNames: Map<string, string>;
+  /** On the Shortlisted tab every row is shortlisted, so the tag says nothing. */
+  hideShortlistedTag?: boolean;
 }) {
   return (
     <li className="group relative flex flex-wrap items-start gap-4 rounded-xl p-4 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40 bg-card">
@@ -164,7 +167,7 @@ export function TrendRow({
             level={trend.relevance_level}
             overridden={trend.relevance_overridden}
           />
-          {trend.status === "shortlisted" && (
+          {trend.status === "shortlisted" && !hideShortlistedTag && (
             <Tag tone="green" dot>
               Shortlisted
             </Tag>

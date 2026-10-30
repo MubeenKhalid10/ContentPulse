@@ -141,7 +141,7 @@ export function Dashboard() {
                   icon={SendIcon}
                   metric={data.approved_posts}
                   days={days}
-                  href="/approvals"
+                  href={can("approval.read") ? "/approvals" : "/content"}
                   color="var(--flash)"
                 />
               </>

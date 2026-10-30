@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.email import send_email
+from app.core.email_templates import password_reset_email
 from app.core.errors import AppError, Conflict, ErrorCode, Forbidden, NotFound, Unauthorized
 from app.core.permissions import Role, permissions_for
 from app.core.security import (
@@ -138,17 +139,18 @@ async def request_password_reset(db: AsyncSession, email: str, settings: Setting
     token = create_password_reset_token(user.id, user.password_hash, settings)
     link = f"{settings.frontend_url.rstrip('/')}/reset-password#token={token}"
     minutes = settings.password_reset_ttl_minutes
+    text, html = password_reset_email(
+        name=user.full_name,
+        reset_url=link,
+        expires_in_minutes=minutes,
+        site_url=settings.frontend_url.rstrip("/"),
+    )
     await send_email(
         settings,
         to=user.email,
         subject="Reset your ContentPulse password",
-        body=(
-            f"Hi{' ' + user.full_name if user.full_name else ''},\n\n"
-            "Someone asked to reset the password for this ContentPulse account.\n"
-            f"Choose a new password here (the link works for {minutes} minutes, once):\n\n"
-            f"{link}\n\n"
-            "If it wasn't you, ignore this email; your password stays the same.\n"
-        ),
+        body=text,
+        html=html,
     )
 
 

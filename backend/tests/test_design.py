@@ -12,6 +12,7 @@ from sqlalchemy import select
 from app.ai.provider import AIError, AIErrorKind, StructuredResult, set_ai_provider
 from app.models.ai import AIGenerationJob, LLMRequest
 from app.models.design import DesignBrief
+from app.models.enums import JobStatus
 from app.services.design import briefs
 from app.storage import safe_filename
 from app.storage.s3 import S3Storage
@@ -532,6 +533,34 @@ async def test_ai_image_becomes_the_next_design_version(
 
     rows = list(await db.scalars(select(LLMRequest).where(LLMRequest.workflow == "design_image")))
     assert [r.status for r in rows] == ["succeeded"]
+
+
+async def test_a_design_cant_be_submitted_while_its_ai_image_is_being_created(
+    client, internet, design_ai, fake_images, db
+):
+    admin, org = await setup_org(client)
+    _, task = await in_design(admin, org)
+    url = f"{API}/{task['id']}"
+    await admin.post(f"{url}/generate-image")
+    await runner.wait_idle()
+
+    job = AIGenerationJob(
+        organization_id=uuid.UUID(org["id"]),
+        type="design_image",
+        entity_type="design_brief",
+        entity_id=uuid.UUID(task["id"]),
+        provider="fake",
+        model="fake",
+        status=JobStatus.RUNNING,
+    )
+    db.add(job)
+    await db.commit()
+    resp = await admin.post(f"{url}/submit")
+    assert resp.status_code == 409 and "being created" in resp.json()["error"]["message"]
+
+    job.status = JobStatus.SUCCEEDED
+    await db.commit()
+    assert (await admin.post(f"{url}/submit")).status_code == 200
 
 
 async def test_ai_image_failures_are_explained(client, internet, design_ai, fake_images):
