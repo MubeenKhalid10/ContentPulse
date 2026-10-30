@@ -14,7 +14,7 @@ from app.models.enums import (
 )
 from app.schemas.blog import BlogMeta
 from app.schemas.common import ORMModel
-from app.schemas.design import CreativeVersion, ReviewSummary
+from app.schemas.design import ChangeRequestRead, CreativeVersion, ReviewSummary
 from app.schemas.topic import StrategyRead
 
 # Blog articles are long-form; platform limits are checked as warnings.
@@ -83,6 +83,7 @@ class PostListItem(BaseModel):
     # What an approver sent back, while the post waits on those changes: the copy,
     # the design or both. None when nothing was sent back.
     changes_scope: Literal["copy", "design", "both"] | None = None
+    change_request: ChangeRequestRead | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -112,6 +113,8 @@ class PostDetail(PostListItem):
     design_task: DesignTaskRef | None = None
     review: ReviewSummary | None = None
     creatives: list[CreativeVersion] = Field(default_factory=list)
+    # What a creator can ask an admin to reopen right now.
+    change_request_scopes: list[Literal["copy", "design", "both"]] = Field(default_factory=list)
 
 
 class PostUpdate(BaseModel):

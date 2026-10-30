@@ -6,7 +6,7 @@ from pydantic import BaseModel, StringConstraints
 
 from app.models.enums import ApprovalStatus, Platform, PostStatus, RelevanceLevel
 from app.schemas.content import VersionRead
-from app.schemas.design import CreativeVersion, Person
+from app.schemas.design import ChangeRequestRead, CreativeVersion, Person
 
 CommentText = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
@@ -37,6 +37,7 @@ class ApprovalListItem(BaseModel):
     comment_count: int
     created_at: datetime
     reviewed_at: datetime | None
+    change_request: ChangeRequestRead | None = None
 
 
 class ApprovalPage(BaseModel):
@@ -45,6 +46,8 @@ class ApprovalPage(BaseModel):
     counts: dict[str, int]
     # Posts waiting for a decision, per stage: {"copy": n, "design": n}.
     stage_pending: dict[str, int]
+    ready_count: int
+    change_request_count: int
 
 
 class CommentRead(BaseModel):
@@ -115,6 +118,21 @@ class ChangesRequest(BaseModel):
     # What needs work. Default "both": the creator may revise the copy and
     # upload a new design, then resubmit.
     scope: Literal["design", "copy", "both"] = "both"
+
+
+class ChangeRequestCreate(BaseModel):
+    scope: Literal["design", "copy", "both"]
+    note: CommentText
+
+
+class ChangeRequestItem(ChangeRequestRead):
+    post: ApprovalPost
+    topic_title: str | None
+
+
+class ChangeRequestPage(BaseModel):
+    items: list[ChangeRequestItem]
+    total: int
 
 
 class CommentCreate(BaseModel):

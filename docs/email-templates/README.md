@@ -25,3 +25,9 @@ The message has a plain-text part and a branded HTML part with an
 **Accept invitation** button; the HTML is built in
 `backend/app/core/email_templates.py`. `invitation-preview.html` is a rendered
 sample you can open in a browser.
+
+Local password-reset messages use the same SMTP settings and include both a
+plain-text fallback and a branded HTML **Reset password** button. In production,
+use a sending domain with SPF and DKIM configured, and check the provider's
+delivery or spam logs if a message is accepted by SMTP but does not appear in
+the inbox.

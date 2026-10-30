@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { toast } from "sonner";
 
+import { LoadingNotice } from "@/components/shared/loading";
 import { Switch } from "@/components/ui/switch";
 import { useOrgSettings, useUpdateSettings } from "@/hooks/use-organization";
 import { useDiscoveryWindow } from "@/hooks/use-trends";
@@ -45,7 +46,7 @@ export function BackgroundDiscoveryToggle({ className }: { className?: string })
   const discovery = useDiscoveryWindow();
   const labelId = useId();
   const hintId = useId();
-  if (!settings.data) return null;
+  if (!settings.data) return settings.isPending ? <LoadingNotice label="Loading settings…" /> : null;
   const on = settings.data.background_discovery;
 
   return (

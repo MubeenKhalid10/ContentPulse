@@ -29,6 +29,7 @@ class ErrorCode(StrEnum):
     FILE_UPLOAD_FAILED = "FILE_UPLOAD_FAILED"
     RATE_LIMITED = "RATE_LIMITED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
+    SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
 
 
 _DEFAULT_STATUS: dict[ErrorCode, int] = {
@@ -44,6 +45,7 @@ _DEFAULT_STATUS: dict[ErrorCode, int] = {
     ErrorCode.FILE_UPLOAD_FAILED: 400,
     ErrorCode.RATE_LIMITED: 429,
     ErrorCode.INTERNAL_ERROR: 500,
+    ErrorCode.SERVICE_UNAVAILABLE: 503,
 }
 
 _HTTP_STATUS_CODES: dict[int, ErrorCode] = {
@@ -88,6 +90,11 @@ class Forbidden(AppError):
 class Unauthorized(AppError):
     def __init__(self, message: str = "Authentication required.") -> None:
         super().__init__(ErrorCode.UNAUTHORIZED, message)
+
+
+class ServiceUnavailable(AppError):
+    def __init__(self, message: str) -> None:
+        super().__init__(ErrorCode.SERVICE_UNAVAILABLE, message)
 
 
 class Conflict(AppError):

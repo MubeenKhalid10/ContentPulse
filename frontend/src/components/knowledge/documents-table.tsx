@@ -4,6 +4,7 @@ import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-re
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ListLoading } from "@/components/shared/loading";
 import { SearchInput } from "@/components/shared/search-input";
 import { Tag } from "@/components/shared/tag";
 import { SourceLink } from "@/components/knowledge/knowledge-search";
@@ -25,7 +26,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -104,11 +104,9 @@ export function DocumentsTable({
       </div>
 
       <Card className="py-0">
-        {docs.isPending ? (
-          <div className="grid gap-3 p-4">
-            {Array.from({ length: 4 }, (_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
+        {docs.isPending || docs.isPlaceholderData ? (
+          <div className="p-4">
+            <ListLoading label="Loading pages…" rowClassName="h-10" />
           </div>
         ) : docs.data?.items.length ? (
           <Table>

@@ -21,7 +21,7 @@ import {
   useSuggestStrategy,
   useUpdateStrategy,
 } from "@/hooks/use-topics";
-import { useGeneratePost, usePosts } from "@/hooks/use-content";
+import { useGeneratePost, useTopicPosts } from "@/hooks/use-content";
 import { useOrgSettings } from "@/hooks/use-organization";
 import { useAIStatus } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -99,7 +99,7 @@ export function StrategyForm({
   const generate = useGeneratePost();
   const router = useRouter();
   const canGenerate = useCan()("content.generate");
-  const topicPosts = usePosts({ status: "all", platform: "", topicId: topic.id, q: "" }, 50);
+  const topicPosts = useTopicPosts(topic.id);
   // Editing a plan that already has its post: just save.
   const hasPost = !!editing && (topicPosts.data?.items ?? []).some((p) => p.content_strategy_id === editing.id);
   const saving = create.isPending || update.isPending || generate.isPending;

@@ -40,16 +40,18 @@ export function withFrom(href: string, here: string): string {
 }
 
 /** The page that fits where a post is in the workflow: writing, design or approval. */
-export function postStageHref(post: PostDetail): string {
+export function postStageHref(post: PostDetail, canReview: boolean): string {
   const studio = `/content/${post.id}`;
   const design = post.design_task ? `/design/${post.design_task.id}` : studio;
-  const review = post.review ? `/approvals/${post.review.request_id}` : studio;
+  // Only admins open Approvals; a design waiting there is followed from its task.
+  const review = canReview && post.review ? `/approvals/${post.review.request_id}` : null;
   switch (post.status) {
     case "content_review":
-    case "pending_approval":
     case "approved":
     case "final":
-      return review;
+      return review ?? studio;
+    case "pending_approval":
+      return review ?? design;
     case "design_pending":
     case "design_in_progress":
     case "design_uploaded":

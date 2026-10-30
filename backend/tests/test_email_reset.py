@@ -53,8 +53,10 @@ async def test_reset_flow_end_to_end(client, smtp_on, outbox):
     r = await client.post("/api/v1/auth/password-reset", json={"email": "Reset@Example.com"})
     assert r.status_code == 202
     assert len(outbox) == 1
-    body = outbox[0].get_content()
+    body = outbox[0].get_body(preferencelist=("plain",)).get_content()
     token = body.split("/reset-password#token=")[1].split()[0]
+    html = outbox[0].get_body(preferencelist=("html",)).get_content()
+    assert "Reset password" in html and "ContentPulse" in html
 
     # A reset token is never a session.
     with pytest.raises(Unauthorized):

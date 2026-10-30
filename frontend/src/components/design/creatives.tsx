@@ -12,10 +12,11 @@ import {
   UploadCloudIcon,
   XIcon,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
+import { FileSlider } from "@/components/shared/file-slider";
 import { SignedImage } from "@/components/shared/signed-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,6 +81,9 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
     ["design_pending", "design_in_progress", "design_uploaded", "changes_requested"].includes(task.post.status);
   const busy = upload.isPending || submit.isPending;
   const [submitting, setSubmitting] = useState(false);
+  const generate = useGenerateImage();
+  const drawing =
+    generate.isPending || task.image_job?.status === "queued" || task.image_job?.status === "running";
 
   const send = async (andSubmit: boolean) => {
     setSubmitting(andSubmit);
@@ -112,7 +116,7 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 grid-cols-1 gap-3">
-        {task.ai_images && <GenerateImage task={task} />}
+        {task.ai_images && <GenerateImage task={task} generate={generate} drawing={drawing} blocked={busy} />}
         <button
           type="button"
           onClick={() => input.current?.click()}
@@ -189,7 +193,11 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
         )}
         {canSubmit ? (
           <div className="grid gap-1.5">
-            <Button onClick={() => send(true)} disabled={busy || (!files.length && !canResubmitCurrent)} pending={busy && submitting}>
+            <Button
+              onClick={() => send(true)}
+              disabled={busy || drawing || (!files.length && !canResubmitCurrent)}
+              pending={busy && submitting}
+            >
               <SendIcon />
               {upload.isPending
                 ? "Uploading…"
@@ -197,8 +205,11 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
                   ? "Submitting…"
                   : "Submit for approval"}
             </Button>
-            {!files.length && !canResubmitCurrent && (
-              <p className="text-xs text-muted-foreground">Add at least one file to submit.</p>
+            {drawing ? (
+              <p className="text-xs text-muted-foreground">You can submit once the AI image is ready.</p>
+            ) : (
+              !files.length &&
+              !canResubmitCurrent && <p className="text-xs text-muted-foreground">Add at least one file to submit.</p>
             )}
             <p className="text-xs text-muted-foreground">
               Submitting locks the design until an admin approves it or asks for changes.
@@ -246,15 +257,35 @@ function LocalStorageNote() {
 
 /** "Generate image with AI": draws an image from the brief and the post; it
  * arrives as the next version, ready to review and submit. */
-function GenerateImage({ task }: { task: DesignTaskDetail }) {
-  const generate = useGenerateImage();
+function GenerateImage({
+  task,
+  generate,
+  drawing,
+  blocked,
+}: {
+  task: DesignTaskDetail;
+  generate: ReturnType<typeof useGenerateImage>;
+  drawing: boolean;
+  /** An upload or submission is running. */
+  blocked: boolean;
+}) {
   const job = task.image_job;
-  const drawing = generate.isPending || (!!job && (job.status === "queued" || job.status === "running"));
+  const status = job?.status;
+  // Say how it ended, since the person may have scrolled away while it was drawing.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && status === "succeeded") {
+      toast.success("AI image ready", { description: "Check it under Design versions, then submit it." });
+    } else if (wasRunning.current && status === "failed") {
+      toast.error("The AI image couldn't be created");
+    }
+    wasRunning.current = status === "queued" || status === "running";
+  }, [status]);
   return (
     <div className="grid gap-2">
       <Button
         variant="outline"
-        disabled={drawing}
+        disabled={drawing || blocked}
         onClick={() =>
           generate.mutate(task.id, {
             onSuccess: () => toast.success("Creating an image from the brief…"),
@@ -296,9 +327,9 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
           {canUse && task.creatives.length > 1 ? ": use an older one to make it the newest again." : "."}
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-5">
+      <CardContent className="grid min-w-0 grid-cols-1 gap-5">
         {task.creatives.map((v, i) => (
-          <section key={v.version} aria-label={`Version ${v.version}`} className="grid gap-2">
+          <section key={v.version} aria-label={`Version ${v.version}`} className="grid min-w-0 grid-cols-1 gap-2">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium">Version {v.version}</span>
               {i === 0 && <Badge>Latest</Badge>}
@@ -332,12 +363,15 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
                 Use version {v.version} as newest
               </Button>
             )}
-            {/* One file gets the panel's full width; carousel slides sit two to a row. */}
-            <ul className={v.files.length > 1 ? "grid grid-cols-2 gap-2" : "grid gap-2"}>
-              {v.files.map((f) => (
-                <CreativeTile key={f.id} file={f} />
-              ))}
-            </ul>
+            {v.files.length > 1 ? (
+              <FileSlider
+                files={v.files}
+                label={`Version ${v.version} files`}
+                renderSlide={(f) => <CreativeTile file={f} />}
+              />
+            ) : (
+              v.files.map((f) => <CreativeTile key={f.id} file={f} />)
+            )}
           </section>
         ))}
       </CardContent>
@@ -349,7 +383,7 @@ export function CreativeTile({ file }: { file: CreativeFile }) {
   const isImage = file.file_type.startsWith("image/");
   const isVideo = file.file_type.startsWith("video/");
   return (
-    <li className="grid gap-1 overflow-hidden rounded-lg border">
+    <div className="grid min-w-0 grid-cols-1 gap-1 overflow-hidden rounded-lg border">
       <a
         href={file.url}
         target="_blank"
@@ -384,6 +418,6 @@ export function CreativeTile({ file }: { file: CreativeFile }) {
           <DownloadIcon className="size-3.5" />
         </a>
       </div>
-    </li>
+    </div>
   );
 }

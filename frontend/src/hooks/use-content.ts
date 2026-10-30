@@ -55,6 +55,10 @@ export function usePosts(filters: ContentFilters, limit = 30) {
   });
 }
 
+/** Every post of a topic. One shared query, so the topic's cards never disagree. */
+export const useTopicPosts = (topicId: string) =>
+  usePosts({ status: "all", platform: "", topicId, q: "" }, 50);
+
 export function usePost(id: string) {
   const orgId = useOrgId();
   return useQuery({

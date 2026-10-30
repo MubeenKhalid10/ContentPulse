@@ -1,7 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { isAuthRetryableFetchError, type SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * How users sign in is decided by the API (AUTH_PROVIDER in the root .env),
@@ -41,11 +41,16 @@ export async function getSupabase(): Promise<SupabaseClient | null> {
   return client;
 }
 
-/** Current access token in Supabase mode (refreshed automatically). */
+/**
+ * Current access token in Supabase mode (refreshed automatically). Null means there is no
+ * session. It throws when Supabase can't be reached to renew the token: the session may
+ * be fine, so this must not look like being signed out.
+ */
 export async function supabaseAccessToken(): Promise<string | null> {
   const supabase = await getSupabase();
   if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
+  const { data, error } = await supabase.auth.getSession();
+  if (isAuthRetryableFetchError(error)) throw error;
   return data.session?.access_token ?? null;
 }
 

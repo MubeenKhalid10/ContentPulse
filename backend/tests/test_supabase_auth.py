@@ -2,6 +2,7 @@ import json
 import time
 import uuid
 
+import httpx
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -122,6 +123,20 @@ async def test_local_mode_publishes_no_turnstile_key(client, monkeypatch):
     monkeypatch.setattr(get_settings(), "turnstile_site_key", "0x4AAAAAAATestSiteKey")
     body = (await client.get("/api/v1/auth/config")).json()
     assert body["provider"] == "local" and body["turnstile_site_key"] is None
+
+
+async def test_unreachable_signing_keys_are_not_a_finished_session(client, supabase, monkeypatch):
+    # A 401 signs the person out; failing to reach Supabase says nothing about the token.
+    token = supabase.token("sam@example.com")
+    jwks_cache.clear()
+
+    async def unreachable(self, url):
+        raise httpx.ConnectError("getaddrinfo failed")
+
+    monkeypatch.setattr(type(jwks_cache), "_refresh", unreachable)
+    response = await client.get("/api/v1/auth/me", headers=bearer(token))
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
 
 
 async def test_es256_token_provisions_and_links_user(client, supabase):

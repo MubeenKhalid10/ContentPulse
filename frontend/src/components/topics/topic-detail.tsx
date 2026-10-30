@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { TOPIC_STATUS_TONE } from "@/lib/tones";
 import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { CollapsibleCard } from "@/components/shared/collapsible-card";
+import { PageLoading } from "@/components/shared/loading";
 import { Tag } from "@/components/shared/tag";
 import { EditTopicDialog } from "@/components/topics/edit-topic-dialog";
 import { StrategyDialog } from "@/components/topics/strategy-dialog";
@@ -18,7 +19,7 @@ import { groupBySource, MentionItem } from "@/components/trends/mentions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useTopicPosts } from "@/hooks/use-content";
 import { useTopic } from "@/hooks/use-topics";
 import { useMarkets } from "@/hooks/use-trends";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -35,6 +36,8 @@ import { PlatformFitCard } from "./platform-fit-card";
 export function TopicDetailView({ id }: { id: string }) {
   const fromHere = useFromHere();
   const topic = useTopic(id);
+  // Fetched together with the topic rather than after it, so the plans don't wait twice.
+  useTopicPosts(id);
   const markets = useMarkets();
   const can = useCan();
   const canManage = can("topics.manage");
@@ -81,11 +84,7 @@ export function TopicDetailView({ id }: { id: string }) {
     return (
       <>
         {back}
-        <Skeleton className="h-10 w-2/3" />
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <Skeleton className="h-96 lg:col-span-2" />
-          <Skeleton className="h-64" />
-        </div>
+        <PageLoading label="Loading trend…" />
       </>
     );
   }

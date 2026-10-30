@@ -79,10 +79,12 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.DESIGN_READ,
             P.DESIGN_UPLOAD,
             P.DESIGN_SUBMIT,
-            P.APPROVAL_READ,
         }
     ),
-    Role.VIEWER: frozenset(p for p in Permission if p.value.endswith(".read")),
+    # Approvals are the admin's desk: others follow a post's status on the post itself.
+    Role.VIEWER: frozenset(
+        p for p in Permission if p.value.endswith(".read") and p != P.APPROVAL_READ
+    ),
 }
 
 

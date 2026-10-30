@@ -17,6 +17,7 @@ from app.core.clock import utcnow
 from app.core.config import get_settings
 from app.core.errors import (
     AppError,
+    Conflict,
     ErrorCode,
     Forbidden,
     InvalidStateTransition,
@@ -216,6 +217,10 @@ async def _items(db: AsyncSession, rows: list[DesignBrief]) -> list[TaskListItem
         if post_ids
         else {}
     )
+    change_requests = await approvals.current_change_requests(db, list(posts.values()))
+    scopes = await approvals.changes_scopes(
+        db, {p.id for p in posts.values() if p.status == PostStatus.CHANGES_REQUESTED}
+    )
     items = []
     for b in rows:
         post = posts[b.post_id]
@@ -233,6 +238,7 @@ async def _items(db: AsyncSession, rows: list[DesignBrief]) -> list[TaskListItem
                     status=post.status,
                     current_version=post.current_version,
                     topic_title=topics.get(post.topic_id),
+                    changes_scope=scopes.get(post.id),
                 ),
                 assignee=person(users.get(b.assignee_id)),
                 creative_versions=versions.get(post.id, 0),
@@ -240,6 +246,7 @@ async def _items(db: AsyncSession, rows: list[DesignBrief]) -> list[TaskListItem
                 created_at=b.created_at,
                 updated_at=b.updated_at,
                 submitted_at=b.submitted_at,
+                change_request=change_requests.get(post.id),
             )
         )
     return items
@@ -400,6 +407,7 @@ async def task_detail(
         ai_images=get_image_provider(settings) is not None,
         image_job=await _image_job(db, brief.id),
         review=await approvals.latest_review(db, post.id),
+        change_request_scopes=await approvals.change_request_scopes(db, post),
     )
 
 
@@ -845,6 +853,10 @@ async def submit(
         )
     if brief.assignee_id not in (None, user_id) and not _can_manage(role):
         raise Forbidden("This task is assigned to someone else.")
+    # The image arrives as a new version: it would land after the design was locked.
+    job = await _image_job(db, brief.id)
+    if job and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
+        raise Conflict("An AI image is still being created. Submit once it's ready.")
     await approvals.submit_post(db, post, user_id, note)
     await db.commit()
     return await task_detail(db, organization_id, brief.id)

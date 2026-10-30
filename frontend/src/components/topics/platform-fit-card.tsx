@@ -19,7 +19,7 @@ export function SectionHeader({
   icon: LucideIcon;
   title: string;
   description: string;
-  badge: string;
+  badge?: string;
   actions?: React.ReactNode;
 }) {
   return (
@@ -31,7 +31,9 @@ export function SectionHeader({
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </div>
-      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{badge}</span>
+      {badge && (
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{badge}</span>
+      )}
       {actions && (
         <div className="flex basis-full flex-wrap justify-end gap-2 sm:basis-auto">{actions}</div>
       )}
