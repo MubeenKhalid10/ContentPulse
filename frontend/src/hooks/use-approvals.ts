@@ -10,6 +10,10 @@ import {
 import { useOrgId } from "@/hooks/use-organization";
 import { api, apiList } from "@/lib/api";
 import type {
+  ApprovalComment,
+  ChangeRequest,
+  ChangeRequestPage,
+  ChangeScope,
   ApprovalDetail,
   ApprovalFilter,
   ApprovalPage,
@@ -168,6 +172,76 @@ export const useAddComment = () =>
       body: { body },
     }),
   );
+
+/** Everything a change request or a comment can move. */
+function useReviewRefresh() {
+  const orgId = useOrgId();
+  const queryClient = useQueryClient();
+  return () => {
+    for (const key of ["approvals", "content", "design", "dashboard"]) {
+      queryClient.invalidateQueries({ queryKey: ["org", orgId, key] });
+    }
+  };
+}
+
+/** Admin: creators' requests to reopen locked work. */
+export function useChangeRequests() {
+  const orgId = useOrgId();
+  return useQuery({
+    queryKey: [...root(orgId ?? "none"), "change-requests"],
+    queryFn: () => api<ChangeRequestPage>("/approvals/change-requests?limit=100"),
+    enabled: !!orgId,
+  });
+}
+
+/** Creator: ask an admin to reopen locked work. */
+export function useCreateChangeRequest() {
+  const refresh = useReviewRefresh();
+  return useMutation({
+    mutationFn: ({ postId, scope, note }: { postId: string; scope: ChangeScope; note: string }) =>
+      api<ChangeRequest>(`/content/${postId}/change-requests`, { method: "POST", body: { scope, note } }),
+    onSuccess: refresh,
+  });
+}
+
+export function useAcceptChangeRequest() {
+  const refresh = useReviewRefresh();
+  return useMutation({
+    mutationFn: (id: string) => api<ChangeRequest>(`/approvals/change-requests/${id}/accept`, { method: "POST" }),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeclineChangeRequest() {
+  const refresh = useReviewRefresh();
+  return useMutation({
+    mutationFn: ({ id, comment }: { id: string; comment: string }) =>
+      api<ChangeRequest>(`/approvals/change-requests/${id}/decline`, {
+        method: "POST",
+        body: { comment: comment || null },
+      }),
+    onSuccess: refresh,
+  });
+}
+
+/** The review conversation on a post, for everyone who works on it. */
+export function usePostComments(postId: string) {
+  const orgId = useOrgId();
+  return useQuery({
+    queryKey: ["org", orgId ?? "none", "content", "comments", postId],
+    queryFn: () => api<ApprovalComment[]>(`/content/${postId}/comments`),
+    enabled: !!orgId,
+  });
+}
+
+export function useAddPostComment() {
+  const refresh = useReviewRefresh();
+  return useMutation({
+    mutationFn: ({ postId, body }: { postId: string; body: string }) =>
+      api<ApprovalComment[]>(`/content/${postId}/comments`, { method: "POST", body: { body } }),
+    onSuccess: refresh,
+  });
+}
 
 /** Studio: send the post back for approval after copy-only changes. */
 export function useResubmitPost() {

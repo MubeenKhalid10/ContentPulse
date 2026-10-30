@@ -1,18 +1,22 @@
 "use client";
 
-import { ChevronRightIcon, CopyIcon, LoaderCircleIcon } from "lucide-react";
+import { ChevronRightIcon, CopyIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
+import { ChangeRequestTag } from "@/components/approvals/change-request";
 import { useFromHere } from "@/components/shared/back-link";
 import { DeleteButton } from "@/components/shared/delete-button";
+import { ListLoading } from "@/components/shared/loading";
 import { PlatformTag, Tag } from "@/components/shared/tag";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { useDeletePost, usePosts } from "@/hooks/use-content";
+import { useDeletePost, useTopicPosts } from "@/hooks/use-content";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { POST_STATUS_LABEL } from "@/lib/content";
+import { postStatusLabel } from "@/lib/content";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import type { Post } from "@/types/api";
 
@@ -23,9 +27,9 @@ const POST_DESCRIPTION =
 
 export function TopicPosts({ topicId }: { topicId: string }) {
   const fromHere = useFromHere();
-  const posts = usePosts({ status: "all", platform: "", topicId, q: "" }, 50);
-  if (!posts.data) return null;
-  const items = posts.data.items;
+  const posts = useTopicPosts(topicId);
+  // No count while loading: "0 posts" would read as the answer.
+  const items = posts.data && !posts.isPlaceholderData ? posts.data.items : null;
   return (
     <Card>
       <CardHeader>
@@ -33,11 +37,23 @@ export function TopicPosts({ topicId }: { topicId: string }) {
           icon={CopyIcon}
           title="Generated posts"
           description="Posts created from your plans, with their current review status."
-          badge={`${items.length} ${items.length === 1 ? "post" : "posts"}`}
+          badge={items ? `${items.length} ${items.length === 1 ? "post" : "posts"}` : undefined}
         />
       </CardHeader>
       <CardContent className="grid gap-3">
-        {items.length ? (
+        {posts.isError ? (
+          <Alert variant="destructive">
+            <AlertDescription className="grid gap-2">
+              <span>Couldn&apos;t load the generated posts. {errorMessage(posts.error)}</span>
+              <Button size="sm" variant="outline" className="w-fit" onClick={() => posts.refetch()}>
+                <RefreshCwIcon />
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : !items ? (
+          <ListLoading label="Loading generated posts…" rows={1} />
+        ) : items.length ? (
           <>
             <ul className="grid gap-2" aria-label="Generated posts">
               {items.map((p) => (
@@ -90,8 +106,9 @@ function GeneratedPost({ post, href }: { post: Post; href: string }) {
       )}
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         <Tag tone={POST_STATUS_TONE[post.status]} dot className="h-6 px-2.5 text-xs font-semibold">
-          {POST_STATUS_LABEL[post.status]}
+          {postStatusLabel(post)}
         </Tag>
+        <ChangeRequestTag request={post.change_request} />
         <span>
           {post.current_version ? `Version ${post.current_version} · ` : ""}
           <time dateTime={post.updated_at} title={formatDateTime(post.updated_at)}>

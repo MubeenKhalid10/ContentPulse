@@ -158,8 +158,8 @@ function ShellError({ onRetry }: { onRetry: () => void }) {
           We couldn&apos;t load your workspace
         </h1>
         <p className="text-sm text-muted-foreground">
-          ContentPulse didn&apos;t respond. Check your connection and try
-          again. If it keeps happening, sign out and back in.
+          ContentPulse didn&apos;t respond. Check your connection. This page
+          keeps trying and reconnects by itself once it can.
         </p>
         <Button onClick={onRetry} className="justify-self-center">
           Try again

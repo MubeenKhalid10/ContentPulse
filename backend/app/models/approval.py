@@ -44,6 +44,36 @@ class ApprovalRequest(UUIDPk, CreatedAt, OrgScoped, Base):
     scope: Mapped[str | None] = mapped_column(String(20))
 
 
+class PostChangeRequest(UUIDPk, CreatedAt, OrgScoped, Base):
+    """A creator asks an admin to reopen locked copy or a locked design."""
+
+    __tablename__ = "post_change_requests"
+    __table_args__ = (
+        # One open request per post, so an admin answers it once.
+        Index(
+            "uq_post_change_requests_one_pending",
+            "post_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+    )
+
+    post_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    # "copy", "design" or "both".
+    scope: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str] = mapped_column(Text, nullable=False)
+    # "pending", "accepted", "declined", or "closed" when the post moved on first.
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending", nullable=False
+    )
+    requested_by: Mapped[uuid.UUID | None] = fk_user()
+    decided_by: Mapped[uuid.UUID | None] = fk_user()
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decision_note: Mapped[str | None] = mapped_column(Text)
+
+
 class ApprovalComment(UUIDPk, CreatedAt, OrgScoped, Base):
     """Review comment pinned to the post version it refers to (spec §33)."""
 

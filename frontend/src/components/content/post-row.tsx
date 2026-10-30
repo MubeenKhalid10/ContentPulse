@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
+import { ChangeRequestTag } from "@/components/approvals/change-request";
 import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { Button } from "@/components/ui/button";
@@ -151,6 +152,7 @@ export function PostRow({
             {postStatusLabel(post)}
           </Tag>
         )}
+        <ChangeRequestTag request={post.change_request} />
         {post.variant_of_id && <Tag tone="neutral">Variant</Tag>}
         <span className="ml-auto text-xs text-muted-foreground">
           {post.current_version ? `v${post.current_version} · ` : ""}

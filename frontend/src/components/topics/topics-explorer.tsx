@@ -4,6 +4,7 @@ import { ListChecksIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import { isSwitchingList, ListLoading } from "@/components/shared/loading";
 import { PageHeader } from "@/components/shared/page-header";
 import {
   FILTER_SEARCH,
@@ -18,14 +19,12 @@ import { RelevanceBadge } from "@/components/trends/relevance";
 import { Score } from "@/components/trends/score";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { type TopicFilters, useTopics } from "@/hooks/use-topics";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { PLATFORM_OPTIONS } from "@/lib/options";
 import { topicHref } from "@/lib/topics";
-import { cn } from "@/lib/utils";
 import type { Topic } from "@/types/api";
 
 const PAGE = 30;
@@ -117,16 +116,12 @@ export function TopicsExplorer() {
                 Retry
               </Button>
             </div>
-          ) : topics.isPending ? (
-            <div className="grid gap-3">
-              {Array.from({ length: 4 }, (_, i) => (
-                <Skeleton key={i} className="h-24 w-full rounded-xl" />
-              ))}
-            </div>
+          ) : topics.isPending || isSwitchingList(topics, limit) ? (
+            <ListLoading label="Loading your shortlist…" rowClassName="h-24" />
           ) : topics.data?.items.length ? (
             <>
               <ul
-                className={cn("grid min-w-0 grid-cols-1 gap-3 transition-opacity", topics.isPlaceholderData && "opacity-50")}
+                className="grid min-w-0 grid-cols-1 gap-3"
                 aria-label="Topics"
                 aria-busy={topics.isPlaceholderData}
               >
@@ -135,8 +130,16 @@ export function TopicsExplorer() {
                 ))}
               </ul>
               {topics.data.total > topics.data.items.length && (
-                <Button variant="outline" className="justify-self-center" onClick={() => setLimit((n) => n + PAGE)}>
-                  Show more ({topics.data.total - topics.data.items.length} left)
+                <Button
+                  variant="outline"
+                  className="justify-self-center"
+                  disabled={topics.isPlaceholderData}
+                  pending={topics.isPlaceholderData}
+                  onClick={() => setLimit((n) => n + PAGE)}
+                >
+                  {topics.isPlaceholderData
+                    ? "Loading more…"
+                    : `Show more (${topics.data.total - topics.data.items.length} left)`}
                 </Button>
               )}
             </>

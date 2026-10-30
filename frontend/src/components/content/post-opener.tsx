@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePost } from "@/hooks/use-content";
 import { errorMessage } from "@/lib/api";
+import { useCan } from "@/lib/auth";
 import { postStageHref, safeFrom, withFrom } from "@/lib/back";
 
 /** Opens a post on the page for its current step: writing, design or approval. */
@@ -15,7 +16,8 @@ export function PostOpener({ id }: { id: string }) {
   const post = usePost(id);
   const router = useRouter();
   const from = safeFrom(useSearchParams().get("from"));
-  const target = post.data && postStageHref(post.data);
+  const canReview = useCan()("approval.read");
+  const target = post.data && postStageHref(post.data, canReview);
 
   useEffect(() => {
     if (target) router.replace(from ? withFrom(target, from) : target);

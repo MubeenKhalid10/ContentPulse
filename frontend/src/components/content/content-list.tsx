@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { isSwitchingList, ListLoading } from "@/components/shared/loading";
 import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { DayGroups } from "@/components/shared/day-groups";
 import { PageHeader } from "@/components/shared/page-header";
@@ -15,7 +16,6 @@ import { SimpleSelect } from "@/components/shared/simple-select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { type ContentFilters, usePosts, useSubmitAllForReview } from "@/hooks/use-content";
@@ -201,12 +201,8 @@ export function ContentList() {
             />
           )}
 
-          {posts.isPending ? (
-            <div className="grid gap-3">
-              {Array.from({ length: 4 }, (_, i) => (
-                <Skeleton key={i} className="h-20 w-full rounded-xl" />
-              ))}
-            </div>
+          {posts.isPending || isSwitchingList(posts, limit) ? (
+            <ListLoading label="Loading posts…" />
           ) : posts.isError ? (
             <Alert variant="destructive">
               <AlertTriangleIcon />
@@ -220,13 +216,7 @@ export function ContentList() {
             </Alert>
           ) : posts.data?.items.length ? (
             <>
-              <div
-                aria-busy={posts.isPlaceholderData}
-                className={cn(
-                  "transition-opacity",
-                  posts.isPlaceholderData && "opacity-50",
-                )}
-              >
+              <div aria-busy={posts.isPlaceholderData}>
                 <DayGroups
                   items={byTopic(posts.data.items)}
                   dateOf={(g) => g.updated_at}
@@ -249,9 +239,13 @@ export function ContentList() {
                 <Button
                   variant="outline"
                   className="justify-self-center"
+                  disabled={posts.isPlaceholderData}
+                  pending={posts.isPlaceholderData}
                   onClick={() => setLimit((n) => n + PAGE)}
                 >
-                  Show more ({posts.data.total - posts.data.items.length} left)
+                  {posts.isPlaceholderData
+                    ? "Loading more…"
+                    : `Show more (${posts.data.total - posts.data.items.length} left)`}
                 </Button>
               )}
             </>

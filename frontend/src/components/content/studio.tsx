@@ -9,7 +9,6 @@ import {
   LockIcon,
   PaletteIcon,
   RefreshCwIcon,
-  RotateCcwIcon,
   SendIcon,
   Undo2Icon,
 } from "lucide-react";
@@ -19,8 +18,16 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
+import { PageLoading } from "@/components/shared/loading";
 import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { PlatformTag, Tag } from "@/components/shared/tag";
+import {
+  AdminRequestChanges,
+  ChangeRequestNotice,
+  ChangeRequestTag,
+  RequestChangeButton,
+} from "@/components/approvals/change-request";
+import { PostComments } from "@/components/approvals/post-comments";
 import { ReviewBanner } from "@/components/approvals/review-banner";
 import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { PostEditor } from "@/components/content/post-editor";
@@ -90,11 +97,7 @@ export function ContentStudio({ id }: { id: string }) {
     return (
       <>
         {back}
-        <Skeleton className="h-10 w-2/3" />
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <Skeleton className="h-[32rem] lg:col-span-2" />
-          <Skeleton className="h-64" />
-        </div>
+        <PageLoading label="Loading post…" />
       </>
     );
   }
@@ -111,6 +114,7 @@ export function ContentStudio({ id }: { id: string }) {
             <h1 className="text-2xl font-semibold tracking-tight">{p.title ?? "Untitled post"}</h1>
             <PlatformTag platform={p.platform} />
             <Tag tone={POST_STATUS_TONE[p.status]} dot>{postStatusLabel(p)}</Tag>
+            <ChangeRequestTag request={p.change_request} />
             {p.variant_of_id && <Tag tone="neutral">Variant</Tag>}
           </div>
           <p className="text-sm text-muted-foreground">
@@ -145,6 +149,7 @@ export function ContentStudio({ id }: { id: string }) {
       <PostProgress status={p.status} />
 
       <GenerationBanner post={p} canGenerate={canGenerate} generating={generating} />
+      <ChangeRequestNotice request={p.change_request} />
       <LockedNotice post={p} />
       <ReviewBanner review={p.review}>
         {p.status === "changes_requested" && canEdit && <ResubmitControl postId={p.id} />}
@@ -159,6 +164,7 @@ export function ContentStudio({ id }: { id: string }) {
           <div className="grid content-start gap-6">
             <PreviewPanel post={p} />
             <VariantsPanel post={p} />
+            {p.review && <PostComments postId={p.id} currentRound={p.review.request_id} />}
           </div>
         </div>
       ) : (
@@ -186,22 +192,27 @@ const APPROVED_COPY = [
 
 /** Approved copy is read-only until an admin requests changes to it. */
 function LockedNotice({ post }: { post: PostDetail }) {
-  const fromHere = useFromHere();
   const canReview = useCan()("approval.manage");
+  const ask = (
+    <RequestChangeButton postId={post.id} scopes={post.change_request_scopes} request={post.change_request} />
+  );
   if (!post.editable && post.status === "content_review") {
     return (
       <Alert className="mb-6">
         <LockIcon />
         <AlertTitle>With an admin for approval</AlertTitle>
-        <AlertDescription>
-          The copy is locked while an admin reviews it. To change it, withdraw it from review (the ⋯ More actions
-          menu at the top) and send it again when you are done.
+        <AlertDescription className="grid gap-2">
+          <span>
+            The copy is locked while an admin reviews it. To change it, withdraw it from review (the ⋯ More actions
+            menu at the top) and send it again when you are done, or ask the admin to send it back.
+          </span>
+          {ask}
+          <AdminRequestChanges review={post.review} />
         </AlertDescription>
       </Alert>
     );
   }
   if (post.editable || !APPROVED_COPY.includes(post.status)) return null;
-  const reopenHref = post.review?.status === "approved" ? `/approvals/${post.review.request_id}` : null;
   return (
     <Alert className="mb-6">
       <LockIcon />
@@ -212,14 +223,10 @@ function LockedNotice({ post }: { post: PostDetail }) {
             ? "The admin asked for design changes only, so the copy stays as approved."
             : canReview
               ? "Request changes to let the creator edit it again."
-              : "An admin can request changes to reopen it."}
+              : "Ask an admin to reopen it if something needs to change."}
         </span>
-        {canReview && reopenHref && (
-          <Link href={fromHere(reopenHref)} className={buttonVariants({ size: "sm", variant: "outline" }) + " w-fit"}>
-            <RotateCcwIcon />
-            Request changes
-          </Link>
-        )}
+        {ask}
+        <AdminRequestChanges review={post.review} />
       </AlertDescription>
     </Alert>
   );

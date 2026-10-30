@@ -9,7 +9,7 @@ from sqlalchemy.orm import aliased
 
 from app.core.clock import utcnow
 from app.core.errors import InvalidStateTransition, NotFound, require
-from app.models.approval import ApprovalComment, ApprovalRequest
+from app.models.approval import ApprovalComment, ApprovalRequest, PostChangeRequest
 from app.models.design import CreativeAsset, DesignBrief
 from app.models.enums import ApprovalStatus, DesignBriefStatus, PostStatus
 from app.models.post import Post, PostVersion
@@ -28,6 +28,7 @@ from app.schemas.approval import (
 )
 from app.schemas.content import VersionRead
 from app.services import audit
+from app.services.approvals import workflow
 from app.services.audit import AuditAction
 from app.services.design import brief_state
 from app.services.design import briefs as design_briefs
@@ -91,6 +92,7 @@ async def _items(db: AsyncSession, requests: list[ApprovalRequest]) -> list[Appr
         return []
     post_ids = {r.post_id for r in requests}
     posts = {p.id: p for p in await db.scalars(select(Post).where(Post.id.in_(post_ids)))}
+    change_requests = await workflow.current_change_requests(db, list(posts.values()))
     topic_ids = {p.topic_id for p in posts.values() if p.topic_id}
     topics = (
         dict(
@@ -164,6 +166,7 @@ async def _items(db: AsyncSession, requests: list[ApprovalRequest]) -> list[Appr
                 submitted_by=person(users.get(r.submitted_by)),
                 reviewer=person(users.get(r.reviewer_id)),
                 comment_count=comment_counts.get(r.id, 0),
+                change_request=change_requests.get(r.post_id),
                 created_at=r.created_at,
                 reviewed_at=r.reviewed_at,
             )
@@ -204,18 +207,23 @@ async def list_approvals(
                 )
             )
         )
-    # Waiting-for-review counts per stage, for the two tabs.
-    stage_rows = (
+    # The tab counts: waiting for review per stage, and approved designs (Ready to publish).
+    tab_rows = (
         await db.execute(
-            select(ApprovalRequest.creative_version.is_(None), func.count())
-            .where(*filters, ApprovalRequest.status == A.PENDING)
-            .group_by(ApprovalRequest.creative_version.is_(None))
+            select(
+                ApprovalRequest.creative_version.is_(None),
+                ApprovalRequest.status,
+                func.count(),
+            )
+            .where(*filters, ApprovalRequest.status.in_([A.PENDING, A.APPROVED]))
+            .group_by(ApprovalRequest.creative_version.is_(None), ApprovalRequest.status)
         )
     ).all()
     stage_pending = {
-        "copy": sum(n for is_copy, n in stage_rows if is_copy),
-        "design": sum(n for is_copy, n in stage_rows if not is_copy),
+        "copy": sum(n for is_copy, s, n in tab_rows if is_copy and s == A.PENDING),
+        "design": sum(n for is_copy, s, n in tab_rows if not is_copy and s == A.PENDING),
     }
+    ready_count = sum(n for is_copy, s, n in tab_rows if not is_copy and s == A.APPROVED)
     if stage == "copy":
         filters.append(ApprovalRequest.creative_version.is_(None))
     elif stage == "design":
@@ -256,10 +264,20 @@ async def list_approvals(
         total=total or 0,
         counts=counts,
         stage_pending=stage_pending,
+        ready_count=ready_count,
+        change_request_count=await db.scalar(
+            select(func.count())
+            .select_from(PostChangeRequest)
+            .where(
+                PostChangeRequest.organization_id == organization_id,
+                PostChangeRequest.status == "pending",
+            )
+        )
+        or 0,
     )
 
 
-async def _comments(db: AsyncSession, post_id: uuid.UUID) -> list[CommentRead]:
+async def comments(db: AsyncSession, post_id: uuid.UUID) -> list[CommentRead]:
     rows = list(
         await db.scalars(
             select(ApprovalComment)
@@ -356,7 +374,7 @@ async def approval_detail(
         if brief
         else None,
         topic=await _topic_context(db, post),
-        comments=await _comments(db, post.id),
+        comments=await comments(db, post.id),
         rounds=[
             Round(
                 id=r.id,

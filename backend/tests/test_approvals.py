@@ -57,8 +57,8 @@ async def test_submission_enters_the_queue_with_full_context(client, internet, d
 
     summary = (await admin.get("/api/v1/dashboard/summary")).json()
     assert summary["pending_approval"] == 1
-    # Creators see the queue (to follow their posts) but can't decide.
-    assert (await designer.get(API)).status_code == 200
+    # Creators follow their posts from the posts, and can't decide.
+    assert (await designer.get(API)).status_code == 403  # the queue is for admins
     assert (await designer.post(f"{API}/{item['id']}/approve", json={})).status_code == 403
 
 
@@ -92,6 +92,9 @@ async def test_approve_then_final(client, internet, design_ai):
     # way to design is still there, so look at the design stage.
     design_stage = {"status": "approved", "stage": "design"}
     assert (await admin.get(API, params=design_stage)).json()["total"] == 1
+    # The Ready to publish count is on every tab's response, not only its own.
+    assert (await admin.get(API, params={"stage": "copy"})).json()["ready_count"] == 1
+    assert (await admin.get(API, params={"platform": "blog"})).json()["ready_count"] == 0
 
 
 async def test_changes_requested_revision_and_resubmit(client, internet, design_ai):
@@ -217,13 +220,18 @@ async def test_comments_and_permissions(client, internet, design_ai):
 
     first = (await admin.post(f"{url}/comments", json={"body": "Love slide 1."})).json()
     assert first["comments"][0]["author"]["id"] == admin.user["id"]
-    second = (await manager.post(f"{url}/comments", json={"body": "Agreed."})).json()
-    assert [c["body"] for c in second["comments"]] == ["Love slide 1.", "Agreed."]
-    assert all(c["post_version"] == 1 and c["creative_version"] == 1 for c in second["comments"])
-    third = await designer.post(f"{url}/comments", json={"body": "Fixed slide 3."})
-    assert third.status_code == 200  # creators can reply
-    assert (await viewer.get(url)).status_code == 200  # read-only access
+    # Creators don't open Approvals: they reply on the post itself.
+    post_comments = f"/api/v1/content/{item['post']['id']}/comments"
+    second = (await manager.post(post_comments, json={"body": "Agreed."})).json()
+    assert [c["body"] for c in second] == ["Love slide 1.", "Agreed."]
+    assert all(c["post_version"] == 1 and c["creative_version"] == 1 for c in second)
+    third = await designer.post(post_comments, json={"body": "Fixed slide 3."})
+    assert third.status_code == 200
+    assert len((await viewer.get(post_comments)).json()) == 3  # read-only access
+    assert (await viewer.post(post_comments, json={"body": "x"})).status_code == 403
+    assert (await viewer.get(url)).status_code == 403
     assert (await viewer.post(f"{url}/comments", json={"body": "x"})).status_code == 403
+    assert (await designer.post(f"{url}/comments", json={"body": "x"})).status_code == 403
     assert (await admin.post(f"{url}/comments", json={"body": "  "})).status_code == 422
     assert (await admin.get(API)).json()["items"][0]["comment_count"] == 3
 

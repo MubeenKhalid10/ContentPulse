@@ -3,13 +3,13 @@
 import { RefreshCwIcon } from "lucide-react";
 
 import { APPROVAL_STATUS_TONE } from "@/lib/tones";
+import { PageLoading } from "@/components/shared/loading";
 import { BackLink } from "@/components/shared/back-link";
 import { PostProgress } from "@/components/shared/post-progress";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { SharePostButton } from "@/components/content/share-post-button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useApproval } from "@/hooks/use-approvals";
 import { ApiError, errorMessage } from "@/lib/api";
 import { approvalStatusLabel } from "@/lib/approvals";
@@ -17,6 +17,7 @@ import { POST_STATUS_LABEL } from "@/lib/content";
 import { formatDateTime, timeAgo } from "@/lib/format";
 
 import { PreviewCard } from "./preview-card";
+import { ChangeRequestNotice, ChangeRequestTag } from "./change-request";
 import { DecisionCard } from "./decision-card";
 import { CommentsCard } from "./comments-card";
 
@@ -46,11 +47,7 @@ export function ReviewPage({ id }: { id: string }) {
     return (
       <>
         {back}
-        <Skeleton className="h-10 w-2/3" />
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <Skeleton className="h-[32rem] lg:col-span-2" />
-          <Skeleton className="h-72" />
-        </div>
+        <PageLoading label="Loading review…" />
       </>
     );
   }
@@ -65,6 +62,7 @@ export function ReviewPage({ id }: { id: string }) {
           <PlatformTag platform={a.post.platform} />
           <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>{approvalStatusLabel(a.status, a.stage)}</Tag>
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
+          <ChangeRequestTag request={a.change_request} />
           {a.post.status === "final" && (
             <div className="ml-auto">
               <SharePostButton title={a.post.title} platform={a.post.platform} copy={a.content} creative={a.creative} />
@@ -79,6 +77,8 @@ export function ReviewPage({ id }: { id: string }) {
       </div>
 
       <PostProgress status={a.post.status} />
+
+      <ChangeRequestNotice request={a.change_request} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="grid min-w-0 grid-cols-1 content-start gap-6 lg:col-span-2">

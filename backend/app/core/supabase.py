@@ -14,7 +14,7 @@ import httpx
 import jwt
 
 from app.core.config import Settings
-from app.core.errors import Unauthorized
+from app.core.errors import ServiceUnavailable, Unauthorized
 from app.core.logging import logger
 
 JWKS_TTL_SECONDS = 600
@@ -49,8 +49,9 @@ class JWKSCache:
                         await self._refresh(url)
                     except (httpx.HTTPError, ValueError, jwt.PyJWKError) as exc:
                         logger.warning("Could not load Supabase signing keys: %s", exc)
+                        # Not a 401: the token may be fine, and a 401 signs the person out.
                         if kid not in self._keys:
-                            raise Unauthorized(
+                            raise ServiceUnavailable(
                                 "Could not verify the sign-in. Try again shortly."
                             ) from exc
         if kid not in self._keys:

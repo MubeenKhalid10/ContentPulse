@@ -3,27 +3,24 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
-from app.api.deps import DB, OrgContext, active_org_any_permission, active_org_permission
+from app.api.deps import DB, OrgContext, active_org_permission
 from app.core.permissions import Permission
 from app.models.enums import ApprovalStatus, Platform
 from app.schemas.approval import (
     ApprovalDetail,
     ApprovalPage,
+    ChangeRequestPage,
     ChangesRequest,
     CommentCreate,
     DecisionRequest,
 )
-from app.services.approvals import service
+from app.schemas.design import ChangeRequestRead
+from app.services.approvals import change_requests, service
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 CanRead = Annotated[OrgContext, Depends(active_org_permission(Permission.APPROVAL_READ))]
 CanReview = Annotated[OrgContext, Depends(active_org_permission(Permission.APPROVAL_MANAGE))]
-# Reviewers and the people who own the copy can discuss a submission.
-CanComment = Annotated[
-    OrgContext,
-    Depends(active_org_any_permission(Permission.APPROVAL_MANAGE, Permission.CONTENT_EDIT)),
-]
 
 
 @router.get("", response_model=ApprovalPage)
@@ -47,6 +44,30 @@ async def list_approvals(
         stage=stage,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get("/change-requests", response_model=ChangeRequestPage)
+async def list_change_requests(
+    ctx: CanReview,
+    db: DB,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    return await change_requests.list_pending(db, ctx.organization_id, limit=limit, offset=offset)
+
+
+@router.post("/change-requests/{request_id}/accept", response_model=ChangeRequestRead)
+async def accept_change_request(request_id: uuid.UUID, ctx: CanReview, db: DB):
+    return await change_requests.accept(db, ctx.organization_id, ctx.user.id, request_id)
+
+
+@router.post("/change-requests/{request_id}/decline", response_model=ChangeRequestRead)
+async def decline_change_request(
+    request_id: uuid.UUID, data: DecisionRequest, ctx: CanReview, db: DB
+):
+    return await change_requests.decline(
+        db, ctx.organization_id, ctx.user.id, request_id, data.comment
     )
 
 
@@ -96,5 +117,5 @@ async def reopen(approval_id: uuid.UUID, data: ChangesRequest, ctx: CanReview, d
 
 
 @router.post("/{approval_id}/comments", response_model=ApprovalDetail)
-async def add_comment(approval_id: uuid.UUID, data: CommentCreate, ctx: CanComment, db: DB):
+async def add_comment(approval_id: uuid.UUID, data: CommentCreate, ctx: CanReview, db: DB):
     return await service.add_comment(db, ctx.organization_id, ctx.user.id, approval_id, data.body)
