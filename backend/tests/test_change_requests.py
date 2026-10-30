@@ -1,11 +1,16 @@
 """A creator asks an admin to reopen locked work; the admin decides. Approvals
 themselves are for admins: everyone else follows a post from the post."""
 
+pytest_plugins = (
+    "tests.test_alignment",
+    "tests.test_content",
+    "tests.test_design",
+)
+
 from tests.conftest import add_member
-from tests.test_alignment import internet, setup_org  # noqa: F401  (fixtures)
+from tests.test_alignment import setup_org
 from tests.test_approvals import submitted
-from tests.test_content import approved_strategy, content_ai, generated  # noqa: F401  (fixtures)
-from tests.test_design import design_ai  # noqa: F401  (fixtures)
+from tests.test_content import approved_strategy, generated
 
 APPROVALS = "/api/v1/approvals"
 QUEUE = f"{APPROVALS}/change-requests"
