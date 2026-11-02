@@ -171,6 +171,9 @@ async def update_member(
     member = await get_member(db, organization_id, member_id, lock=True)
     changes = data.changes()
 
+    if member.user_id == actor_id and "role" in changes:
+        raise Conflict("You can't change your own role.")
+
     if changes.get("status") == MemberStatus.INVITED:
         raise AppError(ErrorCode.VALIDATION_ERROR, "Use an invitation to set a member to invited.")
     if member.status == MemberStatus.INVITED and changes.get("status") == MemberStatus.ACTIVE:

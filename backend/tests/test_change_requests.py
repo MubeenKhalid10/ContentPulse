@@ -1,5 +1,7 @@
 """A creator asks an admin to reopen locked work; the admin decides. Approvals
 themselves are for admins: everyone else follows a post from the post."""
+# Fixture imports intentionally mirror parameters used by individual tests.
+# ruff: noqa: F811
 
 from tests.conftest import add_member
 from tests.test_alignment import internet, setup_org  # noqa: F401  (fixtures)
@@ -86,9 +88,7 @@ async def test_declined_request_stays_visible_and_keeps_the_lock(client, interne
     assert (await ask(creator, post["id"], "design")).status_code == 201
 
 
-async def test_during_content_approval_only_the_copy_can_be_asked_for(
-    client, internet, content_ai
-):
+async def test_during_content_approval_only_the_copy_can_be_asked_for(client, internet, content_ai):
     admin, org = await setup_org(client)
     post = await generated(admin, await approved_strategy(admin, org))
     creator = await add_member(client, admin, org["id"], "cam@acme.example.com", "creator")

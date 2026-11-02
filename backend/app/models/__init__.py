@@ -23,6 +23,7 @@ __all__ = [
     "AIGenerationJob",
     "ApprovalComment",
     "ApprovalRequest",
+    "PostChangeRequest",
     "AuditLog",
     "Base",
     "BrandProfile",

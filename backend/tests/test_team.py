@@ -40,6 +40,12 @@ async def test_invite_preview_and_accept_as_new_user(client):
     assert resp.json()["role"] == "creator"
     assert "design.upload" in resp.json()["permissions"]
 
+    signed_in = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "designer@acme.example.com", "password": PASSWORD},
+    )
+    assert signed_in.status_code == 200, signed_in.text
+
     # Token is single-use.
     assert (await client.get(f"/api/v1/auth/invites/{token}")).status_code == 404
 
@@ -67,6 +73,20 @@ async def test_existing_account_must_prove_password(client):
         json={"token": token, "full_name": "X", "password": PASSWORD},
     )
     assert resp.status_code == 200
+
+
+async def test_admin_cannot_change_own_role(client):
+    admin = await register(client, "admin@acme.example.com")
+    org = await create_org(admin)
+    members = (await admin.get(f"{API}/{org['id']}/members")).json()
+    admin_member = next(m for m in members if m["user_id"] == admin.user["id"])
+
+    resp = await admin.patch(
+        f"{API}/{org['id']}/members/{admin_member['id']}",
+        json={"role": "viewer"},
+    )
+    assert resp.status_code == 409
+    assert "own role" in resp.json()["error"]["message"]
 
 
 async def test_reinvite_replaces_token_and_expired_invites_fail(client, db):
@@ -106,9 +126,19 @@ async def test_last_admin_cannot_be_demoted_disabled_or_removed(client):
         assert resp.status_code == 409, body
     assert (await admin.delete(f"{API}/{org['id']}/members/{me}")).status_code == 409
 
-    # With a second admin, the first can step down.
-    await add_member(client, admin, org["id"], "admin2@acme.example.com", "admin")
+    # Self-role changes remain blocked even when another admin exists.
+    second_admin = await add_member(client, admin, org["id"], "admin2@acme.example.com", "admin")
     resp = await admin.patch(f"{API}/{org['id']}/members/{me}", json={"role": "viewer"})
+    assert resp.status_code == 409
+
+    # A different admin can still change the first admin's role.
+    second_members = (await admin.get(f"{API}/{org['id']}/members")).json()
+    second_member_id = next(
+        m["id"] for m in second_members if m["user_id"] == second_admin.user["id"]
+    )
+    resp = await admin.patch(
+        f"{API}/{org['id']}/members/{second_member_id}", json={"role": "viewer"}
+    )
     assert resp.status_code == 200
     assert resp.json()["role"] == "viewer"
 

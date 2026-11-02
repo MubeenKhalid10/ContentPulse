@@ -206,12 +206,12 @@ async def _resolve_supabase_user(db: AsyncSession, claims: dict) -> User:
         user = User(email=normalize_email(email), auth_provider=AuthProvider.SUPABASE)
         db.add(user)
     else:
-        # An existing account (with its orgs and roles) is only claimed by the
-        # holder of its mailbox, and never taken from another identity.
-        if user.external_auth_id and user.external_auth_id != subject:
-            raise Unauthorized("This email is already linked to another sign-in.")
         if not (claims.get("user_metadata") or {}).get("email_verified"):
             raise Unauthorized("Confirm your email first: check your inbox for the link.")
+        # Supabase identities can be deleted and recreated. A verified
+        # same-email identity may reclaim the existing platform user so their
+        # organizations and roles are preserved; an unverified claim above
+        # cannot take over that user.
     user.external_auth_id = subject
     user.auth_provider = AuthProvider.SUPABASE
     if not user.full_name:

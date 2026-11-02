@@ -85,7 +85,7 @@ DEFAULT_RULES: dict[Platform, RuleDefaults] = {
             "One idea per post. Make the first line work on its own. Threads: number the "
             "posts and end with a recap."
         ),
-        "max_length": 280,
+        "max_length": 2000,
         "hashtag_limit": 2,
     },
     Platform.INSTAGRAM: {

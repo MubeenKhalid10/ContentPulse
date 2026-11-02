@@ -267,9 +267,11 @@ async def list_documents(
     elif status == "failed":
         filters.append(KnowledgeDocument.crawl_status == CrawlStatus.FAILED)
     elif status == "indexed":
-        filters.append(
-            KnowledgeDocument.crawl_status.in_([CrawlStatus.EXTRACTED, CrawlStatus.EMBEDDED]),
-            KnowledgeDocument.excluded.is_(False),
+        filters.extend(
+            [
+                KnowledgeDocument.crawl_status.in_([CrawlStatus.EXTRACTED, CrawlStatus.EMBEDDED]),
+                KnowledgeDocument.excluded.is_(False),
+            ]
         )
 
     total = await db.scalar(select(func.count()).select_from(KnowledgeDocument).where(*filters))
