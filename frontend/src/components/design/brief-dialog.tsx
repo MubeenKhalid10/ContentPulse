@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { XIcon } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -12,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -41,7 +43,7 @@ type Values = z.infer<typeof schema>;
 export function BriefDialog({ task, open, onClose }: { task: DesignTaskDetail; open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl" showCloseButton={false}>
         {open && <BriefForm task={task} onClose={onClose} />}
       </DialogContent>
     </Dialog>
@@ -102,6 +104,15 @@ function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => v
         ),
       )}
     >
+      <DialogClose
+        disabled={update.isPending}
+        render={
+          <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" />
+        }
+      >
+        <XIcon />
+        <span className="sr-only">Close</span>
+      </DialogClose>
       <DialogHeader>
         <DialogTitle>Edit design brief</DialogTitle>
         <DialogDescription>
@@ -113,7 +124,7 @@ function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => v
           <AlertDescription>{errorMessage(update.error)}</AlertDescription>
         </Alert>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <fieldset disabled={update.isPending} className="grid gap-4 sm:grid-cols-2">
         <FormField id="brief-format" label="Format">
           <Controller
             control={form.control}
@@ -126,7 +137,7 @@ function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => v
         <FormField id="brief-dimensions" label="Dimensions" error={errors.dimensions?.message}>
           <Input {...fieldAria("brief-dimensions", errors.dimensions?.message)} placeholder="1080×1350 (4:5)" {...form.register("dimensions")} />
         </FormField>
-      </div>
+      </fieldset>
       {text("headline", "Headline")}
       {text("supporting_text", "Supporting text")}
       {text("visual_concept", "Visual direction", 3)}
@@ -145,10 +156,10 @@ function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => v
       {text("cta", "Call to action")}
       {text("designer_notes", "Notes for the designer", 3)}
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
+        <Button type="button" variant="outline" disabled={update.isPending} onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={update.isPending} pending={update.isPending}>
+        <Button type="submit" disabled={update.isPending} pending={update.isPending}>
           {update.isPending ? "Saving…" : "Save brief"}
         </Button>
       </DialogFooter>

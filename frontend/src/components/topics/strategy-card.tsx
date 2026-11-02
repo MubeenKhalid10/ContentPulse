@@ -217,7 +217,7 @@ export function StrategyCard({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={action.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={action.isPending}
               onClick={() => {

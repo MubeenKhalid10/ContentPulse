@@ -157,7 +157,7 @@ function SetupForm({
         }),
       )}
     >
-      <fieldset disabled={!canEdit} className="grid gap-6">
+      <fieldset disabled={!canEdit || update.isPending} className="grid gap-6">
         <Card id="audience" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Audience &amp; goals</CardTitle>

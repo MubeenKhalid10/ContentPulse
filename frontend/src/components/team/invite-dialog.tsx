@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Controller, useForm, useWatch } from "react-hook-form";
@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -39,7 +40,7 @@ export function InviteDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
         {open && <InviteFlow key={initial?.email ?? "new"} initial={initial} onClose={onClose} />}
       </DialogContent>
     </Dialog>
@@ -70,6 +71,15 @@ function InviteFlow({
       className="grid gap-5"
       onSubmit={form.handleSubmit((values) => invite.mutate(values, { onSuccess: setResult }))}
     >
+      <DialogClose
+        disabled={invite.isPending}
+        render={
+          <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" />
+        }
+      >
+        <XIcon />
+        <span className="sr-only">Close</span>
+      </DialogClose>
       <DialogHeader>
         <DialogTitle>{initial ? "Replace invite link" : "Invite a teammate"}</DialogTitle>
         <DialogDescription>
@@ -102,10 +112,10 @@ function InviteFlow({
         />
       </FormField>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
+        <Button type="button" variant="outline" disabled={invite.isPending} onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={invite.isPending} pending={invite.isPending}>
+        <Button type="submit" disabled={invite.isPending} pending={invite.isPending}>
           {invite.isPending ? "Creating…" : initial ? "Create new link" : "Create invite link"}
         </Button>
       </DialogFooter>

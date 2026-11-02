@@ -146,7 +146,7 @@ export function LogoCard({
           </p>
         </div>
       </CardContent>
-      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+      <AlertDialog open={confirmRemove} onOpenChange={(open) => !remove.isPending && setConfirmRemove(open)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove the uploaded logo?</AlertDialogTitle>
@@ -157,9 +157,11 @@ export function LogoCard({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
+              disabled={remove.isPending}
+              pending={remove.isPending}
               onClick={() => {
                 setConfirmRemove(false);
                 remove.mutate(undefined, {

@@ -6,11 +6,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { ActiveJob, JobCounts, KnowledgeStats, LastJobNotice, SemanticSearchNotice } from "@/components/knowledge/crawl-status";
+import { ActiveJob, KnowledgeStats, LastJobNotice, SemanticSearchNotice } from "@/components/knowledge/crawl-status";
 import { DocumentSheet } from "@/components/knowledge/document-sheet";
 import { DocumentsTable } from "@/components/knowledge/documents-table";
 import { CrawlDialog, DocumentDialog } from "@/components/knowledge/knowledge-dialogs";
-import { KnowledgeSearch } from "@/components/knowledge/knowledge-search";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -130,14 +129,16 @@ export function KnowledgeBase() {
               </Button>
             </p>
           )}
-          <KnowledgeSearch onOpenDocument={setOpenDoc} />
-          {data.last_job && !data.active_job && data.last_job.kind === "crawl" && data.last_job.status === "succeeded" && (
-            <div className="-mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-              <span className="text-muted-foreground">Last crawl</span>
-              <JobCounts job={data.last_job} />
-            </div>
-          )}
-          <DocumentsTable canManage={canManage} onOpen={setOpenDoc} />
+          <DocumentsTable
+            canManage={canManage}
+            onOpen={setOpenDoc}
+            counts={{
+              all: data.documents,
+              indexed: data.indexed_documents,
+              failed: data.failed_documents,
+              excluded: data.excluded_documents,
+            }}
+          />
         </div>
       )}
 
