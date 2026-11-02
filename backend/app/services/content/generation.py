@@ -22,7 +22,7 @@ from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.models.ai import AIGenerationJob
 from app.models.enums import JobStatus, Platform, PostStatus, VersionSource
-from app.models.organization import BrandProfile
+from app.models.organization import BrandProfile, OrganizationSettings
 from app.models.post import Post, PostVersion
 from app.models.topic import ContentStrategy, PlatformRule, TopicCandidate
 from app.models.trend import Trend
@@ -46,6 +46,15 @@ from app.workers.tasks import enqueue, schedule_retry
 JOB_TYPE = "post_generation"
 STALE_AFTER = timedelta(minutes=15)
 KINDS = ("generate", "regenerate", "variant")
+LANGUAGE_LABELS = {
+    "ar": "Arabic",
+    "de": "German",
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "pt": "Portuguese",
+    "ur": "Urdu",
+}
 
 
 async def active_job(db: AsyncSession, post_id: uuid.UUID) -> AIGenerationJob | None:
@@ -118,6 +127,7 @@ def _line(label: str, value: str | None) -> str | None:
 def build_prompt(
     *,
     strategy: ContentStrategy,
+    language: str,
     topic: TopicCandidate | None,
     coverage: list[str],
     passages: list[Passage],
@@ -127,10 +137,12 @@ def build_prompt(
     instructions: str | None,
 ) -> str:
     label = PLATFORM_LABELS[strategy.platform]
+    language_label = LANGUAGE_LABELS.get(language, language)
     is_blog = strategy.platform == Platform.BLOG
     noun = "blog article" if is_blog else f"{label} post"
     strategy_lines = [
         _line("Platform", label),
+        _line("Content language", language_label),
         _line("Post type", strategy.post_type),
         _line("Objective", strategy.objective),
         _line("Angle", strategy.content_angle),
@@ -169,6 +181,9 @@ def build_prompt(
     ]
     parts = [
         UNTRUSTED_NOTICE,
+        f"Write all generated text in {language_label}, including the hook, body, call to action, "
+        "hashtags, and any blog metadata. Do not translate proper names, URLs, or evidence "
+        "citations unless needed for natural grammar.",
         "<strategy>\n" + "\n".join(x for x in strategy_lines if x) + "\n</strategy>",
         "<topic>\n" + "\n".join(x for x in topic_lines if x) + "\n</topic>" if topic_lines else "",
         "<recent_coverage>\n"
@@ -253,7 +268,11 @@ async def _generate_with_ai(
             return blog.parse_output(raw.data, refs=refs)
         return parse_output(raw.data, refs=refs, hashtag_limit=rule.hashtag_limit)
     except InvalidCopy as exc:
-        raise AIError(AIErrorKind.BAD_OUTPUT, str(exc)) from exc
+        raise AIError(
+            AIErrorKind.BAD_OUTPUT,
+            f"AI response validation failed: {exc}",
+            public=True,
+        ) from exc
 
 
 async def run(job_id: uuid.UUID) -> None:
@@ -312,6 +331,12 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
     topic = await db.get(TopicCandidate, post.topic_id) if post.topic_id else None
     trend = await db.get(Trend, topic.trend_id) if topic and topic.trend_id else None
     rule = (await get_rules(db, post.organization_id))[Platform(post.platform)]
+    settings = await db.scalar(
+        select(OrganizationSettings).where(
+            OrganizationSettings.organization_id == post.organization_id
+        )
+    )
+    language = settings.default_language if settings else "en"
     brand = await db.scalar(
         select(BrandProfile).where(BrandProfile.organization_id == post.organization_id)
     )
@@ -337,6 +362,7 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
     if provider is not None:
         prompt_text = build_prompt(
             strategy=strategy,
+            language=language,
             topic=topic,
             coverage=coverage,
             passages=passages,

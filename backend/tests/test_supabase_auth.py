@@ -229,15 +229,23 @@ async def test_password_endpoints_disabled(client, supabase):
     assert resp.status_code == 403
 
 
-async def test_an_existing_account_is_never_taken_over_by_email(client, supabase):
+async def test_verified_recreated_identity_relinks_existing_account(client, supabase):
     victim = bearer(supabase.token("victim@example.com", sub=str(uuid.uuid4())))
-    assert (await client.get("/api/v1/auth/me", headers=victim)).status_code == 200
+    original = await client.get("/api/v1/auth/me", headers=victim)
+    assert original.status_code == 200
 
-    # Same email, a different identity: the account stays with its owner.
-    attacker = bearer(supabase.token("victim@example.com", sub=str(uuid.uuid4())))
-    resp = await client.get("/api/v1/auth/me", headers=attacker)
-    assert resp.status_code == 401
-    assert (await client.get("/api/v1/auth/me", headers=victim)).status_code == 200
+    # Supabase deletion followed by signup creates a new subject. The verified
+    # email reclaims the same platform row and keeps its identity/data.
+    recreated = bearer(supabase.token("victim@example.com", sub=str(uuid.uuid4())))
+    resp = await client.get("/api/v1/auth/me", headers=recreated)
+    assert resp.status_code == 200
+    assert resp.json()["id"] == original.json()["id"]
+
+    # A token without email verification still cannot claim the row.
+    unverified = bearer(
+        supabase.token("victim@example.com", sub=str(uuid.uuid4()), email_verified=False)
+    )
+    assert (await client.get("/api/v1/auth/me", headers=unverified)).status_code == 401
 
 
 async def test_an_unverified_email_cannot_claim_an_existing_account(client, supabase, db):
