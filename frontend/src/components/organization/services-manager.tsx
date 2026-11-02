@@ -1,7 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { BriefcaseIcon, MoreHorizontalIcon, PlusIcon } from "lucide-react";
+import {
+  BriefcaseIcon,
+  MoreHorizontalIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -25,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -244,7 +250,7 @@ function ServiceDialog({
       open={editing !== undefined}
       onOpenChange={(open) => !open && onClose()}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" showCloseButton={false}>
         {editing !== undefined && (
           <ServiceForm
             key={editing?.id ?? "new"}
@@ -294,6 +300,20 @@ function ServiceForm({
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-5">
       <DialogHeader>
+        <DialogClose
+          disabled={pending}
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2"
+            />
+          }
+        >
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </DialogClose>
         <DialogTitle>
           {service
             ? `Edit ${service.name}`
@@ -304,6 +324,7 @@ function ServiceForm({
           beats generic.
         </DialogDescription>
       </DialogHeader>
+      <fieldset disabled={pending} className="grid gap-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <FormField id="svc-kind" label="Type">
           <Controller
@@ -364,6 +385,7 @@ function ServiceForm({
             <Switch
               id="svc-active"
               checked={field.value}
+              disabled={pending}
               onCheckedChange={field.onChange}
             />
             <Label htmlFor="svc-active" className="font-normal">
@@ -372,8 +394,9 @@ function ServiceForm({
           </div>
         )}
       />
+      </fieldset>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onDone}>
+        <Button type="button" variant="outline" disabled={pending} onClick={onDone}>
           Cancel
         </Button>
         <Button type="submit" disabled={pending} pending={pending}>
@@ -393,7 +416,10 @@ function DeleteServiceDialog({
 }) {
   const remove = useDeleteService();
   return (
-    <AlertDialog open={!!service} onOpenChange={(open) => !open && onClose()}>
+    <AlertDialog
+      open={!!service}
+      onOpenChange={(open) => !open && !remove.isPending && onClose()}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {service?.name}?</AlertDialogTitle>
@@ -403,7 +429,9 @@ function DeleteServiceDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={remove.isPending}>
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={remove.isPending}

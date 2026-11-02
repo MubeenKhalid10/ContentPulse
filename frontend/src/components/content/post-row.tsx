@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangleIcon, LoaderCircleIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import { AlertTriangleIcon, LoaderCircleIcon, RefreshCwIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -10,7 +10,7 @@ import { ChangeRequestTag } from "@/components/approvals/change-request";
 import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { Button } from "@/components/ui/button";
-import { useDeletePost, useRegenerate } from "@/hooks/use-content";
+import { useDeletePost, usePostAction, useRegenerate } from "@/hooks/use-content";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { postStatusLabel } from "@/lib/content";
@@ -106,6 +106,31 @@ function FailedPostActions({ post }: { post: Post }) {
   );
 }
 
+function RejectedPostActions({ post }: { post: Post }) {
+  const action = usePostAction();
+  const onError = (e: unknown) => toast.error(errorMessage(e));
+  return (
+    <div className="relative z-10 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+      <span className="mr-auto">Restore this post to edit, rewrite, or resubmit it.</span>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={action.isPending}
+        pending={action.isPending}
+        onClick={() =>
+          action.mutate(
+            { id: post.id, action: "restore-rejected" },
+            { onSuccess: () => toast.success("Post restored to draft"), onError },
+          )
+        }
+      >
+        <RotateCcwIcon />
+        Restore
+      </Button>
+    </div>
+  );
+}
+
 export function PostRow({
   post,
   compact = false,
@@ -127,7 +152,7 @@ export function PostRow({
     generation?.status === "queued" || generation?.status === "running";
   const failed = generation?.status === "failed" && !post.current_version;
   return (
-    <li className="relative grid gap-1.5 rounded-xl bg-card p-4 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
+    <li className="relative grid min-w-0 gap-1.5 overflow-hidden rounded-xl bg-card p-4 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
       <div className="flex flex-wrap items-center gap-2">
         {select && (
           <Check
@@ -171,6 +196,8 @@ export function PostRow({
         </p>
       ) : failed ? (
         <FailedPostActions post={post} />
+      ) : post.status === "rejected" ? (
+        <RejectedPostActions post={post} />
       ) : (
         post.hook && (
           <p

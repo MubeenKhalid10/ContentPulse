@@ -157,7 +157,7 @@ function MemberRow({
             aria-label={`Role for ${member.email}`}
             value={member.role}
             options={ROLE_OPTIONS}
-            disabled={update.isPending}
+            disabled={update.isPending || isSelf}
             onChange={(role) =>
               update.mutate(
                 { memberId: member.id, role },

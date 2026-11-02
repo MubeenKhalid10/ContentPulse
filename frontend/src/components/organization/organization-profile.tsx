@@ -97,7 +97,7 @@ function ProfileForm({
 
   return (
     <form onSubmit={onSubmit} noValidate>
-      <fieldset disabled={!canEdit} className="grid gap-6">
+      <fieldset disabled={!canEdit || update.isPending} className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Basics</CardTitle>

@@ -21,7 +21,7 @@ import { PasswordInput } from "@/components/auth/password-input";
 import { Input } from "@/components/ui/input";
 import { errorMessage } from "@/lib/api";
 import { useAuthConfig, useLogin } from "@/lib/auth";
-import { safeNext } from "@/lib/supabase";
+import { clearSupabaseBrowserSession, safeNext } from "@/lib/supabase";
 import { type LoginValues, loginSchema } from "@/schemas/auth";
 
 export function LoginForm() {
@@ -34,6 +34,7 @@ export function LoginForm() {
   // Supabase sends its own reset emails; local mode needs SMTP on the server.
   const authConfig = useAuthConfig();
   const canReset = authConfig.data?.password_reset === true;
+  const [clearingSession, setClearingSession] = useState(false);
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -55,6 +56,17 @@ export function LoginForm() {
       },
     }),
   );
+
+  const clearSession = async () => {
+    setClearingSession(true);
+    try {
+      await clearSupabaseBrowserSession();
+      login.reset();
+      form.reset();
+    } finally {
+      setClearingSession(false);
+    }
+  };
 
   return (
     <Card>
@@ -109,7 +121,7 @@ export function LoginForm() {
             />
           </FormField>
           <AuthCaptcha key={captchaKey} onToken={setCaptchaToken} />
-          <Button type="submit" size="lg" disabled={login.isPending} pending={login.isPending}>
+          <Button type="submit" size="lg" disabled={login.isPending} pending={login.isPending}>
             {login.isPending ? "Signing in…" : "Sign in"}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
@@ -121,6 +133,16 @@ export function LoginForm() {
               Create an account
             </Link>
           </p>
+          {authConfig.data?.provider === "supabase" && (
+            <button
+              type="button"
+              onClick={clearSession}
+              disabled={clearingSession}
+              className="text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              {clearingSession ? "Clearing sign-in session…" : "Clear this browser's sign-in session"}
+            </button>
+          )}
         </form>
       </CardContent>
     </Card>

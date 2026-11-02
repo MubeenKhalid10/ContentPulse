@@ -273,7 +273,7 @@ function ConfirmJoin({
               />
             </FormField>
           )}
-          <Button type="submit" size="lg" disabled={join.isPending} pending={join.isPending}>
+          <Button type="submit" size="lg" disabled={join.isPending} pending={join.isPending}>
             {join.isPending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>
         </form>
@@ -356,6 +356,8 @@ function SupabaseIdentityForm({
 
   const pending = identify.isPending || accept.isPending;
   const failure = identify.error ?? accept.error;
+  const accountLinkError =
+    failure && errorMessage(failure).toLowerCase().includes("already linked");
   return (
     <Card>
       <InviteHeader invite={invite} />
@@ -369,6 +371,23 @@ function SupabaseIdentityForm({
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(failure)}</AlertDescription>
             </Alert>
+          )}
+          {accountLinkError && hasAccount && (
+            <p className="text-sm text-muted-foreground">
+              If you deleted the old Supabase account, choose{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setHasAccount(false);
+                  identify.reset();
+                  form.clearErrors();
+                }}
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Create an account instead
+              </button>
+              {" "}to set a new password.
+            </p>
           )}
           <FormField
             id="full_name"
@@ -384,7 +403,7 @@ function SupabaseIdentityForm({
           </FormField>
           <FormField
             id="password"
-            label={hasAccount ? "Your password" : "Choose a password"}
+            label={hasAccount ? "Your password" : "Set a new password"}
             action={
               hasAccount ? (
                 <Link
@@ -398,7 +417,7 @@ function SupabaseIdentityForm({
             hint={
               hasAccount
                 ? `Sign in as ${invite.email}.`
-                : "At least 10 characters. You will use it to sign in next time."
+                : "You don't have a ContentPulse account yet. Set at least 10 characters to create your sign-in password."
             }
             error={errors.password?.message}
           >
@@ -477,12 +496,12 @@ function AcceptForm({
           <FormField
             id="password"
             label={
-              invite.has_account ? "Your current password" : "Choose a password"
+              invite.has_account ? "Your current password" : "Set a new password"
             }
             hint={
               invite.has_account
                 ? "You already have an account. Confirm it's you."
-                : "At least 10 characters. You will use it to sign in next time."
+                : "You don't have a ContentPulse account yet. Set at least 10 characters to create your sign-in password."
             }
             error={errors.password?.message}
           >
@@ -494,7 +513,7 @@ function AcceptForm({
               {...form.register("password")}
             />
           </FormField>
-          <Button type="submit" size="lg" disabled={accept.isPending} pending={accept.isPending}>
+          <Button type="submit" size="lg" disabled={accept.isPending} pending={accept.isPending}>
             {accept.isPending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>
         </form>

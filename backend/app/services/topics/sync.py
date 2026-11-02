@@ -49,17 +49,18 @@ async def analysis_fields(db: AsyncSession, trend: Trend) -> dict:
             "platforms": a.get("platforms", []),
             "evidence": a.get("evidence", []),
         }
-        for a in alignment.get("possible_angles", [])
+        for a in (alignment.get("possible_angles") or [])
+        if isinstance(a, dict)
     ]
     audience = " ".join(
         [settings.target_audience or "", *settings.content_goals] if settings else []
     )
     recommended, fit = recommend(
         RecommendationInput(
-            enabled_platforms=settings.enabled_platforms if settings else [],
+            enabled_platforms=(settings.enabled_platforms or []) if settings else [],
             audience_text=audience,
-            topic_text=" ".join([trend.topic, *trend.keywords, trend.category or ""]),
-            sources=trend.sources,
+            topic_text=" ".join([trend.topic, *(trend.keywords or []), trend.category or ""]),
+            sources=trend.sources or [],
             angles=angles,
         ),
         rules,

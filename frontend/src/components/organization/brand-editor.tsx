@@ -121,7 +121,7 @@ function BrandForm({
               value={field.value}
               onChange={field.onChange}
               placeholder={placeholder}
-              disabled={!canEdit}
+              disabled={!canEdit || update.isPending}
             />
             {name === "brand_colors" && field.value.length > 0 && (
               <ul className="flex flex-wrap gap-1.5" aria-label="Color preview">
@@ -153,7 +153,7 @@ function BrandForm({
         }),
       )}
     >
-      <fieldset disabled={!canEdit} className="grid gap-6">
+      <fieldset disabled={!canEdit || update.isPending} className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Voice</CardTitle>
@@ -261,7 +261,7 @@ function BrandForm({
                     logoSrc={logoSrc}
                     value={field.value}
                     onChange={field.onChange}
-                    disabled={!canEdit}
+                    disabled={!canEdit || update.isPending}
                   />
                 )}
               />

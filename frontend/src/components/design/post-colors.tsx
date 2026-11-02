@@ -104,6 +104,7 @@ export function PostColors({
                 variant="ghost"
                 size="icon"
                 aria-label={`Remove color ${i + 1}`}
+                disabled={update.isPending}
                 onClick={() => setDraft(draft.filter((_, j) => j !== i))}
               >
                 <XIcon />
@@ -116,7 +117,7 @@ export function PostColors({
             type="button"
             variant="outline"
             size="sm"
-            disabled={draft.length >= MAX_COLORS}
+            disabled={update.isPending || draft.length >= MAX_COLORS}
             onClick={() => setDraft([...draft, ""])}
           >
             <PlusIcon /> Add color
@@ -137,6 +138,7 @@ export function PostColors({
             type="button"
             variant="ghost"
             size="sm"
+            disabled={update.isPending}
             onClick={() => setDraft(null)}
           >
             Cancel

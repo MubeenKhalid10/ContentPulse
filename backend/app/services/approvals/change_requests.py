@@ -250,7 +250,10 @@ async def add_post_comment(
     """A comment on the post's latest review round."""
     latest = await db.scalar(
         select(ApprovalRequest.id)
-        .where(ApprovalRequest.post_id == post_id, ApprovalRequest.organization_id == organization_id)
+        .where(
+            ApprovalRequest.post_id == post_id,
+            ApprovalRequest.organization_id == organization_id,
+        )
         .order_by(ApprovalRequest.created_at.desc())
         .limit(1)
     )

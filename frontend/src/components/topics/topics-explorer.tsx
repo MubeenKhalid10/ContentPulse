@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { isSwitchingList, ListLoading } from "@/components/shared/loading";
+import { useFromHere } from "@/components/shared/back-link";
 import { PageHeader } from "@/components/shared/page-header";
 import {
   FILTER_SEARCH,
@@ -155,6 +156,7 @@ export function TopicsExplorer() {
 }
 
 function TopicRow({ topic, canManage }: { topic: Topic; canManage: boolean }) {
+  const fromHere = useFromHere();
   return (
     <li className="group relative flex flex-wrap items-start gap-x-4 gap-y-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40 sm:flex-nowrap">
       <Score score={topic.opportunity_score} />
@@ -181,11 +183,11 @@ function TopicRow({ topic, canManage }: { topic: Topic; canManage: boolean }) {
       </div>
       <div className="relative z-10 flex basis-full flex-wrap items-center gap-1.5 pl-16 sm:basis-auto sm:self-center sm:pl-0">
         <Link
-          href={topicHref(topic)}
-          aria-label={`View trend ${topic.title}`}
+          href={topic.trend_id ? fromHere(`/trends/${topic.trend_id}`) : topicHref(topic)}
+          aria-label={topic.trend_id ? `View trend ${topic.title}` : `Open topic ${topic.title}`}
           className={buttonVariants({ variant: "view", size: "sm" })}
         >
-          View trend
+          {topic.trend_id ? "View trend" : "Open topic"}
         </Link>
         {canManage && <TopicActions topic={topic} compact />}
       </div>
