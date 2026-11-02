@@ -68,9 +68,7 @@ export function TrendsExplorer() {
     location: "",
     q: "",
   });
-  // The Rejected tab is gone: rejected trends are in All trends, with Restore.
-  const filters: TrendFilters =
-    saved.status === ("rejected" as string) ? { ...saved, status: "all" } : saved;
+  const filters: TrendFilters = saved;
   const [limit, setLimit] = useState(PAGE);
   const trends = useTrends(filters, limit);
   const runs = useDiscoveryRuns();
@@ -263,6 +261,7 @@ export function TrendsExplorer() {
                     <TabsTrigger value="all">All trends</TabsTrigger>
                     <TabsTrigger value="active">To review</TabsTrigger>
                     <TabsTrigger value="shortlisted">Shortlisted</TabsTrigger>
+                    <TabsTrigger value="rejected">Rejected</TabsTrigger>
                   </TabsList>
                 </Tabs>
                 <SearchInput
@@ -428,6 +427,8 @@ export function TrendsExplorer() {
                       ? "No trends match the “Relevant to us” filter."
                       : filters.status === "shortlisted"
                         ? "Nothing shortlisted yet. Shortlist a trend to plan posts for it."
+                        : filters.status === "rejected"
+                          ? "No rejected trends. Rejected trends will remain here until restored."
                         : running
                           ? "Collecting… trends will appear here shortly."
                           : `No trends in the last ${TREND_WINDOW_DAYS} days.`}

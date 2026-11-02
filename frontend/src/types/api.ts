@@ -750,6 +750,7 @@ export type PostGroup =
   | "approval_pending"
   | "approval_done"
   | "approved"
+  | "rejected"
   | "archived"
   | "all";
 

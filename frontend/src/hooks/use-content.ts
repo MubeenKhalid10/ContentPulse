@@ -95,6 +95,7 @@ function useContentMutation<TVars>(
       queryClient.setQueryData([...root(orgId!), "detail", post.id], post);
       queryClient.invalidateQueries({ queryKey: root(orgId!) });
       queryClient.invalidateQueries({ queryKey: ["org", orgId, "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["org", orgId, "approvals"] });
       // Writing a post approves its plan, shown on the topic page.
       queryClient.invalidateQueries({ queryKey: ["org", orgId, "topics"] });
     },
@@ -221,7 +222,7 @@ export const useRestoreVersion = () =>
       }),
   );
 
-export type PostAction = "back-to-draft" | "submit-for-review" | "archive";
+export type PostAction = "back-to-draft" | "restore-rejected" | "submit-for-review" | "archive";
 
 export const usePostAction = () =>
   useContentMutation(({ id, action }: { id: string; action: PostAction }) =>

@@ -22,7 +22,7 @@ const root = (orgId: string) => ["org", orgId, "trends"] as const;
 export type RelevanceFilter = "" | "relevant" | "highly_relevant" | "weakly_relevant" | "not_relevant" | "unanalyzed";
 
 export interface TrendFilters {
-  status: "all" | "active" | "shortlisted";
+  status: "all" | "active" | "shortlisted" | "rejected";
   relevance: RelevanceFilter;
   sort: "score" | "recent" | "mentions" | "new";
   source: string;
@@ -41,7 +41,7 @@ export function useTrends(filters: TrendFilters, limit: number) {
     status: filters.status === "all" ? "unshortlisted" : filters.status,
     sort: filters.sort,
     limit: String(limit),
-    seen_within_days: String(TREND_WINDOW_DAYS),
+    ...(filters.status === "rejected" ? {} : { seen_within_days: String(TREND_WINDOW_DAYS) }),
   });
   if (filters.source) params.set("source", filters.source);
   if (filters.location) params.set("location", filters.location);

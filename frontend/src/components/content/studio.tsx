@@ -11,6 +11,7 @@ import {
   RefreshCwIcon,
   SendIcon,
   Undo2Icon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -48,6 +49,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -61,7 +63,7 @@ import { useResubmitPost } from "@/hooks/use-approvals";
 import { type PostAction, useCreateVariant, useDeletePost, usePost, usePostAction, useRegenerate } from "@/hooks/use-content";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { postStatusLabel } from "@/lib/content";
+import { fullText, postStatusLabel } from "@/lib/content";
 import { PLATFORM_LABEL } from "@/lib/topics";
 import type { PostDetail } from "@/types/api";
 
@@ -157,11 +159,11 @@ export function ContentStudio({ id }: { id: string }) {
 
       {p.current ? (
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+          <div className="min-w-0 lg:col-span-2">
             {/* Remount on a new version so the form shows what was saved or generated. */}
             <PostEditor key={`${p.id}:${p.current_version}`} post={p} canEdit={canEdit && !generating} />
           </div>
-          <div className="grid content-start gap-6">
+          <div className="grid min-w-0 content-start gap-6">
             <PreviewPanel post={p} />
             <VariantsPanel post={p} />
             {p.review && <PostComments postId={p.id} currentRound={p.review.request_id} />}
@@ -251,7 +253,7 @@ function ResubmitControl({ postId }: { postId: string }) {
         onChange={(e) => setNote(e.target.value)}
         className="min-w-48 flex-1 bg-background"
       />
-      <Button type="submit" size="sm" disabled={resubmit.isPending} pending={resubmit.isPending}>
+      <Button type="submit" size="sm" disabled={resubmit.isPending} pending={resubmit.isPending}>
         <SendIcon />
         {resubmit.isPending ? "Resubmitting…" : "Resubmit for approval"}
       </Button>
@@ -362,6 +364,7 @@ function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail;
 
 const ACTION_COPY: Record<PostAction, string> = {
   "back-to-draft": "Moved back to draft",
+  "restore-rejected": "Post restored to draft",
   "submit-for-review": "Sent to an admin for approval",
   archive: "Post archived",
 };
@@ -395,12 +398,18 @@ function StudioActions({
     action.mutate({ id: post.id, action: kind }, { onSuccess: () => toast.success(ACTION_COPY[kind]), onError });
   const busy = action.isPending || generating;
   const hasCopy = post.current_version > 0;
+  const copyLength = post.current
+    ? fullText(post.current.hook, post.current.body, post.current.cta, post.current.hashtags).length
+    : 0;
+  const overCharacterLimit =
+    post.limits.max_length != null && copyLength > post.limits.max_length;
   const s = post.status;
   const canVariant = canGenerate && post.editable && !!post.content_strategy_id;
   // Withdrawing from review is the writer's call; taking a post back from
   // design reopens approved copy, so only an admin can.
   const canBackToDraft =
     (canEdit && s === "content_review") ||
+    (canEdit && s === "rejected") ||
     (canReview && ["design_pending", "design_in_progress", "design_uploaded"].includes(s));
   const hasMore = canVariant || canBackToDraft;
 
@@ -430,7 +439,7 @@ function StudioActions({
         {canEdit && s === "draft" && (
           <Button
             size="sm"
-            disabled={busy || !hasCopy}
+            disabled={busy || !hasCopy || overCharacterLimit}
             pending={action.isPending && action.variables?.action === "submit-for-review"}
             onClick={() => setConfirm("submit")}
           >
@@ -479,7 +488,11 @@ function StudioActions({
               {canBackToDraft && (
                 <DropdownMenuItem onClick={() => setConfirm("back")}>
                   <Undo2Icon />
-                  {s === "content_review" ? "Withdraw from review" : "Reopen copy"}
+                  {s === "content_review"
+                    ? "Withdraw from review"
+                    : s === "rejected"
+                      ? "Restore to draft"
+                      : "Reopen copy"}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -515,15 +528,23 @@ function StudioActions({
         <ConfirmDialog
           open={confirm === "back"}
           onOpenChange={(o) => !o && setConfirm(null)}
-          title={s === "content_review" ? "Withdraw from review?" : "Reopen the copy?"}
+          title={
+            s === "content_review"
+              ? "Withdraw from review?"
+              : s === "rejected"
+                ? "Restore rejected post?"
+                : "Reopen the copy?"
+          }
           description={
             s === "content_review"
               ? "The admin's review is cancelled and the post goes back to draft so you can edit it. Submit it again when you are done."
+              : s === "rejected"
+                ? "The rejected post will return to draft so you can edit or rewrite it, then submit it for approval again."
               : "The approved copy becomes editable again and the post goes back to draft. It will need content approval again."
           }
-          confirmLabel={s === "content_review" ? "Withdraw" : "Reopen copy"}
+          confirmLabel={s === "content_review" ? "Withdraw" : s === "rejected" ? "Restore" : "Reopen copy"}
           pending={action.isPending}
-          onConfirm={() => run("back-to-draft")}
+          onConfirm={() => run(s === "rejected" ? "restore-rejected" : "back-to-draft")}
         />
         <RegenerateDialog post={post} open={regenOpen} onClose={() => setRegenOpen(false)} />
       </div>
@@ -546,7 +567,16 @@ function RegenerateDialog({ post, open, onClose }: { post: PostDetail; open: boo
         onClose();
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <DialogClose
+          disabled={regenerate.isPending}
+          render={
+            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" />
+          }
+        >
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </DialogClose>
         <DialogHeader>
           <DialogTitle>Rewrite with AI</DialogTitle>
           <DialogDescription>
