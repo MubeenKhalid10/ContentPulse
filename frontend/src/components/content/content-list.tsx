@@ -36,6 +36,7 @@ const TABS: { value: PostGroup; label: string }[] = [
   { value: "drafts", label: "Draft posts" },
   { value: "changes", label: "Changes requested" },
   { value: "approval", label: "Sent for approval" },
+  { value: "rejected", label: "Rejected" },
 ];
 
 const EMPTY: Record<PostGroup, string> = {
@@ -47,6 +48,7 @@ const EMPTY: Record<PostGroup, string> = {
   approval_pending: "Nothing is waiting for an admin right now.",
   approval_done: "No approved posts yet.",
   approved: "Nothing ready to post yet.",
+  rejected: "No rejected posts. Posts rejected by an approver will remain here.",
   archived: "No archived posts.",
   all: "No posts yet.",
 };

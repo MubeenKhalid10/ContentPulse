@@ -71,7 +71,7 @@ POST_MACHINE: StateMachine[PostStatus] = StateMachine(
         # -> CHANGES_REQUESTED: an admin reopens an approved post.
         _P.APPROVED: {_P.FINAL, _P.CHANGES_REQUESTED, _P.ARCHIVED},
         _P.FINAL: {_P.CHANGES_REQUESTED, _P.ARCHIVED},
-        _P.REJECTED: {_P.ARCHIVED},
+        _P.REJECTED: {_P.DRAFT, _P.ARCHIVED},
         _P.ARCHIVED: set(),
     },
 )

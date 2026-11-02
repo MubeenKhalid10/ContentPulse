@@ -96,7 +96,8 @@ STATUS_GROUPS: dict[str, list[PostStatus] | None] = {
         P.FINAL,
     ],
     "approved": [P.APPROVED, P.FINAL],
-    "archived": [P.ARCHIVED, P.REJECTED],
+    "rejected": [P.REJECTED],
+    "archived": [P.ARCHIVED],
     "all": None,
 }
 # Changes requested on the copy put the post back to DRAFT; on the design
@@ -661,6 +662,7 @@ async def restore_version(
 
 ACTIONS: dict[str, PostStatus] = {
     "back-to-draft": P.DRAFT,
+    "restore-rejected": P.DRAFT,
     "submit-for-review": P.CONTENT_REVIEW,
     "archive": P.ARCHIVED,
 }
@@ -677,7 +679,11 @@ async def transition(
 ) -> PostDetail:
     post = await _get_post(db, organization_id, post_id, lock=True)
     target = ACTIONS[action]
-    if target == P.DRAFT and post.status not in (*EDITABLE, P.CONTENT_REVIEW) and not can_review:
+    if (
+        target == P.DRAFT
+        and post.status not in (*EDITABLE, P.CONTENT_REVIEW, P.REJECTED)
+        and not can_review
+    ):
         # Back to draft reopens approved copy: an admin's call.
         raise Forbidden("Only an admin can reopen approved copy.")
     if target == P.ARCHIVED and post.status not in (*EDITABLE, P.CONTENT_REVIEW) and not can_review:

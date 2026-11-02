@@ -203,6 +203,9 @@ async def test_reject(client, internet, design_ai):
     studio = (await admin.get(f"/api/v1/content/{post['id']}")).json()
     assert studio["editable"] is False and studio["design_task"] is None  # task cancelled
     assert (await admin.post(f"/api/v1/content/{post['id']}/resubmit", json={})).status_code == 409
+    restored = await admin.post(f"/api/v1/content/{post['id']}/restore-rejected")
+    assert restored.status_code == 200 and restored.json()["status"] == "draft"
+    assert restored.json()["editable"] is True
     assert (await admin.post(f"/api/v1/content/{post['id']}/archive")).json()[
         "status"
     ] == "archived"
