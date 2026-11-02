@@ -41,6 +41,16 @@ export async function getSupabase(): Promise<SupabaseClient | null> {
   return client;
 }
 
+/** Remove the local browser session without requiring the old Supabase account. */
+export async function clearSupabaseBrowserSession(): Promise<void> {
+  const supabase = await getSupabase();
+  await supabase?.auth.signOut({ scope: "local" });
+  if (typeof window !== "undefined") {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  }
+}
+
 /**
  * Current access token in Supabase mode (refreshed automatically). Null means there is no
  * session. It throws when Supabase can't be reached to renew the token: the session may
