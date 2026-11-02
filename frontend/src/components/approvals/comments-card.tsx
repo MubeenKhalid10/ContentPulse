@@ -88,7 +88,7 @@ export function CommentsView({
           >
             <Textarea aria-label="Add a comment" rows={2} maxLength={4000} placeholder="Add a comment" value={body} onChange={(e) => setBody(e.target.value)} />
             <p className="text-right text-xs tabular-nums text-muted-foreground">{body.length} / 4000</p>
-            <Button type="submit" size="sm" variant="outline" className="justify-self-end" disabled={!body.trim() || adding} pending={adding}>
+            <Button type="submit" size="sm" variant="outline" className="justify-self-end" disabled={!body.trim() || adding} pending={adding}>
               <MessageSquarePlusIcon />
               {adding ? "Posting…" : "Comment"}
             </Button>

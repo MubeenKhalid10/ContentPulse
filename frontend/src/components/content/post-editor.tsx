@@ -137,7 +137,7 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
 
   return (
     <form noValidate onSubmit={onSubmit} aria-label="Post editor" className="grid gap-6">
-      <fieldset disabled={locked} className="grid gap-6">
+      <fieldset disabled={locked || update.isPending} className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle>{isBlog ? "Blog article" : `${PLATFORM_LABEL[post.platform]} post`}</CardTitle>
@@ -268,7 +268,7 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
 
       {!locked && (
         <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 rounded-xl border bg-background/95 p-3 shadow-sm backdrop-blur">
-          <div className="flex min-w-48 flex-1 items-center gap-2">
+          <div className="flex min-w-[20rem] flex-[1_1_24rem] items-center gap-2">
             <Label htmlFor="post-change-note" className="shrink-0">
               Change note
             </Label>
@@ -295,7 +295,7 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
           <Button type="button" variant="outline" disabled={!isDirty || update.isPending} onClick={() => setDiscardOpen(true)}>
             Discard
           </Button>
-          <Button type="submit" disabled={!isDirty || update.isPending} pending={update.isPending}>
+          <Button type="submit" disabled={!isDirty || update.isPending} pending={update.isPending}>
             <SaveIcon />
             {update.isPending ? "Saving…" : "Save version"}
           </Button>

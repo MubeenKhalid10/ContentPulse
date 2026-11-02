@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { XIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -10,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -41,7 +43,7 @@ export function CrawlDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
         {open && <CrawlForm websiteUrl={websiteUrl} onClose={onClose} />}
       </DialogContent>
     </Dialog>
@@ -69,6 +71,15 @@ function CrawlForm({ websiteUrl, onClose }: { websiteUrl: string | null; onClose
         }),
       )}
     >
+      <DialogClose
+        disabled={start.isPending}
+        render={
+          <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" />
+        }
+      >
+        <XIcon />
+        <span className="sr-only">Close</span>
+      </DialogClose>
       <DialogHeader>
         <DialogTitle>Crawl your website</DialogTitle>
         <DialogDescription>
@@ -101,10 +112,10 @@ function CrawlForm({ websiteUrl, onClose }: { websiteUrl: string | null; onClose
         />
       </FormField>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
+        <Button type="button" variant="outline" disabled={start.isPending} onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={start.isPending} pending={start.isPending}>
+        <Button type="submit" disabled={start.isPending} pending={start.isPending}>
           {start.isPending ? "Starting…" : "Start crawl"}
         </Button>
       </DialogFooter>
@@ -129,7 +140,7 @@ export function DocumentDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl" showCloseButton={false}>
         {open && <DocumentForm key={editing?.id ?? "new"} editing={editing} onClose={onClose} />}
       </DialogContent>
     </Dialog>
@@ -160,6 +171,20 @@ function DocumentForm({ editing, onClose }: { editing: KnowledgeDocumentDetail |
 
   return (
     <form noValidate onSubmit={onSubmit} className="grid gap-5">
+      <DialogClose
+        disabled={pending}
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 right-2"
+          />
+        }
+      >
+        <XIcon />
+        <span className="sr-only">Close</span>
+      </DialogClose>
       <DialogHeader>
         <DialogTitle>{editing ? "Edit document" : "Add a document"}</DialogTitle>
         <DialogDescription>
@@ -189,7 +214,7 @@ function DocumentForm({ editing, onClose }: { editing: KnowledgeDocumentDetail |
         />
       </FormField>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
+        <Button type="button" variant="outline" disabled={pending} onClick={onClose}>
           Cancel
         </Button>
         <Button type="submit" disabled={pending} pending={pending}>

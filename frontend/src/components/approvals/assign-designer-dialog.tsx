@@ -1,12 +1,13 @@
 "use client";
 
-import { LoaderCircleIcon, UserRoundIcon } from "lucide-react";
+import { LoaderCircleIcon, UserRoundIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -43,7 +44,16 @@ export function AssignDesignerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onDone()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <DialogClose
+          disabled={assign.isPending}
+          render={
+            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" />
+          }
+        >
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </DialogClose>
         <DialogHeader>
           <DialogTitle>Content approved. Who designs it?</DialogTitle>
           <DialogDescription>

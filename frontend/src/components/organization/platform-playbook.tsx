@@ -290,7 +290,7 @@ function RuleForm({
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={reset.isPending}>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   variant="destructive"
                   disabled={reset.isPending}
@@ -312,7 +312,7 @@ function RuleForm({
           </AlertDialog>
         </CardHeader>
         <CardContent>
-          <fieldset disabled={!canEdit} className="grid gap-5">
+          <fieldset disabled={!canEdit || update.isPending} className="grid gap-5">
             {list(
               "post_types",
               "Post types",

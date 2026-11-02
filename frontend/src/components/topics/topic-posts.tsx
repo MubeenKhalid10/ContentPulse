@@ -30,46 +30,90 @@ export function TopicPosts({ topicId }: { topicId: string }) {
   const posts = useTopicPosts(topicId);
   // No count while loading: "0 posts" would read as the answer.
   const items = posts.data && !posts.isPlaceholderData ? posts.data.items : null;
+  const drafts = items?.filter((post) => post.status === "draft") ?? [];
+  const generated = items?.filter((post) => post.status !== "draft") ?? [];
+  return (
+    <div className="grid gap-6">
+      {drafts.length > 0 && (
+        <PostSection
+          title="Draft posts"
+          description="Posts saved from your plans that are still being prepared."
+          posts={drafts}
+          href={fromHere}
+        />
+      )}
+      <Card>
+        <CardHeader>
+          <SectionHeader
+            icon={CopyIcon}
+            title="Generated posts"
+            description="Posts created from your plans, with their current review status."
+            badge={items ? `${generated.length} ${generated.length === 1 ? "post" : "posts"}` : undefined}
+          />
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {posts.isError ? (
+            <Alert variant="destructive">
+              <AlertDescription className="grid gap-2">
+                <span>Couldn&apos;t load the generated posts. {errorMessage(posts.error)}</span>
+                <Button size="sm" variant="outline" className="w-fit" onClick={() => posts.refetch()}>
+                  <RefreshCwIcon />
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : !items ? (
+            <ListLoading label="Loading generated posts…" rows={1} />
+          ) : generated.length ? (
+            <>
+              <ul className="grid gap-2" aria-label="Generated posts">
+                {generated.map((p) => (
+                  <GeneratedPost key={p.id} post={p} href={fromHere(`/posts/${p.id}`)} />
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                Select a post to open it in the studio, review its content, and continue the workflow
+                according to its current status.
+              </p>
+            </>
+          ) : (
+            <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+              No generated posts yet. Posts appear here once you start one from a plan.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function PostSection({
+  title,
+  description,
+  posts,
+  href,
+}: {
+  title: string;
+  description: string;
+  posts: Post[];
+  href: ReturnType<typeof useFromHere>;
+}) {
   return (
     <Card>
       <CardHeader>
         <SectionHeader
           icon={CopyIcon}
-          title="Generated posts"
-          description="Posts created from your plans, with their current review status."
-          badge={items ? `${items.length} ${items.length === 1 ? "post" : "posts"}` : undefined}
+          title={title}
+          description={description}
+          badge={`${posts.length} ${posts.length === 1 ? "post" : "posts"}`}
         />
       </CardHeader>
-      <CardContent className="grid gap-3">
-        {posts.isError ? (
-          <Alert variant="destructive">
-            <AlertDescription className="grid gap-2">
-              <span>Couldn&apos;t load the generated posts. {errorMessage(posts.error)}</span>
-              <Button size="sm" variant="outline" className="w-fit" onClick={() => posts.refetch()}>
-                <RefreshCwIcon />
-                Retry
-              </Button>
-            </AlertDescription>
-          </Alert>
-        ) : !items ? (
-          <ListLoading label="Loading generated posts…" rows={1} />
-        ) : items.length ? (
-          <>
-            <ul className="grid gap-2" aria-label="Generated posts">
-              {items.map((p) => (
-                <GeneratedPost key={p.id} post={p} href={fromHere(`/posts/${p.id}`)} />
-              ))}
-            </ul>
-            <p className="text-xs text-muted-foreground">
-              Select a post to open it in the studio, review its content, and continue the workflow
-              according to its current status.
-            </p>
-          </>
-        ) : (
-          <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-            No posts yet. Posts appear here once you generate one from a plan.
-          </p>
-        )}
+      <CardContent>
+        <ul className="grid gap-2" aria-label={title}>
+          {posts.map((post) => (
+            <GeneratedPost key={post.id} post={post} href={href(`/posts/${post.id}`)} />
+          ))}
+        </ul>
       </CardContent>
     </Card>
   );

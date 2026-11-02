@@ -53,47 +53,47 @@ export function StrategiesCard({
         <SectionHeader
           icon={ClipboardListIcon}
           title="Post plans"
-          description="Each plan sets the platform, audience, message and goal of one post."
-          badge={`${strategies.length} ${strategies.length === 1 ? "plan" : "plans"}`}
+          description="Plans waiting to be turned into posts."
+          badge={`${unwritten.length} ${unwritten.length === 1 ? "plan" : "plans"}`}
           actions={
-            !checking && !checkFailed && hasPlans && canCreate && unwritten.length > 0 ? (
-              <>
-                {canGenerate && toWrite.length > 1 && (
+              !checking && !checkFailed && canCreate && toWrite.length > 0 ? (
+                <>
+                  {canGenerate && toWrite.length > 1 && (
+                    <Button
+                      size="sm"
+                      disabled={writeAll.isPending}
+                      pending={writeAll.isPending}
+                      onClick={() =>
+                        writeAll.mutate(
+                          toWrite.map((s) => s.id),
+                          {
+                            onError: (e) => toast.error(errorMessage(e)),
+                            onSuccess: (r) =>
+                              r.failed
+                                ? toast.error(
+                                    `Started ${r.ok}, but ${r.failed} failed: ${errorMessage(r.error)}`,
+                                  )
+                                : toast.success(
+                                    `Writing ${r.ok} posts, one per platform. They stay together in Write posts.`,
+                                  ),
+                          },
+                        )
+                      }
+                    >
+                      <SparklesIcon />
+                      {writeAll.isPending ? "Starting…" : `Write all ${toWrite.length} posts`}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
-                    disabled={writeAll.isPending}
-                    pending={writeAll.isPending}
-                    onClick={() =>
-                      writeAll.mutate(
-                        toWrite.map((s) => s.id),
-                        {
-                          onError: (e) => toast.error(errorMessage(e)),
-                          onSuccess: (r) =>
-                            r.failed
-                              ? toast.error(
-                                  `Started ${r.ok}, but ${r.failed} failed: ${errorMessage(r.error)}`,
-                                )
-                              : toast.success(
-                                  `Writing ${r.ok} posts, one per platform. They stay together in Write posts.`,
-                                ),
-                        },
-                      )
-                    }
+                    variant={toWrite.length > 1 && canGenerate ? "outline" : "default"}
+                    onClick={() => onPlan(null)}
                   >
-                    <SparklesIcon />
-                    {writeAll.isPending ? "Starting…" : `Write all ${toWrite.length} posts`}
+                    <PlusIcon />
+                    Create plan
                   </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant={toWrite.length > 1 && canGenerate ? "outline" : "default"}
-                  onClick={() => onPlan(null)}
-                >
-                  <PlusIcon />
-                  Create plan
-                </Button>
-              </>
-            ) : null
+                </>
+              ) : null
           }
         />
       </CardHeader>
@@ -102,53 +102,65 @@ export function StrategiesCard({
           <ListLoading label="Loading post plans…" rows={1} rowClassName="h-32" />
         ) : hasPlans && checkFailed ? (
           <Alert variant="destructive">
-            <AlertDescription className="grid gap-2">
-              <span>Couldn&apos;t check which plans already have a post. {errorMessage(posts.error)}</span>
-              <Button size="sm" variant="outline" className="w-fit" onClick={() => posts.refetch()}>
-                <RefreshCwIcon />
-                Retry
-              </Button>
-            </AlertDescription>
+              <AlertDescription className="grid gap-2">
+                <span>Couldn&apos;t check which plans already have a post. {errorMessage(posts.error)}</span>
+                <Button size="sm" variant="outline" className="w-fit" onClick={() => posts.refetch()}>
+                  <RefreshCwIcon />
+                  Retry
+                </Button>
+              </AlertDescription>
           </Alert>
         ) : unwritten.length ? (
-          unwritten.map((s) => (
-            <StrategyCard
-              key={s.id}
-              strategy={s}
-              canManage={canManage && shortlisted}
-              onEdit={() => onEdit(s)}
-            />
-          ))
+          <PlanList plans={unwritten} canManage={canManage && shortlisted} onEdit={onEdit} />
         ) : hasPlans ? (
           <div className="grid justify-items-center gap-3 rounded-lg border border-dashed p-5 text-center">
-            <p className="text-sm text-muted-foreground">
-              Every plan has a post. Review them under Generated posts below.
-            </p>
-            {canCreate && (
-              <Button size="sm" onClick={() => onPlan(null)}>
-                <PlusIcon />
-                Create plan
-              </Button>
-            )}
+              <p className="text-sm text-muted-foreground">
+                Every plan has a post. Review them under Generated posts below.
+              </p>
+              {canCreate && (
+                <Button size="sm" onClick={() => onPlan(null)}>
+                  <PlusIcon />
+                  Create plan
+                </Button>
+              )}
           </div>
         ) : shortlisted ? (
           <div className="grid justify-items-center gap-3 rounded-lg border border-dashed p-5 text-center">
-            <p className="text-sm text-muted-foreground">
-              Choose where to publish, who you&apos;re targeting, and what the post should achieve.
-            </p>
-            {canCreate && (
-              <Button size="sm" onClick={() => onPlan(null)}>
-                <PlusIcon />
-                Create plan
-              </Button>
-            )}
+              <p className="text-sm text-muted-foreground">
+                Choose where to publish, who you&apos;re targeting, and what the post should achieve.
+              </p>
+              {canCreate && (
+                <Button size="sm" onClick={() => onPlan(null)}>
+                  <PlusIcon />
+                  Create plan
+                </Button>
+              )}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Plans can be made once the trend is shortlisted.
+              Plans can be made once the trend is shortlisted.
           </p>
         )}
       </CardContent>
     </Card>
   );
+}
+
+function PlanList({
+  plans,
+  canManage,
+  onEdit,
+}: {
+  plans: Strategy[];
+  canManage: boolean;
+  onEdit: (strategy: Strategy) => void;
+}) {
+  return plans.map((strategy) => (
+    <StrategyCard
+      key={strategy.id}
+      strategy={strategy}
+      canManage={canManage}
+      onEdit={() => onEdit(strategy)}
+    />
+  ));
 }

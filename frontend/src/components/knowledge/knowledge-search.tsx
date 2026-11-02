@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLinkIcon, SearchIcon } from "lucide-react";
+import { ExternalLinkIcon, SearchIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -56,14 +56,31 @@ export function KnowledgeSearch({ onOpenDocument }: { onOpenDocument: (id: strin
             if (query.trim()) search.mutate(query.trim());
           }}
         >
-          <Input
-            aria-label="Search the knowledge base"
-            maxLength={500}
-            placeholder="e.g. What do we offer, and who is it for?"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <Button type="submit" variant="outline" disabled={!query.trim() || search.isPending} pending={search.isPending}>
+          <div className="relative min-w-0 flex-1">
+            <Input
+              type="search"
+              aria-label="Search the knowledge base"
+              maxLength={500}
+              placeholder="e.g. What do we offer, and who is it for?"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pr-9 [&::-webkit-search-cancel-button]:appearance-none"
+            />
+            {query && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => {
+                  setQuery("");
+                  search.reset();
+                }}
+                className="absolute top-1/2 right-0.5 grid size-8 -translate-y-1/2 place-items-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <XIcon className="size-3.5" aria-hidden />
+              </button>
+            )}
+          </div>
+          <Button type="submit" variant="outline" disabled={!query.trim() || search.isPending} pending={search.isPending}>
             <SearchIcon />
             {search.isPending ? "Searching…" : "Search"}
           </Button>

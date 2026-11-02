@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { XIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -10,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -32,7 +34,7 @@ type Values = z.infer<typeof schema>;
 export function EditTopicDialog({ topic, open, onClose }: { topic: TopicDetail; open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-lg">{open && <EditForm topic={topic} onClose={onClose} />}</DialogContent>
+      <DialogContent className="sm:max-w-lg" showCloseButton={false}>{open && <EditForm topic={topic} onClose={onClose} />}</DialogContent>
     </Dialog>
   );
 }
@@ -65,6 +67,15 @@ function EditForm({ topic, onClose }: { topic: TopicDetail; onClose: () => void 
         ),
       )}
     >
+      <DialogClose
+        disabled={update.isPending}
+        render={
+          <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" />
+        }
+      >
+        <XIcon />
+        <span className="sr-only">Close</span>
+      </DialogClose>
       <DialogHeader>
         <DialogTitle>Edit topic</DialogTitle>
         <DialogDescription>
@@ -77,20 +88,22 @@ function EditForm({ topic, onClose }: { topic: TopicDetail; onClose: () => void 
           <AlertDescription>{errorMessage(update.error)}</AlertDescription>
         </Alert>
       )}
-      <FormField id="topic-title" label="Title" error={errors.title?.message}>
-        <Input {...fieldAria("topic-title", errors.title?.message)} {...form.register("title")} />
-      </FormField>
-      <FormField id="topic-summary" label="Summary (optional)" error={errors.summary?.message}>
-        <Textarea {...fieldAria("topic-summary", errors.summary?.message)} rows={4} {...form.register("summary")} />
-      </FormField>
-      <FormField id="topic-audience" label="Target audience (optional)" error={errors.target_audience?.message}>
-        <Input {...fieldAria("topic-audience", errors.target_audience?.message)} {...form.register("target_audience")} />
-      </FormField>
+      <fieldset disabled={update.isPending} className="grid gap-5">
+        <FormField id="topic-title" label="Title" error={errors.title?.message}>
+          <Input {...fieldAria("topic-title", errors.title?.message)} {...form.register("title")} />
+        </FormField>
+        <FormField id="topic-summary" label="Summary (optional)" error={errors.summary?.message}>
+          <Textarea {...fieldAria("topic-summary", errors.summary?.message)} rows={4} {...form.register("summary")} />
+        </FormField>
+        <FormField id="topic-audience" label="Target audience (optional)" error={errors.target_audience?.message}>
+          <Input {...fieldAria("topic-audience", errors.target_audience?.message)} {...form.register("target_audience")} />
+        </FormField>
+      </fieldset>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
+        <Button type="button" variant="outline" disabled={update.isPending} onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={update.isPending} pending={update.isPending}>
+        <Button type="submit" disabled={update.isPending} pending={update.isPending}>
           {update.isPending ? "Saving…" : "Save"}
         </Button>
       </DialogFooter>

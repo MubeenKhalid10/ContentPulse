@@ -56,9 +56,11 @@ export function DocumentStatus({ doc }: { doc: KnowledgeDocument }) {
 export function DocumentsTable({
   canManage,
   onOpen,
+  counts,
 }: {
   canManage: boolean;
   onOpen: (id: string) => void;
+  counts: Record<DocumentFilter, number>;
 }) {
   const [filter, setFilter] = useState<DocumentFilter>("all");
   const [q, setQ] = useState("");
@@ -85,10 +87,10 @@ export function DocumentsTable({
           }}
         >
           <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="indexed">Indexed</TabsTrigger>
-            <TabsTrigger value="failed">Failed</TabsTrigger>
-            <TabsTrigger value="excluded">Excluded</TabsTrigger>
+            <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
+            <TabsTrigger value="indexed">Indexed ({counts.indexed})</TabsTrigger>
+            <TabsTrigger value="failed">Failed ({counts.failed})</TabsTrigger>
+            <TabsTrigger value="excluded">Excluded ({counts.excluded})</TabsTrigger>
           </TabsList>
         </Tabs>
         <SearchInput
@@ -234,7 +236,7 @@ function DeleteDocumentDialog({ doc, onClose }: { doc?: KnowledgeDocument; onClo
   const remove = useDeleteDocument();
   const crawled = doc?.document_type !== "manual";
   return (
-    <AlertDialog open={!!doc} onOpenChange={(open) => !open && onClose()}>
+    <AlertDialog open={!!doc} onOpenChange={(open) => !open && !remove.isPending && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {doc?.title ?? "this source"}?</AlertDialogTitle>
@@ -245,7 +247,7 @@ function DeleteDocumentDialog({ doc, onClose }: { doc?: KnowledgeDocument; onClo
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={remove.isPending}
