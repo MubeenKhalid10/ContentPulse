@@ -84,6 +84,12 @@ export const useDeleteDesign = () =>
     api<DesignTaskDetail>(`/design/tasks/${id}/creatives`, { method: "DELETE" }),
   );
 
+/** Remove one uploaded version that has not been sent for approval. */
+export const useDeleteCreativeVersion = () =>
+  useTaskMutation(({ id, version }: { id: string; version: number }) =>
+    api<DesignTaskDetail>(`/design/tasks/${id}/creatives/${version}`, { method: "DELETE" }),
+  );
+
 /** The designer takes a submitted design back (before an admin decided) to change it. */
 export const useWithdrawDesign = () =>
   useTaskMutation((id: string) =>

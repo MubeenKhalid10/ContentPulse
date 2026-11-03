@@ -9,6 +9,7 @@ import {
   RotateCcwIcon,
   SendIcon,
   SparklesIcon,
+  Trash2Icon,
   UploadCloudIcon,
   XIcon,
 } from "lucide-react";
@@ -22,7 +23,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useGenerateImage, useSubmitTask, useUploadCreatives, useUseCreativeVersion } from "@/hooks/use-design";
+import { ConfirmDialog } from "@/components/content/confirm-dialog";
+import {
+  useDeleteCreativeVersion,
+  useGenerateImage,
+  useSubmitTask,
+  useUploadCreatives,
+  useUseCreativeVersion,
+} from "@/hooks/use-design";
 import { errorMessage } from "@/lib/api";
 import { formatBytes } from "@/lib/design";
 import { cleanNote, formatDateTime, timeAgo } from "@/lib/format";
@@ -80,6 +88,8 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
     task.creatives.length > 0 &&
     ["design_pending", "design_in_progress", "design_uploaded", "changes_requested"].includes(task.post.status);
   const busy = upload.isPending || submit.isPending;
+  // The newest version, while it hasn't been sent for approval: it is what the designer just added.
+  const unsent = task.creatives[0] && task.creatives[0].version > (task.review?.creative_version ?? 0) ? task.creatives[0] : null;
   const [submitting, setSubmitting] = useState(false);
   const generate = useGenerateImage();
   const drawing =
@@ -116,7 +126,32 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 grid-cols-1 gap-3">
-        {task.ai_images && <GenerateImage task={task} generate={generate} drawing={drawing} blocked={busy} />}
+        {unsent && (
+          <div className="grid gap-2 rounded-xl border bg-muted/30 p-3" data-testid="uploaded-design">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium">Uploaded, not yet submitted</p>
+              <RemoveVersionButton task={task} version={unsent.version} />
+            </div>
+            <ul className="grid gap-1.5">
+              {unsent.files.map((f) => (
+                <li key={f.id} className="flex min-w-0 items-center gap-2 text-sm">
+                  {f.file_type.startsWith("image/") ? (
+                    <SignedImage src={f.url} alt="" className="size-10 shrink-0 rounded object-cover" />
+                  ) : (
+                    <FileTextIcon className="size-5 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="min-w-0 truncate" title={f.file_name}>
+                    {f.file_name}
+                  </span>
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">{formatBytes(f.file_size ?? 0)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {task.ai_images && (
+          <GenerateImage task={task} generate={generate} drawing={drawing} blocked={busy || !!unsent} unsent={!!unsent} />
+        )}
         <button
           type="button"
           onClick={() => input.current?.click()}
@@ -262,12 +297,15 @@ function GenerateImage({
   generate,
   drawing,
   blocked,
+  unsent = false,
 }: {
   task: DesignTaskDetail;
   generate: ReturnType<typeof useGenerateImage>;
   drawing: boolean;
-  /** An upload or submission is running. */
+  /** An upload or submission is running, or a design is already uploaded. */
   blocked: boolean;
+  /** A design is uploaded and waiting: remove it to generate another. */
+  unsent?: boolean;
 }) {
   const job = task.image_job;
   const status = job?.status;
@@ -296,6 +334,9 @@ function GenerateImage({
         {drawing ? <LoaderCircleIcon className="animate-spin" /> : <SparklesIcon />}
         {drawing ? "Creating image…" : "Generate image with AI"}
       </Button>
+      {unsent && !drawing && (
+        <p className="text-xs text-muted-foreground">A design is already uploaded. Remove it to generate one with AI.</p>
+      )}
       {drawing ? (
         <p className="text-xs text-muted-foreground" role="status">
           Using the brief, the post and this post&apos;s colors. This usually takes under a minute.
@@ -315,9 +356,49 @@ function GenerateImage({
   );
 }
 
+/** Remove one uploaded version that has not been sent for approval (with a confirmation). */
+export function RemoveVersionButton({ task, version }: { task: DesignTaskDetail; version: number }) {
+  const remove = useDeleteCreativeVersion();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button size="sm" variant="outline" className="w-fit" disabled={remove.isPending} onClick={() => setOpen(true)}>
+        <Trash2Icon />
+        Remove version {version}
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={(next) => !next && !remove.isPending && setOpen(false)}
+        title={`Remove version ${version}?`}
+        description="Its files are deleted. You can upload a new design afterwards. This only works until the design is sent for approval."
+        confirmLabel="Remove"
+        destructive
+        pending={remove.isPending}
+        onConfirm={() =>
+          remove.mutate(
+            { id: task.id, version },
+            {
+              onSuccess: () => {
+                toast.success(`Version ${version} removed`);
+                setOpen(false);
+              },
+              onError: (e) => {
+                toast.error(errorMessage(e));
+                setOpen(false);
+              },
+            },
+          )
+        }
+      />
+    </>
+  );
+}
+
 export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDetail; canUse?: boolean }) {
   const use = useUseCreativeVersion();
   if (!task.creatives.length) return null;
+  // Versions an admin has already seen stay as history; anything newer can still be removed.
+  const reviewed = task.review?.creative_version ?? 0;
   return (
     <Card>
       <CardHeader>
@@ -363,6 +444,7 @@ export function CreativeVersions({ task, canUse = false }: { task: DesignTaskDet
                 Use version {v.version} as newest
               </Button>
             )}
+            {canUse && v.version > reviewed && <RemoveVersionButton task={task} version={v.version} />}
             {v.files.length > 1 ? (
               <FileSlider
                 files={v.files}
