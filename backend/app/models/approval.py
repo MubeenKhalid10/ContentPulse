@@ -45,7 +45,9 @@ class ApprovalRequest(UUIDPk, CreatedAt, OrgScoped, Base):
 
 
 class PostChangeRequest(UUIDPk, CreatedAt, OrgScoped, Base):
-    """A creator asks an admin to reopen locked copy or a locked design."""
+    """ARCHIVE ONLY. Creators used to ask admins to reopen locked work; that workflow is gone
+    (only an admin requests changes, through ApprovalRequest). Nothing writes here any more;
+    the rows stay so history is not lost."""
 
     __tablename__ = "post_change_requests"
     __table_args__ = (
@@ -95,3 +97,30 @@ class ApprovalComment(UUIDPk, CreatedAt, OrgScoped, Base):
     # "comment", or the decision it explains: "approved", "changes_requested",
     # "rejected", "resubmitted".
     kind: Mapped[str] = mapped_column(String(30), default="comment", server_default="comment")
+
+
+class Notification(UUIDPk, CreatedAt, OrgScoped, Base):
+    """A short in-app message to one person about a post, with a link to open it."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (
+        # An event tells each person once, even when it is retried or double clicked.
+        Index("uq_notifications_user_dedupe", "user_id", "dedupe_key", unique=True),
+        Index("ix_notifications_user_unread", "user_id", "read_at"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    post_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), index=True
+    )
+    # "changes_requested", "resubmitted", "approved", "rejected", "clarification".
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    # What it concerns: "copy", "design" or "both".
+    scope: Mapped[str | None] = mapped_column(String(20))
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    body: Mapped[str | None] = mapped_column(Text)
+    link: Mapped[str] = mapped_column(String(300), nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

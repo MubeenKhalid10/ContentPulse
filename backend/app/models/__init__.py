@@ -1,7 +1,7 @@
 """Import every model so Base.metadata is complete (Alembic, tests)."""
 
 from app.models.ai import AIGenerationJob, LLMRequest, PromptTemplate
-from app.models.approval import ApprovalComment, ApprovalRequest, PostChangeRequest
+from app.models.approval import ApprovalComment, ApprovalRequest, Notification, PostChangeRequest
 from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.design import CreativeAsset, DesignBrief
@@ -23,6 +23,7 @@ __all__ = [
     "AIGenerationJob",
     "ApprovalComment",
     "ApprovalRequest",
+    "Notification",
     "PostChangeRequest",
     "AuditLog",
     "Base",
