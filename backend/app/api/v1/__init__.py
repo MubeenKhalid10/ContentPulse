@@ -9,6 +9,7 @@ from app.api.v1 import (
     design,
     internal,
     knowledge,
+    notifications,
     organizations,
     storage,
     topics,
@@ -25,6 +26,7 @@ api_router.include_router(topics.rules_router)
 api_router.include_router(content.router)
 api_router.include_router(design.router)
 api_router.include_router(approvals.router)
+api_router.include_router(notifications.router)
 api_router.include_router(storage.router)
 api_router.include_router(ai.router)
 api_router.include_router(dashboard.router)

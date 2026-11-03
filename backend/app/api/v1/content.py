@@ -8,7 +8,6 @@ from app.core.permissions import Permission
 from app.core.ratelimit import AI_PER_USER, per_user
 from app.models.enums import Platform
 from app.schemas.approval import (
-    ChangeRequestCreate,
     CommentCreate,
     CommentRead,
     ResubmitRequest,
@@ -22,8 +21,7 @@ from app.schemas.content import (
     RestoreRequest,
     VersionRead,
 )
-from app.schemas.design import ChangeRequestRead
-from app.services.approvals import change_requests
+from app.services.approvals import service as approval_service
 from app.services.content import service
 
 AI_LIMIT = per_user(AI_PER_USER)
@@ -86,26 +84,14 @@ async def get_post(post_id: uuid.UUID, ctx: CanRead, db: DB):
     return await service.post_detail(db, ctx.organization_id, post_id)
 
 
-@router.post(
-    "/{post_id}/change-requests",
-    response_model=ChangeRequestRead,
-    status_code=status.HTTP_201_CREATED,
-)
-async def request_change(post_id: uuid.UUID, data: ChangeRequestCreate, ctx: CanEdit, db: DB):
-    """Ask an admin to reopen locked copy or a locked design."""
-    return await change_requests.create(
-        db, ctx.organization_id, ctx.user.id, post_id, data.scope, data.note
-    )
-
-
 @router.get("/{post_id}/comments", response_model=list[CommentRead])
 async def list_comments(post_id: uuid.UUID, ctx: CanRead, db: DB):
-    return await change_requests.post_comments(db, ctx.organization_id, post_id)
+    return await approval_service.post_comments(db, ctx.organization_id, post_id)
 
 
 @router.post("/{post_id}/comments", response_model=list[CommentRead])
 async def add_comment(post_id: uuid.UUID, data: CommentCreate, ctx: CanEdit, db: DB):
-    return await change_requests.add_post_comment(
+    return await approval_service.add_post_comment(
         db, ctx.organization_id, ctx.user.id, post_id, data.body
     )
 

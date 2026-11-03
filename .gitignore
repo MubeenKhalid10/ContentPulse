@@ -55,6 +55,24 @@ infra/aws/terraform/terraform.tfvars
 infra/aws/terraform/release.auto.tfvars
 infra/aws/terraform/backend.hcl
 
+# --- Logs, coverage and deployment tooling output ------------------------------------
+*.log
+logs/
+coverage/
+.vercel/
+.turbo/
+.cache/
+playwright/.cache/
+*.bak
+*.orig
+*.rej
+*.tmp
+
+# --- Third-party tools cloned into the workspace (not part of the product) -----------
+# Community Firefox extension used for local browser testing.
+claude-for-firefox/
+.mcp.json
+
 # --- AI tooling and personal notes (for your own use, not part of the product) -------
 .claude/
 .claudeignore

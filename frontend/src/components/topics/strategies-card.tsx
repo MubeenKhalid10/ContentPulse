@@ -87,6 +87,7 @@ export function StrategiesCard({
                   <Button
                     size="sm"
                     variant={toWrite.length > 1 && canGenerate ? "outline" : "default"}
+                    disabled={writeAll.isPending}
                     onClick={() => onPlan(null)}
                   >
                     <PlusIcon />

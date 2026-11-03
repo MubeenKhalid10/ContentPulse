@@ -2,18 +2,16 @@
 
 import {
   keepPreviousData,
+  type QueryClient,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 
 import { useOrgId } from "@/hooks/use-organization";
-import { api, apiList } from "@/lib/api";
+import { api, ApiError, apiList } from "@/lib/api";
 import type {
   ApprovalComment,
-  ChangeRequest,
-  ChangeRequestPage,
-  ChangeScope,
   ApprovalDetail,
   ApprovalFilter,
   ApprovalPage,
@@ -56,6 +54,12 @@ export function useApproval(id: string) {
   });
 }
 
+function refreshAll(queryClient: QueryClient, orgId: string | null | undefined) {
+  for (const key of ["approvals", "content", "design", "dashboard"]) {
+    queryClient.invalidateQueries({ queryKey: ["org", orgId, key] });
+  }
+}
+
 function useApprovalMutation<TVars>(
   request: (vars: TVars) => Promise<ApprovalDetail>,
 ) {
@@ -63,6 +67,11 @@ function useApprovalMutation<TVars>(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: request,
+    // 409: someone else already decided this submission (or it moved on). The decision is
+    // never retried; the lists reload so the screen shows what really happened.
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 409) refreshAll(queryClient, orgId);
+    },
     onSuccess: (approval) => {
       queryClient.setQueryData(
         [...root(orgId!), "detail", approval.id],
@@ -126,7 +135,7 @@ export const useRequestChanges = () =>
     }: {
       id: string;
       comment: string;
-      scope: "design" | "copy" | "both";
+      scope: "design" | "copy";
     }) =>
       api<ApprovalDetail>(`/approvals/${id}/request-changes`, {
         method: "POST",
@@ -144,7 +153,7 @@ export const useReopen = () =>
     }: {
       id: string;
       comment: string;
-      scope: "design" | "copy" | "both";
+      scope: "design" | "copy";
     }) =>
       api<ApprovalDetail>(`/approvals/${id}/reopen`, {
         method: "POST",
@@ -182,46 +191,6 @@ function useReviewRefresh() {
       queryClient.invalidateQueries({ queryKey: ["org", orgId, key] });
     }
   };
-}
-
-/** Admin: creators' requests to reopen locked work. */
-export function useChangeRequests() {
-  const orgId = useOrgId();
-  return useQuery({
-    queryKey: [...root(orgId ?? "none"), "change-requests"],
-    queryFn: () => api<ChangeRequestPage>("/approvals/change-requests?limit=100"),
-    enabled: !!orgId,
-  });
-}
-
-/** Creator: ask an admin to reopen locked work. */
-export function useCreateChangeRequest() {
-  const refresh = useReviewRefresh();
-  return useMutation({
-    mutationFn: ({ postId, scope, note }: { postId: string; scope: ChangeScope; note: string }) =>
-      api<ChangeRequest>(`/content/${postId}/change-requests`, { method: "POST", body: { scope, note } }),
-    onSuccess: refresh,
-  });
-}
-
-export function useAcceptChangeRequest() {
-  const refresh = useReviewRefresh();
-  return useMutation({
-    mutationFn: (id: string) => api<ChangeRequest>(`/approvals/change-requests/${id}/accept`, { method: "POST" }),
-    onSuccess: refresh,
-  });
-}
-
-export function useDeclineChangeRequest() {
-  const refresh = useReviewRefresh();
-  return useMutation({
-    mutationFn: ({ id, comment }: { id: string; comment: string }) =>
-      api<ChangeRequest>(`/approvals/change-requests/${id}/decline`, {
-        method: "POST",
-        body: { comment: comment || null },
-      }),
-    onSuccess: refresh,
-  });
 }
 
 /** The review conversation on a post, for everyone who works on it. */

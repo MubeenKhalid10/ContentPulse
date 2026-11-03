@@ -19,6 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  useDialogBusy,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useInviteMember } from "@/hooks/use-organization";
@@ -55,6 +56,7 @@ function InviteFlow({
   onClose: () => void;
 }) {
   const invite = useInviteMember();
+  useDialogBusy(invite.isPending);
   const [result, setResult] = useState<InviteResponse | null>(null);
   const form = useForm<Values>({
     resolver: zodResolver(inviteSchema),
@@ -71,6 +73,7 @@ function InviteFlow({
       className="grid gap-5"
       onSubmit={form.handleSubmit((values) => invite.mutate(values, { onSuccess: setResult }))}
     >
+<fieldset disabled={invite.isPending} className="contents">
       <DialogClose
         disabled={invite.isPending}
         render={
@@ -119,7 +122,8 @@ function InviteFlow({
           {invite.isPending ? "Creating…" : initial ? "Create new link" : "Create invite link"}
         </Button>
       </DialogFooter>
-    </form>
+    </fieldset>
+</form>
   );
 }
 

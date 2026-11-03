@@ -219,6 +219,7 @@ function ServiceRow({
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  disabled={update.isPending}
                   aria-label={`Actions for ${service.name}`}
                 />
               }

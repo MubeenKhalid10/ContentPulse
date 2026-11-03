@@ -24,9 +24,6 @@ import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import {
   AdminRequestChanges,
-  ChangeRequestNotice,
-  ChangeRequestTag,
-  RequestChangeButton,
 } from "@/components/approvals/change-request";
 import { PostComments } from "@/components/approvals/post-comments";
 import { ReviewBanner } from "@/components/approvals/review-banner";
@@ -116,7 +113,6 @@ export function ContentStudio({ id }: { id: string }) {
             <h1 className="text-2xl font-semibold tracking-tight">{p.title ?? "Untitled post"}</h1>
             <PlatformTag platform={p.platform} />
             <Tag tone={POST_STATUS_TONE[p.status]} dot>{postStatusLabel(p)}</Tag>
-            <ChangeRequestTag request={p.change_request} />
             {p.variant_of_id && <Tag tone="neutral">Variant</Tag>}
           </div>
           <p className="text-sm text-muted-foreground">
@@ -151,9 +147,8 @@ export function ContentStudio({ id }: { id: string }) {
       <PostProgress status={p.status} />
 
       <GenerationBanner post={p} canGenerate={canGenerate} generating={generating} />
-      <ChangeRequestNotice request={p.change_request} />
       <LockedNotice post={p} />
-      <ReviewBanner review={p.review}>
+      <ReviewBanner review={p.review} request={p.change_request}>
         {p.status === "changes_requested" && canEdit && <ResubmitControl postId={p.id} />}
       </ReviewBanner>
 
@@ -195,9 +190,6 @@ const APPROVED_COPY = [
 /** Approved copy is read-only until an admin requests changes to it. */
 function LockedNotice({ post }: { post: PostDetail }) {
   const canReview = useCan()("approval.manage");
-  const ask = (
-    <RequestChangeButton postId={post.id} scopes={post.change_request_scopes} request={post.change_request} />
-  );
   if (!post.editable && post.status === "content_review") {
     return (
       <Alert className="mb-6">
@@ -206,9 +198,8 @@ function LockedNotice({ post }: { post: PostDetail }) {
         <AlertDescription className="grid gap-2">
           <span>
             The copy is locked while an admin reviews it. To change it, withdraw it from review (the ⋯ More actions
-            menu at the top) and send it again when you are done, or ask the admin to send it back.
+            menu at the top) and send it again when you are done. Only an admin can send it back with requested changes.
           </span>
-          {ask}
           <AdminRequestChanges review={post.review} />
         </AlertDescription>
       </Alert>
@@ -225,9 +216,8 @@ function LockedNotice({ post }: { post: PostDetail }) {
             ? "The admin asked for design changes only, so the copy stays as approved."
             : canReview
               ? "Request changes to let the creator edit it again."
-              : "Ask an admin to reopen it if something needs to change."}
+              : "Only an admin can reopen it by requesting changes. Leave a comment if something needs a second look."}
         </span>
-        {ask}
         <AdminRequestChanges review={post.review} />
       </AlertDescription>
     </Alert>
@@ -248,6 +238,7 @@ function ResubmitControl({ postId }: { postId: string }) {
     >
       <Input
         aria-label="Note for the reviewer"
+        disabled={resubmit.isPending}
         placeholder="What did you change? (optional)"
         value={note}
         onChange={(e) => setNote(e.target.value)}
@@ -587,6 +578,7 @@ function RegenerateDialog({ post, open, onClose }: { post: PostDetail; open: boo
           Instructions (optional)
           <Textarea
             id="regen-instructions"
+            disabled={regenerate.isPending}
             rows={3}
             maxLength={1000}
             placeholder="e.g. Shorter, and lead with the statistic"

@@ -121,10 +121,11 @@ _CHANGES_SCOPE = (
     .limit(1)
     .scalar_subquery()
 )
-# Sent back with the copy to change. Design-only changes are the designer's work: they
-# show on Add designs, not here.
+# Sent back with the copy to change. Only content-only requests live here. A request that
+# includes the design ("design" or "both") is one request and lives on Add designs, so it is
+# never listed twice.
 SENT_BACK = or_(
-    and_(Post.status == P.CHANGES_REQUESTED, _CHANGES_SCOPE.is_distinct_from("design")),
+    and_(Post.status == P.CHANGES_REQUESTED, _CHANGES_SCOPE == "copy"),
     # IS NOT DISTINCT FROM: a never-reviewed draft (no request, NULL) is not sent back.
     and_(
         Post.status == P.DRAFT,
@@ -229,6 +230,7 @@ async def _items(db: AsyncSession, posts: list[Post]) -> list[PostListItem]:
         if sent_back
         else {}
     )
+    scopes = {post_id: approvals.shown_scope(scope) for post_id, scope in scopes.items()}
     topic_ids = {p.topic_id for p in posts if p.topic_id}
     topics = {
         t.id: t
@@ -348,7 +350,6 @@ async def post_detail(
         design_task=DesignTaskRef(id=brief.id, status=brief.status) if brief else None,
         review=await approvals.latest_review(db, post.id),
         creatives=await design.creative_versions(db, post.id),
-        change_request_scopes=await approvals.change_request_scopes(db, post),
     )
 
 

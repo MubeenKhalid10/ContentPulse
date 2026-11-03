@@ -68,8 +68,9 @@ async def test_changes_requested_are_listed_apart(client, db):
     drafts, counts = await titles("/api/v1/content?status=drafts")
     assert drafts == {"Fresh draft", "Never reviewed"}
     changes, _ = await titles("/api/v1/content?status=changes")
-    assert changes == {"Copy sent back", "Design sent back"}
-    assert counts["drafts"] == 2 and counts["changes"] == 2 and counts["all"] == 5
+    # Content-only requests are here; one that includes the design lives on Add designs.
+    assert changes == {"Copy sent back"}
+    assert counts["drafts"] == 2 and counts["changes"] == 1 and counts["all"] == 5
 
     todo, counts = await titles("/api/v1/design/tasks?status=todo")
     assert todo == {"Being designed"}
@@ -112,15 +113,15 @@ async def test_write_posts_lists_only_changes_that_open_the_copy(client, db):
     await db.commit()
 
     body = (await admin.get("/api/v1/content?status=changes")).json()
-    # Design-only changes are the designer's: they aren't on Write posts.
+    # Older requests that covered both now count as design requests, listed on Add designs.
     assert {i["title"]: i["changes_scope"] for i in body["items"]} == {
-        "Copy and design": "both",
         "Copy only": "copy",
         "Copy at copy approval": "copy",
     }
-    assert body["counts"]["changes"] == 3
+    assert body["counts"]["changes"] == 2
     everything = (await admin.get("/api/v1/content?status=all")).json()["items"]
     assert {i["title"]: i["changes_scope"] for i in everything}["Design only"] == "design"
+    assert {i["title"]: i["changes_scope"] for i in everything}["Copy and design"] == "design"
 
 
 async def test_only_a_post_with_nothing_written_can_be_deleted_by_a_writer(client, db):

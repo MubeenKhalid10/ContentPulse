@@ -17,6 +17,8 @@ import { POST_STATUS_LABEL } from "@/lib/content";
 import { formatDateTime, timeAgo } from "@/lib/format";
 
 import { PreviewCard } from "./preview-card";
+import { CopyContentButton } from "@/components/design/copy-content-button";
+import { fullText } from "@/lib/content";
 import { ChangeRequestNotice, ChangeRequestTag } from "./change-request";
 import { DecisionCard } from "./decision-card";
 import { CommentsCard } from "./comments-card";
@@ -60,11 +62,20 @@ export function ReviewPage({ id }: { id: string }) {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">{a.post.title ?? "Untitled post"}</h1>
           <PlatformTag platform={a.post.platform} />
-          <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>{approvalStatusLabel(a.status, a.stage)}</Tag>
+          {a.change_request ? (
+            <ChangeRequestTag request={a.change_request} />
+          ) : (
+            <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>{approvalStatusLabel(a.status, a.stage)}</Tag>
+          )}
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
-          <ChangeRequestTag request={a.change_request} />
           {a.post.status === "final" && (
-            <div className="ml-auto">
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <CopyContentButton
+                text={
+                  a.content ? fullText(a.content.hook, a.content.body, a.content.cta, a.content.hashtags) : ""
+                }
+                images={a.creative?.files ?? []}
+              />
               <SharePostButton title={a.post.title} platform={a.post.platform} copy={a.content} creative={a.creative} />
             </div>
           )}

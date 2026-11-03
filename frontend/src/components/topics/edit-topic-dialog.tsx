@@ -17,6 +17,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  useDialogBusy,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,6 +42,7 @@ export function EditTopicDialog({ topic, open, onClose }: { topic: TopicDetail; 
 
 function EditForm({ topic, onClose }: { topic: TopicDetail; onClose: () => void }) {
   const update = useUpdateTopic();
+  useDialogBusy(update.isPending);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {

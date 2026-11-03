@@ -12,6 +12,11 @@ CommentText = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
 ]
 
+# Instructions have to give the creator something to act on.
+ChangeInstructions = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=10, max_length=4000)
+]
+
 
 class ApprovalPost(BaseModel):
     id: uuid.UUID
@@ -47,7 +52,6 @@ class ApprovalPage(BaseModel):
     # Posts waiting for a decision, per stage: {"copy": n, "design": n}.
     stage_pending: dict[str, int]
     ready_count: int
-    change_request_count: int
 
 
 class CommentRead(BaseModel):
@@ -114,25 +118,12 @@ class DecisionRequest(BaseModel):
 class ChangesRequest(BaseModel):
     """Spec §42: a reason is required so the revision has direction."""
 
-    comment: CommentText
-    # What needs work. Default "both": the creator may revise the copy and
-    # upload a new design, then resubmit.
-    scope: Literal["design", "copy", "both"] = "both"
-
-
-class ChangeRequestCreate(BaseModel):
-    scope: Literal["design", "copy", "both"]
-    note: CommentText
-
-
-class ChangeRequestItem(ChangeRequestRead):
-    post: ApprovalPost
-    topic_title: str | None
-
-
-class ChangeRequestPage(BaseModel):
-    items: list[ChangeRequestItem]
-    total: int
+    comment: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=10, max_length=4000)
+    ]
+    # What needs work: the content or the design, never both in one request. (At the copy
+    # stage there is no design yet, so the scope only matters once a design exists.)
+    scope: Literal["design", "copy"] = "design"
 
 
 class CommentCreate(BaseModel):

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
-import { ChangeRequestTag } from "@/components/approvals/change-request";
 import { useFromHere } from "@/components/shared/back-link";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { ListLoading } from "@/components/shared/loading";
@@ -152,7 +151,6 @@ function GeneratedPost({ post, href }: { post: Post; href: string }) {
         <Tag tone={POST_STATUS_TONE[post.status]} dot className="h-6 px-2.5 text-xs font-semibold">
           {postStatusLabel(post)}
         </Tag>
-        <ChangeRequestTag request={post.change_request} />
         <span>
           {post.current_version ? `Version ${post.current_version} · ` : ""}
           <time dateTime={post.updated_at} title={formatDateTime(post.updated_at)}>

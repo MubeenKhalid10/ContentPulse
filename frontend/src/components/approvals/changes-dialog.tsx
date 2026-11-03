@@ -15,12 +15,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useReopen, useRequestChanges } from "@/hooks/use-approvals";
-import { errorMessage } from "@/lib/api";
+import { ApiError, errorMessage } from "@/lib/api";
 import type { ApprovalStage, ApprovalStatus, ChangeScope } from "@/types/api";
 
 import { ScopePicker } from "./change-request";
 
-const ALL_SCOPES: ChangeScope[] = ["copy", "design", "both"];
+const ALL_SCOPES: ChangeScope[] = ["copy", "design"];
 
 /** Request changes: on a pending submission, or (reopen) on approved work. */
 export function ChangesDialog({
@@ -35,7 +35,7 @@ export function ChangesDialog({
   const changes = useRequestChanges();
   const reopen = useReopen();
   const [note, setNote] = useState("");
-  const [scope, setScope] = useState<ChangeScope>("both");
+  const [scope, setScope] = useState<ChangeScope>("design");
   const approved = a.status === "approved";
   const mutation = approved ? reopen : changes;
   const copyStage = a.stage === "copy";
@@ -60,6 +60,8 @@ export function ChangesDialog({
           rows={4}
           maxLength={4000}
           placeholder="e.g. Shorten the headline and use the brand blue on slide 3."
+          required
+          minLength={10}
           disabled={mutation.isPending}
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -69,18 +71,22 @@ export function ChangesDialog({
           <AlertDialogCancel disabled={mutation.isPending}>Cancel</AlertDialogCancel>
           {/* A plain button: the dialog stays open if the request fails. */}
           <Button
-            disabled={!note.trim() || mutation.isPending}
+            disabled={note.trim().length < 10 || mutation.isPending}
             pending={mutation.isPending}
             onClick={() =>
               mutation.mutate(
-                { id: a.id, comment: note.trim(), scope: copyStage ? "both" : scope },
+                { id: a.id, comment: note.trim(), scope: copyStage ? "copy" : scope },
                 {
                   onSuccess: () => {
                     toast.success("Changes requested");
                     setNote("");
                     onOpenChange(false);
                   },
-                  onError: (e: unknown) => toast.error(errorMessage(e)),
+                  onError: (e: unknown) => {
+                    toast.error(errorMessage(e));
+                    // Already decided elsewhere: the lists have reloaded, so close and look.
+                    if (e instanceof ApiError && e.status === 409) onOpenChange(false);
+                  },
                 },
               )
             }
