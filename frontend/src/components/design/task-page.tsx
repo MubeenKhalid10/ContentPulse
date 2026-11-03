@@ -13,9 +13,6 @@ import { PostProgress } from "@/components/shared/post-progress";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import {
   AdminRequestChanges,
-  ChangeRequestNotice,
-  ChangeRequestTag,
-  RequestChangeButton,
 } from "@/components/approvals/change-request";
 import { PostComments } from "@/components/approvals/post-comments";
 import { ReviewBanner } from "@/components/approvals/review-banner";
@@ -92,7 +89,6 @@ export function DesignTaskPage({ id }: { id: string }) {
   const canWithdraw =
     can("design.upload") && t.status === "submitted" && t.review?.status === "pending" && (mine || manager || !t.assignee);
   const canEditBrief = (can("content.edit") || manager) && active;
-  const ask = <RequestChangeButton postId={t.post.id} scopes={t.change_request_scopes} request={t.change_request} />;
 
   return (
     <>
@@ -103,7 +99,6 @@ export function DesignTaskPage({ id }: { id: string }) {
             <h1 className="text-2xl font-semibold tracking-tight">{t.post.title ?? "Untitled post"}</h1>
             <PlatformTag platform={t.post.platform} />
             <Tag tone={POST_STATUS_TONE[t.post.status]} dot>{postStatusLabel(t.post)}</Tag>
-            <ChangeRequestTag request={t.change_request} />
           </div>
           <p className="text-sm text-muted-foreground">
             {formatLabel(t.format)}
@@ -115,8 +110,7 @@ export function DesignTaskPage({ id }: { id: string }) {
 
       <PostProgress status={t.post.status} />
 
-      <ChangeRequestNotice request={t.change_request} />
-      <ReviewBanner review={t.review} />
+      <ReviewBanner review={t.review} request={t.change_request} />
       {t.status === "submitted" && t.review?.status === "pending" && (
         <Alert className="mb-6">
           <AlertTitle>Waiting for design approval</AlertTitle>
@@ -127,7 +121,6 @@ export function DesignTaskPage({ id }: { id: string }) {
               {canWithdraw && " Need to change something first? Take it back and submit it again when you are done."}
             </span>
             {canWithdraw && <WithdrawButton taskId={t.id} />}
-            {ask}
             <AdminRequestChanges review={t.review} />
           </AlertDescription>
         </Alert>
@@ -149,9 +142,8 @@ export function DesignTaskPage({ id }: { id: string }) {
             <span>
               {canReview
                 ? "Request changes to let the creator update the design again."
-                : "Ask an admin to reopen it if something needs to change."}
+                : "Only an admin can reopen it by requesting changes."}
             </span>
-            {ask}
             <AdminRequestChanges review={t.review} />
           </AlertDescription>
         </Alert>
@@ -180,6 +172,7 @@ export function DesignTaskPage({ id }: { id: string }) {
             <div className="grid min-w-0 grid-cols-1 content-start gap-6 lg:col-span-2">
               <BriefCard task={t} canEdit={canEditBrief} onEdit={() => setEditing(true)} />
               <BrandCard task={t} canEdit={canEditBrief} canEditBrand={can("organization.write")} />
+              <ContentCard task={t} />
             </div>
             <div className="grid min-w-0 grid-cols-1 content-start gap-6">
               {canWork && <CreativeUploader task={t} canSubmit={can("design.submit")} />}
@@ -193,8 +186,6 @@ export function DesignTaskPage({ id }: { id: string }) {
             </div>
           </div>
         </section>
-
-        <ContentCard task={t} />
       </div>
       <BriefDialog task={t} open={editing} onClose={() => setEditing(false)} />
     </>
@@ -210,7 +201,7 @@ function WithdrawButton({ taskId }: { taskId: string }) {
         <RotateCcwIcon />
         Withdraw to make changes
       </Button>
-      <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialog open={open} onOpenChange={(next) => !withdraw.isPending && setOpen(next)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Take the design back?</AlertDialogTitle>
@@ -220,7 +211,7 @@ function WithdrawButton({ taskId }: { taskId: string }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep it submitted</AlertDialogCancel>
+            <AlertDialogCancel disabled={withdraw.isPending}>Keep it submitted</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setOpen(false);
@@ -261,6 +252,7 @@ function TaskActions({ task, manager, mine }: { task: DesignTaskDetail; manager:
         <SimpleSelect
           id="task-assignee"
           aria-label="Assigned to"
+          disabled={assign.isPending}
           value={task.assignee?.id ?? "none"}
           onChange={(v) =>
             assign.mutate(
@@ -356,8 +348,9 @@ function BriefCard({ task: t, canEdit, onEdit }: { task: DesignTaskDetail; canEd
           </Button>
         )}
       </CardHeader>
-      <CardContent className="grid gap-5">
-        <dl className="grid gap-x-4 gap-y-2.5 text-sm sm:grid-cols-[9rem_1fr]">
+      {/* grid-cols-1 + min-w-0: a long visual element must wrap, not stretch the card past its column. */}
+      <CardContent className="grid min-w-0 grid-cols-1 gap-5">
+        <dl className="grid gap-x-4 gap-y-2.5 text-sm sm:grid-cols-[9rem_minmax(0,1fr)]">
           {rows
             .filter(([, value]) => value)
             .map(([label, value]) => (
@@ -382,10 +375,12 @@ function BriefCard({ task: t, canEdit, onEdit }: { task: DesignTaskDetail; canEd
         {t.visual_elements.length > 0 && (
           <section aria-label="Visual elements" className="grid gap-1.5">
             <h3 className="text-sm font-medium">Visual elements</h3>
-            <ul className="flex flex-wrap gap-1.5">
+            <ul className="flex min-w-0 flex-wrap gap-1.5">
               {t.visual_elements.map((e) => (
-                <li key={e}>
-                  <Badge variant="outline">{e}</Badge>
+                <li key={e} className="min-w-0 max-w-full">
+                  <Badge variant="outline" className="h-auto max-w-full rounded-xl whitespace-normal py-0.5 text-left [overflow-wrap:anywhere]">
+                    {e}
+                  </Badge>
                 </li>
               ))}
             </ul>

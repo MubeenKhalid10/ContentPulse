@@ -736,7 +736,7 @@ export interface Post {
   variant_of_id: string | null;
   generation: GenerationStatus | null;
   /** What an approver sent back while the post waits on those changes; null otherwise. */
-  changes_scope: "copy" | "design" | "both" | null;
+  changes_scope: "copy" | "design" | null;
   change_request?: ChangeRequest | null;
   created_at: string;
   updated_at: string;
@@ -761,7 +761,6 @@ export interface PostPage {
 }
 
 export interface PostDetail extends Post {
-  change_request_scopes: ChangeScope[];
   current: PostVersion | null;
   strategy: Strategy | null;
   variants: Post[];
@@ -796,7 +795,7 @@ export interface DesignTask {
     status: PostStatus;
     current_version: number;
     topic_title: string | null;
-    changes_scope?: "copy" | "design" | "both" | null;
+    changes_scope?: "copy" | "design" | null;
   };
   change_request?: ChangeRequest | null;
   assignee: Person | null;
@@ -832,7 +831,6 @@ export interface CreativeVersion {
 }
 
 export interface DesignTaskDetail extends DesignTask {
-  change_request_scopes: ChangeScope[];
   visual_concept: string | null;
   supporting_text: string | null;
   slide_structure: string[];
@@ -901,30 +899,19 @@ export interface ReviewComment {
   created_at: string;
 }
 
-export type ChangeScope = "copy" | "design" | "both";
+export type ChangeScope = "copy" | "design";
 
-/** A creator's request to reopen locked work; an admin decides. */
+/** What an admin asked a creator to change: one request per review round, whatever the scope. */
 export interface ChangeRequest {
   id: string;
   post_id: string;
   scope: ChangeScope;
-  note: string;
-  status: "pending" | "accepted" | "declined" | "closed";
+  note: string | null;
+  status: "open" | "resolved";
   requested_by: Person | null;
-  decided_by: Person | null;
-  decided_at: string | null;
-  decision_note: string | null;
   created_at: string;
-}
-
-export interface ChangeRequestItem extends ChangeRequest {
-  post: { id: string; title: string | null; platform: Platform; status: PostStatus; current_version: number };
-  topic_title: string | null;
-}
-
-export interface ChangeRequestPage {
-  items: ChangeRequestItem[];
-  total: number;
+  content_done: boolean;
+  design_done: boolean;
 }
 
 export interface ReviewSummary {
@@ -964,7 +951,6 @@ export interface ApprovalPage {
   /** Posts waiting for a decision, per stage. */
   stage_pending: Record<ApprovalStage, number>;
   ready_count: number;
-  change_request_count: number;
 }
 
 export type ApprovalStage = "copy" | "design";
@@ -1011,4 +997,21 @@ export interface ApprovalDetail extends Approval {
     reviewed_at: string | null;
   }[];
   strategy_id: string | null;
+}
+
+export interface AppNotification {
+  id: string;
+  post_id: string | null;
+  kind: "submitted" | "resubmitted" | "changes_requested" | "approved" | "rejected" | "clarification";
+  scope: ChangeScope | null;
+  title: string;
+  body: string | null;
+  link: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationPage {
+  items: AppNotification[];
+  unread: number;
 }

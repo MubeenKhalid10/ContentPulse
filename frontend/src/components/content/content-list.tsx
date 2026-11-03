@@ -34,7 +34,7 @@ const PAGE = 30;
 // copy stands (waiting for approval or approved).
 const TABS: { value: PostGroup; label: string }[] = [
   { value: "drafts", label: "Draft posts" },
-  { value: "changes", label: "Changes requested" },
+  { value: "changes", label: "Content Change Requests" },
   { value: "approval", label: "Sent for approval" },
   { value: "rejected", label: "Rejected" },
 ];
@@ -42,7 +42,7 @@ const TABS: { value: PostGroup; label: string }[] = [
 const EMPTY: Record<PostGroup, string> = {
   drafts:
     "No drafts yet.",
-  changes: "Nothing sent back. Posts an approver asks you to change appear here.",
+  changes: "No content changes requested. When an admin asks you to change a post's content, it appears here.",
   design: "Nothing in design right now.",
   approval: "No copy sent for approval yet.",
   approval_pending: "Nothing is waiting for an admin right now.",
@@ -300,7 +300,7 @@ export function ContentList() {
             <SendIcon />
             {submitAll.isPending ? "Sending…" : "Submit selected for Content approval"}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+          <Button size="sm" variant="ghost" disabled={submitAll.isPending} onClick={() => setSelected([])}>
             Clear
           </Button>
         </div>

@@ -21,5 +21,9 @@ export default defineConfig({
     url: "http://127.0.0.1:8088/robots.txt",
     reuseExistingServer: true,
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // Pick the browser with --project. Firefox: `npx playwright install firefox`, then
+  // `npx playwright test --project=firefox`.
+  projects: [
+    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+  ],
 });

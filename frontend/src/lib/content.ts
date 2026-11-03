@@ -20,24 +20,20 @@ export const POST_STATUS_LABEL: Record<PostStatus, string> = {
 const CHANGES_LABEL = {
   copy: "Content changes requested",
   design: "Design changes requested",
-  both: "Content & design changes requested",
 } as const;
 
 /** What a change is about, in words: a "content change", the "design". */
 export const SCOPE_NAME: Record<keyof typeof CHANGES_LABEL, string> = {
   copy: "content",
   design: "design",
-  both: "content and design",
 };
 
-/** The tag for a creator's change request: what they asked for, and where it stands. */
-export function changeRequestLabel(request: { scope: keyof typeof CHANGES_LABEL; status: string }) {
-  return request.status === "declined"
-    ? `Creator's ${SCOPE_NAME[request.scope]} change declined`
-    : `Creator requested ${SCOPE_NAME[request.scope]} change`;
+/** The tag for an admin's change request: what was asked for. */
+export function changeRequestLabel(request: { scope: keyof typeof CHANGES_LABEL }) {
+  return CHANGES_LABEL[request.scope];
 }
 
-/** The status tag, naming what was sent back (the copy, the design or both) when it can. */
+/** The status tag, naming what was sent back (the copy or the design) when it can. */
 export function postStatusLabel(post: { status: PostStatus; changes_scope?: keyof typeof CHANGES_LABEL | null }) {
   return post.changes_scope ? CHANGES_LABEL[post.changes_scope] : POST_STATUS_LABEL[post.status];
 }

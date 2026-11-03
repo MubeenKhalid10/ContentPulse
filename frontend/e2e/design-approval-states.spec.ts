@@ -161,7 +161,7 @@ test("the change options lock while the request is being sent", async ({ page })
   await dialog.getByRole("button", { name: "Request changes" }).click();
 
   await expect(dialog.getByRole("button", { name: "Sending…" })).toBeDisabled();
-  for (const name of [/^Content/, /^Design/, /^Both/]) {
+  for (const name of [/^Content/, /^Design/]) {
     await expect(dialog.getByRole("radio", { name })).toBeDisabled();
   }
   await expect(dialog.getByLabel("What should change")).toBeDisabled();
