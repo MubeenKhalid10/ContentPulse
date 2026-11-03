@@ -12,7 +12,7 @@ import { fieldAria, FormField } from "@/components/shared/form-field";
 import { SimpleSelect } from "@/components/shared/simple-select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle, useDialogBusy } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -103,6 +103,7 @@ export function StrategyForm({
   // Editing a plan that already has its post: just save.
   const hasPost = !!editing && (topicPosts.data?.items ?? []).some((p) => p.content_strategy_id === editing.id);
   const saving = create.isPending || update.isPending || generate.isPending;
+  useDialogBusy(saving);
   // Which footer button started the save, so only that one spins.
   const [writing, setWriting] = useState(false);
   const failure = create.error ?? update.error;
@@ -110,6 +111,9 @@ export function StrategyForm({
   const select = (next: Platform[]) => {
     if (!next.length) return;
     const ordered = platforms.filter((p) => next.includes(p));
+    // With several platforms the post type is picked per draft, so none is "required" up front.
+    // Leaving it empty made "Write post" ask for a type the screen no longer shows.
+    if (ordered.length > 1 && !form.getValues("post_type")) form.setValue("post_type", AUTO_POST_TYPE);
     const kept = Object.fromEntries(
       Object.entries(drafts).filter(([p]) => ordered.includes(p as Platform)),
     ) as Partial<Record<Platform, Values>>;
@@ -124,7 +128,9 @@ export function StrategyForm({
       return;
     }
     form.setValue("platform", first);
-    form.setValue("post_type", ordered.length > 1 ? AUTO_POST_TYPE : "");
+    // Back to one platform: keep the type already chosen for it instead of asking again.
+    const chosen = first === platform ? form.getValues("post_type") : kept[first]?.post_type;
+    form.setValue("post_type", ordered.length > 1 ? AUTO_POST_TYPE : chosen && chosen !== AUTO_POST_TYPE ? chosen : "");
     if (ordered.length > 1) form.setValue("objective", "");
   };
   const viewDraft = (p: Platform) => {
@@ -136,19 +142,41 @@ export function StrategyForm({
   const toggleAll = () => select(allSelected ? [platforms[0]] : platforms);
 
   const runSuggestAll = async () => {
-    try {
-      const results = await Promise.all(
-        selected.map(async (p) => [p, await suggest.mutateAsync({ topicId: topic.id, platform: p })] as const),
-      );
-      const next: Partial<Record<Platform, Values>> = {};
+    // Two platforms at a time: all at once exhausts the AI models' per-minute limits, and then
+    // the later platforms fall back to the plain rule-based draft. A platform that fails keeps
+    // its place; the others are still filled in.
+    const results = new Map<Platform, Awaited<ReturnType<typeof suggest.mutateAsync>>>();
+    const failed: { platform: Platform; error: unknown }[] = [];
+    const queue = [...selected];
+    const worker = async () => {
+      for (let p = queue.shift(); p; p = queue.shift()) {
+        try {
+          results.set(p, await suggest.mutateAsync({ topicId: topic.id, platform: p }));
+        } catch (error) {
+          failed.push({ platform: p, error });
+        }
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    const done = selected.filter((p) => results.has(p));
+    if (done.length) {
+      const next: Partial<Record<Platform, Values>> = { ...drafts };
       // Post type is hidden with several platforms; an empty one falls back to the platform default.
-      for (const [p, draft] of results) next[p] = { ...toValues(p, draft), post_type: draft.post_type || AUTO_POST_TYPE };
+      for (const p of done) {
+        const draft = results.get(p)!;
+        next[p] = { ...toValues(p, draft), post_type: draft.post_type || AUTO_POST_TYPE };
+      }
       setDrafts(next);
-      form.reset(next[selected[0]]);
-      setSource(results[0][1].source);
-      setNotice(results.find(([, d]) => d.notice)?.[1].notice ?? null);
-    } catch (e) {
-      toast.error(errorMessage(e));
+      const shown = next[platform] && done.includes(platform) ? platform : done[0];
+      form.reset(next[shown]);
+      setSource(results.get(shown)!.source);
+      setNotice(done.map((p) => results.get(p)!.notice).find(Boolean) ?? null);
+    }
+    if (failed.length) {
+      toast.error(
+        `${failed.map((f) => PLATFORM_LABEL[f.platform]).join(", ")} could not be drafted: ${errorMessage(failed[0].error)}`,
+        { description: done.length ? "The other platforms were drafted. Try the rest again." : undefined },
+      );
     }
   };
 
@@ -269,6 +297,8 @@ export function StrategyForm({
 
   return (
     <form noValidate className="grid gap-5" onSubmit={submitWith(canGenerate && !hasPost)}>
+      {/* Nothing in the plan can change (or be cancelled) while it is being saved or written. */}
+      <fieldset disabled={saving} className="contents">
       <DialogHeader>
         <DialogTitle>{editing ? "Edit plan" : "Plan a post"}</DialogTitle>
         <DialogDescription>
@@ -506,7 +536,7 @@ export function StrategyForm({
       )}
 
       <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onClose}>
+        <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>
           Cancel
         </Button>
         {canGenerate && !hasPost ? (
@@ -526,6 +556,7 @@ export function StrategyForm({
           </Button>
         )}
       </DialogFooter>
+      </fieldset>
     </form>
   );
 }

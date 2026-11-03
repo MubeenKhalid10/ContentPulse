@@ -144,6 +144,8 @@ function SetupForm({
     },
   });
   const { errors, isDirty } = form.formState;
+  // Nothing can change while a save is in flight: a fieldset does not reach every custom control.
+  const locked = !canEdit || update.isPending;
   const background = useWatch({ control: form.control, name: "background_discovery" });
   const platforms = useWatch({ control: form.control, name: "enabled_platforms" });
 
@@ -157,7 +159,7 @@ function SetupForm({
         }),
       )}
     >
-      <fieldset disabled={!canEdit || update.isPending} className="grid gap-6">
+      <fieldset disabled={locked} className="grid gap-6">
         <Card id="audience" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Audience &amp; goals</CardTitle>
@@ -180,7 +182,7 @@ function SetupForm({
                     value={field.value}
                     onChange={field.onChange}
                     placeholder="Type a market, press Enter"
-                    disabled={!canEdit}
+                    disabled={locked}
                   />
                 )}
               />
@@ -214,7 +216,7 @@ function SetupForm({
                     value={field.value}
                     onChange={field.onChange}
                     placeholder="Type a goal, press Enter"
-                    disabled={!canEdit}
+                    disabled={locked}
                   />
                 )}
               />
@@ -247,7 +249,7 @@ function SetupForm({
                   options={PLATFORM_OPTIONS}
                   value={field.value}
                   onChange={field.onChange}
-                  disabled={!canEdit}
+                  disabled={locked}
                 />
               )}
             />
@@ -271,7 +273,7 @@ function SetupForm({
                       value={field.value}
                       onChange={field.onChange}
                       options={LANGUAGE_OPTIONS}
-                      disabled={!canEdit}
+                      disabled={locked}
                     />
                   )}
                 />
@@ -310,7 +312,7 @@ function SetupForm({
                     value={field.value}
                     onChange={field.onChange}
                     placeholder="e.g. agentic AI (press Enter to add)"
-                    disabled={!canEdit}
+                    disabled={locked}
                   />
                 )}
               />
@@ -330,7 +332,7 @@ function SetupForm({
                       checked={field.value}
                       onCheckedChange={field.onChange}
                       aria-describedby="background_discovery-hint"
-                      disabled={!canEdit}
+                      disabled={locked}
                     />
                     <span className="text-sm text-muted-foreground" aria-hidden>
                       {field.value ? "On" : "Off"}

@@ -19,6 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  useDialogBusy,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,6 +53,7 @@ export function BriefDialog({ task, open, onClose }: { task: DesignTaskDetail; o
 
 function BriefForm({ task, onClose }: { task: DesignTaskDetail; onClose: () => void }) {
   const update = useUpdateBrief();
+  useDialogBusy(update.isPending);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {

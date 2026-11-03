@@ -157,7 +157,7 @@ export function DocumentsTable({
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger
-                        render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${doc.title ?? doc.source_url}`} />}
+                        render={<Button variant="ghost" size="icon-sm" disabled={update.isPending} aria-label={`Actions for ${doc.title ?? doc.source_url}`} />}
                       >
                         <MoreHorizontalIcon />
                       </DropdownMenuTrigger>

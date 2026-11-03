@@ -128,6 +128,7 @@ function ProfileCard({ me }: { me: Me }) {
           onSubmit={form.handleSubmit((v) => save.mutate(v))}
           className="grid gap-5 sm:grid-cols-2"
         >
+<fieldset disabled={save.isPending} className="contents">
           <FormField
             id="full_name"
             label="Name"
@@ -177,7 +178,8 @@ function ProfileCard({ me }: { me: Me }) {
               {save.isPending ? "Saving…" : "Save changes"}
             </Button>
           </div>
-        </form>
+        </fieldset>
+</form>
       </CardContent>
     </Card>
   );
@@ -269,6 +271,7 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
           })}
           className="grid gap-5 sm:grid-cols-3"
         >
+<fieldset disabled={change.isPending} className="contents">
           {!supabaseMode && (
             <FormField
               id="current_password"
@@ -329,7 +332,8 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
               {change.isPending ? "Changing…" : "Change password"}
             </Button>
           </div>
-        </form>
+        </fieldset>
+</form>
       </CardContent>
     </Card>
   );

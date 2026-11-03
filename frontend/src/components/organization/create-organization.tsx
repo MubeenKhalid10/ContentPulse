@@ -126,6 +126,7 @@ export function CreateOrganization() {
             noValidate
             className="grid gap-4"
           >
+<fieldset disabled={create.isPending} className="contents">
             {create.isError && (
               <Alert variant="destructive">
                 <AlertDescription>
@@ -203,7 +204,8 @@ export function CreateOrganization() {
             <Button type="submit" size="lg" disabled={create.isPending} pending={create.isPending}>
               {create.isPending ? "Creating…" : "Create organization"}
             </Button>
-          </form>
+          </fieldset>
+</form>
         </CardContent>
       </Card>
       <p className="text-center text-sm text-muted-foreground">

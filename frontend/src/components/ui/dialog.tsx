@@ -7,8 +7,35 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+const DialogBusyContext = React.createContext<((busy: boolean) => void) | null>(null)
+
+/**
+ * While a form inside the dialog is saving, the dialog can't be dismissed (Escape, a click
+ * outside, the X): closing mid-save would hide the result and invite a second submit.
+ */
+function Dialog({ onOpenChange, ...props }: DialogPrimitive.Root.Props) {
+  const [busy, setBusy] = React.useState(false)
+  return (
+    <DialogBusyContext.Provider value={setBusy}>
+      <DialogPrimitive.Root
+        data-slot="dialog"
+        onOpenChange={(open, details) => {
+          if (!open && busy) return
+          onOpenChange?.(open, details)
+        }}
+        {...props}
+      />
+    </DialogBusyContext.Provider>
+  )
+}
+
+/** Call from a form rendered inside a Dialog with its pending flag. */
+function useDialogBusy(busy: boolean) {
+  const setBusy = React.useContext(DialogBusyContext)
+  React.useEffect(() => {
+    setBusy?.(busy)
+    return () => setBusy?.(false)
+  }, [busy, setBusy])
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
@@ -159,4 +186,5 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  useDialogBusy,
 }
