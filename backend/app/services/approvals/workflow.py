@@ -9,13 +9,13 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import InvalidStateTransition
-from app.models.approval import ApprovalComment, ApprovalRequest, PostChangeRequest
+from app.models.approval import ApprovalComment, ApprovalRequest
 from app.models.design import CreativeAsset
 from app.models.enums import ApprovalStatus, PostStatus
 from app.models.post import Post
 from app.models.user import User
 from app.schemas.design import ChangeRequestRead, Person, ReviewComment, ReviewSummary
-from app.services import audit
+from app.services import audit, notifications
 from app.services.audit import AuditAction
 from app.services.design import brief_state
 from app.services.design.lookup import current_brief
@@ -27,6 +27,39 @@ SUBMITTABLE = (PostStatus.DESIGN_UPLOADED, PostStatus.CHANGES_REQUESTED)
 async def latest_creative_version(db: AsyncSession, post_id: uuid.UUID) -> int | None:
     return await db.scalar(
         select(func.max(CreativeAsset.version)).where(CreativeAsset.post_id == post_id)
+    )
+
+
+async def _tell_admins(
+    db: AsyncSession, post: Post, user_id: uuid.UUID, request: ApprovalRequest, stage: str
+) -> None:
+    """A submission reaches the admins' queue; they hear about it once. After a change
+    request the message says what was redone: the scope the admin asked for."""
+    previous = await db.scalar(
+        select(ApprovalRequest)
+        .where(ApprovalRequest.post_id == post.id, ApprovalRequest.id != request.id)
+        .order_by(ApprovalRequest.created_at.desc())
+        .limit(1)
+    )
+    again = previous is not None and previous.status == ApprovalStatus.CHANGES_REQUESTED
+    scope = stage
+    word = notifications.SCOPE_WORD[scope]
+    name = notifications.post_name(post)
+    await notifications.notify(
+        db,
+        organization_id=post.organization_id,
+        user_ids=await notifications.admin_ids(db, post.organization_id),
+        post=post,
+        kind="resubmitted" if again else "submitted",
+        scope=scope,
+        title=(
+            f"{name} was resubmitted ({word})"
+            if again
+            else f"{name} is waiting for your review ({word})"
+        ),
+        link=f"/approvals/{request.id}",
+        dedupe_key=f"submitted:{request.id}",
+        skip=user_id,
     )
 
 
@@ -92,6 +125,7 @@ async def submit_post(
             "creative_version": creative,
         },
     )
+    await _tell_admins(db, post, user_id, request, "design")
     return request
 
 
@@ -136,6 +170,7 @@ async def submit_copy(
             "stage": "copy",
         },
     )
+    await _tell_admins(db, post, user_id, request, "copy")
     return request
 
 
@@ -163,9 +198,14 @@ async def withdraw_design(db: AsyncSession, post: Post) -> None:
         await db.delete(request)
 
 
+def shown_scope(scope: str | None) -> str:
+    """ "copy" or "design". Older requests that covered both (or recorded nothing) count as
+    design, where they are listed."""
+    return "copy" if scope == "copy" else "design"
+
+
 async def changes_scope(db: AsyncSession, post_id: uuid.UUID) -> str:
-    """What the latest change request opened: "copy", "design" or "both"
-    (requests with no recorded scope count as "both")."""
+    """What the latest change request opened: "copy" or "design"."""
     scope = await db.scalar(
         select(ApprovalRequest.scope)
         .where(
@@ -175,7 +215,7 @@ async def changes_scope(db: AsyncSession, post_id: uuid.UUID) -> str:
         .order_by(ApprovalRequest.reviewed_at.desc(), ApprovalRequest.created_at.desc())
         .limit(1)
     )
-    return scope or "both"
+    return shown_scope(scope)
 
 
 async def changes_scopes(db: AsyncSession, post_ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
@@ -195,101 +235,72 @@ async def changes_scopes(db: AsyncSession, post_ids: set[uuid.UUID]) -> dict[uui
             ApprovalRequest.created_at.desc(),
         )
     )
-    return {post_id: scope or "both" for post_id, scope in rows.all()}
+    return {post_id: shown_scope(scope) for post_id, scope in rows.all()}
 
 
-ALL_SCOPES = ["copy", "design", "both"]
-_DESIGN_OPEN = (
-    PostStatus.DESIGN_PENDING,
-    PostStatus.DESIGN_IN_PROGRESS,
-    PostStatus.DESIGN_UPLOADED,
-)
-
-
-async def change_request_scopes(db: AsyncSession, post: Post) -> list[str]:
-    """What a creator can ask to reopen now. Empty when nothing is locked (they can just
-    edit it), or when the post isn't waiting on or past an approval."""
-    latest = await db.scalar(
-        select(ApprovalRequest)
-        .where(ApprovalRequest.post_id == post.id)
-        .order_by(ApprovalRequest.created_at.desc())
-        .limit(1)
-    )
-    if latest is None:
-        return []
-    if post.status == PostStatus.CONTENT_REVIEW and latest.status == ApprovalStatus.PENDING:
-        return ["copy"]  # there is no design yet
-    if (
-        post.status in _DESIGN_OPEN
-        and latest.status == ApprovalStatus.APPROVED
-        and latest.creative_version is None
-    ):
-        return ["copy"]  # the design is still open for them to work on
-    if post.status == PostStatus.PENDING_APPROVAL and latest.status == ApprovalStatus.PENDING:
-        return ALL_SCOPES
-    if (
-        post.status in (PostStatus.APPROVED, PostStatus.FINAL)
-        and latest.status == ApprovalStatus.APPROVED
-    ):
-        return ALL_SCOPES
-    return []
-
-
-async def change_request_reads(
-    db: AsyncSession, requests: list[PostChangeRequest]
-) -> dict[uuid.UUID, ChangeRequestRead]:
-    user_ids = {u for r in requests for u in (r.requested_by, r.decided_by) if u}
-    users = (
-        {u.id: u for u in await db.scalars(select(User).where(User.id.in_(user_ids)))}
-        if user_ids
-        else {}
-    )
-
-    def person(user_id: uuid.UUID | None) -> Person | None:
-        user = users.get(user_id) if user_id else None
-        return Person(id=user.id, name=user.full_name, email=user.email) if user else None
-
-    return {
-        r.id: ChangeRequestRead(
-            id=r.id,
-            post_id=r.post_id,
-            scope=r.scope,
-            note=r.note,
-            status=r.status,
-            requested_by=person(r.requested_by),
-            decided_by=person(r.decided_by),
-            decided_at=r.decided_at,
-            decision_note=r.decision_note,
-            created_at=r.created_at,
-        )
-        for r in requests
-    }
+# A request is over when the post is rejected or archived; resubmitting opens a newer round.
+_ENDED = (PostStatus.REJECTED, PostStatus.ARCHIVED)
 
 
 async def current_change_requests(
     db: AsyncSession, posts: list[Post]
 ) -> dict[uuid.UUID, ChangeRequestRead]:
-    """The request to show on each post: one still waiting, or one declined that nothing has
-    happened to since. Once accepted, the post's own status tells the story."""
-    if not posts:
+    """The change request each post is waiting on: its latest review round, if an admin sent
+    it back and the creator hasn't resubmitted. A resubmission opens a newer round, so the
+    old one stops being current and stays in the post's history."""
+    waiting = [p for p in posts if p.status not in _ENDED]
+    if not waiting:
         return {}
     latest = list(
         await db.scalars(
-            select(PostChangeRequest)
-            .where(PostChangeRequest.post_id.in_([p.id for p in posts]))
-            .ext(distinct_on(PostChangeRequest.post_id))
-            .order_by(PostChangeRequest.post_id, PostChangeRequest.created_at.desc())
+            select(ApprovalRequest)
+            .where(ApprovalRequest.post_id.in_([p.id for p in waiting]))
+            .ext(distinct_on(ApprovalRequest.post_id))
+            .order_by(ApprovalRequest.post_id, ApprovalRequest.created_at.desc())
         )
     )
-    updated = {p.id: p.updated_at for p in posts}
-    shown = [
-        r
-        for r in latest
-        if r.status == "pending"
-        or (r.status == "declined" and r.decided_at and r.decided_at >= updated[r.post_id])
-    ]
-    reads = await change_request_reads(db, shown)
-    return {r.post_id: reads[r.id] for r in shown}
+    open_rounds = [r for r in latest if r.status == ApprovalStatus.CHANGES_REQUESTED]
+    if not open_rounds:
+        return {}
+    by_post = {p.id: p for p in waiting}
+    creatives = dict(
+        (
+            await db.execute(
+                select(CreativeAsset.post_id, func.max(CreativeAsset.version))
+                .where(CreativeAsset.post_id.in_([r.post_id for r in open_rounds]))
+                .group_by(CreativeAsset.post_id)
+            )
+        ).all()
+    )
+    user_ids = {r.reviewer_id for r in open_rounds if r.reviewer_id}
+    users = (
+        {u.id: u for u in await db.scalars(select(User).where(User.id.in_(user_ids)))}
+        if user_ids
+        else {}
+    )
+    reads = {}
+    for r in open_rounds:
+        post = by_post[r.post_id]
+        # Older requests could cover both; they are shown as the design request they opened.
+        scope = "copy" if r.scope == "copy" or r.creative_version is None else "design"
+        wants_copy, wants_design = scope == "copy", scope == "design"
+        reviewer = users.get(r.reviewer_id) if r.reviewer_id else None
+        reads[r.post_id] = ChangeRequestRead(
+            id=r.id,
+            post_id=r.post_id,
+            scope=scope,
+            note=r.comments,
+            status="open",
+            requested_by=Person(id=reviewer.id, name=reviewer.full_name, email=reviewer.email)
+            if reviewer
+            else None,
+            created_at=r.reviewed_at or r.created_at,
+            # Each part is done once there is a newer version than the one that was reviewed.
+            content_done=not wants_copy or post.current_version > r.post_version,
+            design_done=not wants_design
+            or (creatives.get(r.post_id) or 0) > (r.creative_version or 0),
+        )
+    return reads
 
 
 async def latest_review(db: AsyncSession, post_id: uuid.UUID) -> ReviewSummary | None:

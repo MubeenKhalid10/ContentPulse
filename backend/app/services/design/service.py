@@ -28,6 +28,7 @@ from app.core.logging import logger
 from app.core.permissions import Permission, has_permission
 from app.core.search import ESCAPE, contains
 from app.models.ai import AIGenerationJob
+from app.models.approval import ApprovalRequest
 from app.models.design import CreativeAsset, DesignBrief
 from app.models.enums import DesignBriefStatus, JobStatus, MemberStatus, PostStatus
 from app.models.organization import BrandProfile, Organization, OrganizationMember
@@ -407,7 +408,6 @@ async def task_detail(
         ai_images=get_image_provider(settings) is not None,
         image_job=await _image_job(db, brief.id),
         review=await approvals.latest_review(db, post.id),
-        change_request_scopes=await approvals.change_request_scopes(db, post),
     )
 
 
@@ -799,6 +799,63 @@ async def delete_design(
         entity_type="post",
         entity_id=post.id,
         old_value={"files": len(assets)},
+    )
+    await db.commit()
+    storage = get_storage()
+    for key in keys:
+        try:
+            await storage.delete(key)
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not remove creative file %s", key)
+    return await task_detail(db, organization_id, brief.id)
+
+
+async def delete_version(
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    role,
+    task_id: uuid.UUID,
+    version: int,
+) -> TaskDetail:
+    """Remove one uploaded design version (all its files) that has not been sent for approval.
+    A version an admin has seen stays: it is part of the review history. Whoever can work on the
+    task can do this, so a wrong upload is fixed without an admin."""
+    brief, post = await _workable(db, organization_id, user_id, role, task_id)
+    reviewed = await db.scalar(
+        select(func.max(ApprovalRequest.creative_version)).where(ApprovalRequest.post_id == post.id)
+    )
+    if reviewed is not None and version <= reviewed:
+        raise InvalidStateTransition(
+            "This version was already sent for approval, so it stays in the history.",
+            details={"version": version, "reviewed": reviewed},
+        )
+    assets = list(
+        await db.scalars(
+            select(CreativeAsset).where(
+                CreativeAsset.post_id == post.id, CreativeAsset.version == version
+            )
+        )
+    )
+    if not assets:
+        raise NotFound("Design version")
+    keys = {a.storage_key for a in assets}
+    for asset in assets:
+        await db.delete(asset)
+    await db.flush()
+    remaining = await db.scalar(
+        select(func.count()).select_from(CreativeAsset).where(CreativeAsset.post_id == post.id)
+    )
+    if not remaining and post.status == PostStatus.DESIGN_UPLOADED:
+        await transition_post(db, post, PostStatus.DESIGN_IN_PROGRESS, user_id=user_id)
+    audit.record(
+        db,
+        organization_id=organization_id,
+        user_id=user_id,
+        action=AuditAction.DESIGN_DELETED,
+        entity_type="post",
+        entity_id=post.id,
+        old_value={"version": version, "files": len(assets)},
     )
     await db.commit()
     storage = get_storage()

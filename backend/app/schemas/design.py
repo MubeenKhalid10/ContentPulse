@@ -21,18 +21,19 @@ class Person(BaseModel):
 
 
 class ChangeRequestRead(BaseModel):
-    """A creator's request to reopen locked copy or a locked design."""
+    """What an admin asked a creator to change. It is the review round that was sent back:
+    one request per round."""
 
-    id: uuid.UUID
+    id: uuid.UUID  # the approval round that asked
     post_id: uuid.UUID
-    scope: Literal["copy", "design", "both"]
-    note: str
-    status: Literal["pending", "accepted", "declined", "closed"]
-    requested_by: Person | None
-    decided_by: Person | None
-    decided_at: datetime | None
-    decision_note: str | None
+    scope: Literal["copy", "design"]
+    note: str | None  # the admin's instructions
+    status: Literal["open", "resolved"]
+    requested_by: Person | None  # the admin
     created_at: datetime
+    # Progress inside the open request. A scope that wasn't asked for counts as done.
+    content_done: bool = False
+    design_done: bool = False
 
 
 class TaskPost(BaseModel):
@@ -43,7 +44,7 @@ class TaskPost(BaseModel):
     current_version: int
     topic_title: str | None
     # What an admin sent back, while it waits on those changes.
-    changes_scope: Literal["copy", "design", "both"] | None = None
+    changes_scope: Literal["copy", "design"] | None = None
 
 
 class TaskListItem(BaseModel):
@@ -155,8 +156,6 @@ class TaskDetail(TaskListItem):
     ai_images: bool = False
     image_job: ImageJob | None = None
     review: ReviewSummary | None = None
-    # What a creator can ask an admin to reopen right now.
-    change_request_scopes: list[Literal["copy", "design", "both"]] = []
 
 
 class HandoffDocument(BaseModel):

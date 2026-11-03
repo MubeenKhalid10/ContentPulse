@@ -9,7 +9,7 @@ from sqlalchemy.orm import aliased
 
 from app.core.clock import utcnow
 from app.core.errors import InvalidStateTransition, NotFound, require
-from app.models.approval import ApprovalComment, ApprovalRequest, PostChangeRequest
+from app.models.approval import ApprovalComment, ApprovalRequest
 from app.models.design import CreativeAsset, DesignBrief
 from app.models.enums import ApprovalStatus, DesignBriefStatus, PostStatus
 from app.models.post import Post, PostVersion
@@ -27,7 +27,7 @@ from app.schemas.approval import (
     TopicContext,
 )
 from app.schemas.content import VersionRead
-from app.services import audit
+from app.services import audit, notifications
 from app.services.approvals import workflow
 from app.services.audit import AuditAction
 from app.services.design import brief_state
@@ -265,15 +265,6 @@ async def list_approvals(
         counts=counts,
         stage_pending=stage_pending,
         ready_count=ready_count,
-        change_request_count=await db.scalar(
-            select(func.count())
-            .select_from(PostChangeRequest)
-            .where(
-                PostChangeRequest.organization_id == organization_id,
-                PostChangeRequest.status == "pending",
-            )
-        )
-        or 0,
     )
 
 
@@ -395,6 +386,41 @@ async def approval_detail(
 
 # --- Decisions ----------------------------------------------------------------------
 
+_DECISION_EVENT = {
+    A.APPROVED: ("approved", "approved"),
+    A.CHANGES_REQUESTED: ("changes_requested", "asked for changes to"),
+    A.REJECTED: ("rejected", "rejected"),
+}
+
+
+async def _tell_creator(
+    db: AsyncSession,
+    request: ApprovalRequest,
+    post: Post,
+    reviewer_id: uuid.UUID,
+    kind: str,
+    verb: str,
+    comment: str | None,
+    scope: str | None,
+) -> None:
+    """The decision, to whoever submitted the round (never to the admin who made it)."""
+    word = notifications.SCOPE_WORD.get(scope or "copy", "content")
+    on = f" ({word})" if kind == "changes_requested" else ""
+    await notifications.notify(
+        db,
+        organization_id=request.organization_id,
+        user_ids={request.submitted_by or post.created_by},
+        post=post,
+        kind=kind,
+        scope=scope or "copy",
+        title=f"An admin {verb} {notifications.post_name(post)}{on}",
+        body=comment,
+        link=f"/content/{post.id}",
+        dedupe_key=f"{kind}:{request.id}",
+        skip=reviewer_id,
+    )
+
+
 DECISIONS = {
     A.APPROVED: (PostStatus.APPROVED, AuditAction.APPROVED, "approved"),
     A.CHANGES_REQUESTED: (
@@ -435,7 +461,7 @@ async def decide(
     request_id: uuid.UUID,
     decision: ApprovalStatus,
     comment: str | None,
-    scope: str = "both",
+    scope: str = "design",
 ) -> ApprovalDetail:
     request, post = await _lock(db, organization_id, request_id)
     if request.status != A.PENDING:
@@ -486,6 +512,21 @@ async def decide(
             **({"scope": scope} if decision == A.CHANGES_REQUESTED and not copy_stage else {}),
         },
     )
+    event, verb = _DECISION_EVENT[decision]
+    await _tell_creator(
+        db,
+        request,
+        post,
+        user_id,
+        event,
+        verb,
+        comment,
+        (request.scope or "copy")
+        if copy_stage
+        else scope
+        if decision == A.CHANGES_REQUESTED
+        else None,
+    )
     await db.commit()
     design_briefs.submit(ai_brief)
     return await approval_detail(db, organization_id, request.id)
@@ -517,7 +558,7 @@ async def reopen(
     user_id: uuid.UUID,
     request_id: uuid.UUID,
     comment: str,
-    scope: str = "both",
+    scope: str = "design",
 ) -> ApprovalDetail:
     """An admin asks for changes to work they already approved. Approved copy
     and designs are locked; this is the one way to open them again.
@@ -579,6 +620,16 @@ async def reopen(
             **({"stage": "copy"} if copy_stage else {"scope": scope}),
         },
     )
+    await _tell_creator(
+        db,
+        request,
+        post,
+        user_id,
+        "changes_requested",
+        "asked for changes to",
+        comment,
+        "copy" if copy_stage else scope,
+    )
     await db.commit()
     return await approval_detail(db, organization_id, request.id)
 
@@ -591,7 +642,40 @@ async def add_comment(
     body: str,
 ) -> ApprovalDetail:
     request = await _get(db, organization_id, request_id)
-    db.add(_comment(request, user_id, body, "comment"))
+    comment = _comment(request, user_id, body, "comment")
+    db.add(comment)
+    await db.flush()
+    post = require(await db.get(Post, request.post_id), "post")
+    admins = await notifications.admin_ids(db, organization_id)
+    name = notifications.post_name(post)
+    if user_id in admins:
+        # An admin answering: the creator who worked on the round hears about it.
+        await notifications.notify(
+            db,
+            organization_id=organization_id,
+            user_ids={request.submitted_by or post.created_by},
+            post=post,
+            kind="clarification",
+            title=f"An admin replied about {name}",
+            body=body,
+            link=f"/content/{post.id}",
+            dedupe_key=f"clarification:{comment.id}",
+            skip=user_id,
+        )
+    else:
+        # A creator asking or answering: every admin hears about it, and it opens the round.
+        await notifications.notify(
+            db,
+            organization_id=organization_id,
+            user_ids=admins,
+            post=post,
+            kind="clarification",
+            title=f"A creator commented on {name}",
+            body=body,
+            link=f"/approvals/{request.id}",
+            dedupe_key=f"clarification:{comment.id}",
+            skip=user_id,
+        )
     audit.record(
         db,
         organization_id=organization_id,
@@ -603,3 +687,35 @@ async def add_comment(
     )
     await db.commit()
     return await approval_detail(db, organization_id, request.id)
+
+
+async def post_comments(
+    db: AsyncSession, organization_id: uuid.UUID, post_id: uuid.UUID
+) -> list[CommentRead]:
+    """The review conversation, for people who work on the post but don't review it."""
+    post = await db.scalar(
+        select(Post.id).where(Post.id == post_id, Post.organization_id == organization_id)
+    )
+    if post is None:
+        raise NotFound("Post")
+    return await comments(db, post_id)
+
+
+async def add_post_comment(
+    db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, post_id: uuid.UUID, body: str
+) -> list[CommentRead]:
+    """A clarification on the post's latest review round. It is only a comment: it never
+    opens a request, reopens approved work or changes the post's status."""
+    latest = await db.scalar(
+        select(ApprovalRequest.id)
+        .where(
+            ApprovalRequest.post_id == post_id,
+            ApprovalRequest.organization_id == organization_id,
+        )
+        .order_by(ApprovalRequest.created_at.desc())
+        .limit(1)
+    )
+    if latest is None:
+        raise InvalidStateTransition("This post hasn't been sent for review yet.")
+    await add_comment(db, organization_id, user_id, latest, body)
+    return await comments(db, post_id)
