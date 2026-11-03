@@ -17,6 +17,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  useDialogBusy,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,6 +53,7 @@ export function CrawlDialog({
 
 function CrawlForm({ websiteUrl, onClose }: { websiteUrl: string | null; onClose: () => void }) {
   const start = useStartCrawl();
+  useDialogBusy(start.isPending);
   const form = useForm<z.input<typeof crawlSchema>, unknown, z.output<typeof crawlSchema>>({
     resolver: zodResolver(crawlSchema),
     defaultValues: { url: websiteUrl ?? "", max_pages: 50 },
@@ -71,6 +73,7 @@ function CrawlForm({ websiteUrl, onClose }: { websiteUrl: string | null; onClose
         }),
       )}
     >
+<fieldset disabled={start.isPending} className="contents">
       <DialogClose
         disabled={start.isPending}
         render={
@@ -119,7 +122,8 @@ function CrawlForm({ websiteUrl, onClose }: { websiteUrl: string | null; onClose
           {start.isPending ? "Starting…" : "Start crawl"}
         </Button>
       </DialogFooter>
-    </form>
+    </fieldset>
+</form>
   );
 }
 
@@ -151,6 +155,7 @@ function DocumentForm({ editing, onClose }: { editing: KnowledgeDocumentDetail |
   const create = useCreateDocument();
   const update = useUpdateDocument();
   const pending = create.isPending || update.isPending;
+  useDialogBusy(pending);
   const error = create.error ?? update.error;
   const form = useForm<DocumentValues>({
     resolver: zodResolver(documentSchema),
@@ -171,6 +176,7 @@ function DocumentForm({ editing, onClose }: { editing: KnowledgeDocumentDetail |
 
   return (
     <form noValidate onSubmit={onSubmit} className="grid gap-5">
+<fieldset disabled={pending} className="contents">
       <DialogClose
         disabled={pending}
         render={
@@ -221,6 +227,7 @@ function DocumentForm({ editing, onClose }: { editing: KnowledgeDocumentDetail |
           {pending ? "Saving…" : editing ? "Save" : "Add document"}
         </Button>
       </DialogFooter>
-    </form>
+    </fieldset>
+</form>
   );
 }

@@ -186,7 +186,7 @@ function MemberRow({
           {!isSelf && (
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${member.email}`} />}
+                render={<Button variant="ghost" size="icon-sm" disabled={update.isPending} aria-label={`Actions for ${member.email}`} />}
               >
                 <MoreHorizontalIcon />
               </DropdownMenuTrigger>
@@ -246,7 +246,7 @@ function StatusBadge({ member }: { member: Member }) {
 function RemoveMemberDialog({ member, onClose }: { member: Member | undefined; onClose: () => void }) {
   const remove = useRemoveMember();
   return (
-    <AlertDialog open={!!member} onOpenChange={(open) => !open && onClose()}>
+    <AlertDialog open={!!member} onOpenChange={(open) => !open && !remove.isPending && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Remove {member?.full_name ?? member?.email}{member?.full_name ? ` (${member.email})` : ""}?</AlertDialogTitle>
@@ -255,7 +255,7 @@ function RemoveMemberDialog({ member, onClose }: { member: Member | undefined; o
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={remove.isPending}

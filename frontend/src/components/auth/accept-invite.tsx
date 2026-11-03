@@ -242,6 +242,7 @@ function ConfirmJoin({
           noValidate
           className="grid gap-4"
         >
+<fieldset disabled={join.isPending} className="contents">
           {join.isError && (
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(join.error)}</AlertDescription>
@@ -276,7 +277,8 @@ function ConfirmJoin({
           <Button type="submit" size="lg" disabled={join.isPending} pending={join.isPending}>
             {join.isPending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>
-        </form>
+        </fieldset>
+</form>
       </CardContent>
     </Card>
   );
@@ -367,6 +369,7 @@ function SupabaseIdentityForm({
           noValidate
           className="grid gap-4"
         >
+<fieldset disabled={pending} className="contents">
           {failure && (
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(failure)}</AlertDescription>
@@ -445,7 +448,8 @@ function SupabaseIdentityForm({
               {hasAccount ? "Create an account instead" : "Sign in instead"}
             </button>
           </p>
-        </form>
+        </fieldset>
+</form>
       </CardContent>
     </Card>
   );
@@ -476,6 +480,7 @@ function AcceptForm({
           noValidate
           className="grid gap-4"
         >
+<fieldset disabled={accept.isPending} className="contents">
           {accept.isError && (
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(accept.error)}</AlertDescription>
@@ -516,7 +521,8 @@ function AcceptForm({
           <Button type="submit" size="lg" disabled={accept.isPending} pending={accept.isPending}>
             {accept.isPending ? "Joining…" : `Join ${invite.organization_name}`}
           </Button>
-        </form>
+        </fieldset>
+</form>
       </CardContent>
     </Card>
   );

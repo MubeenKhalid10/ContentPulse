@@ -80,6 +80,7 @@ export function LoginForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} noValidate className="grid gap-4">
+<fieldset disabled={login.isPending} className="contents">
           {login.isError && (
             <Alert variant="destructive">
               <AlertDescription>{errorMessage(login.error)}</AlertDescription>
@@ -143,7 +144,8 @@ export function LoginForm() {
               {clearingSession ? "Clearing sign-in session…" : "Clear this browser's sign-in session"}
             </button>
           )}
-        </form>
+        </fieldset>
+</form>
       </CardContent>
     </Card>
   );

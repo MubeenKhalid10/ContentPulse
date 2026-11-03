@@ -112,7 +112,7 @@ export function StrategyCard({
         <span className="text-xs text-muted-foreground">{STRATEGY_SOURCE_LABEL[s.source]}</span>
         <div className="ml-auto flex flex-wrap gap-1.5">
           {canManage && active && (
-            <Button size="sm" variant="ghost" onClick={onEdit}>
+            <Button size="sm" variant="ghost" disabled={action.isPending || remove.isPending} onClick={onEdit}>
               <PencilIcon />
               Edit plan
             </Button>
@@ -131,6 +131,7 @@ export function StrategyCard({
               variant="ghost"
               aria-label={`Archive ${label}`}
               title="Archive plan: keep it for reference, but stop editing it"
+              disabled={remove.isPending}
               pending={action.isPending}
               onClick={() => setConfirmArchive(true)}
             >
