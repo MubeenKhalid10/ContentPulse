@@ -82,7 +82,7 @@ class PostListItem(BaseModel):
     generation: GenerationStatus | None
     # What an approver sent back, while the post waits on those changes: the copy,
     # the design or both. None when nothing was sent back.
-    changes_scope: Literal["copy", "design", "both"] | None = None
+    changes_scope: Literal["copy", "design"] | None = None
     change_request: ChangeRequestRead | None = None
     created_at: datetime
     updated_at: datetime
@@ -113,8 +113,6 @@ class PostDetail(PostListItem):
     design_task: DesignTaskRef | None = None
     review: ReviewSummary | None = None
     creatives: list[CreativeVersion] = Field(default_factory=list)
-    # What a creator can ask an admin to reopen right now.
-    change_request_scopes: list[Literal["copy", "design", "both"]] = Field(default_factory=list)
 
 
 class PostUpdate(BaseModel):

@@ -9,13 +9,11 @@ from app.models.enums import ApprovalStatus, Platform
 from app.schemas.approval import (
     ApprovalDetail,
     ApprovalPage,
-    ChangeRequestPage,
     ChangesRequest,
     CommentCreate,
     DecisionRequest,
 )
-from app.schemas.design import ChangeRequestRead
-from app.services.approvals import change_requests, service
+from app.services.approvals import service
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -44,30 +42,6 @@ async def list_approvals(
         stage=stage,
         limit=limit,
         offset=offset,
-    )
-
-
-@router.get("/change-requests", response_model=ChangeRequestPage)
-async def list_change_requests(
-    ctx: CanReview,
-    db: DB,
-    limit: Annotated[int, Query(ge=1, le=100)] = 30,
-    offset: Annotated[int, Query(ge=0)] = 0,
-):
-    return await change_requests.list_pending(db, ctx.organization_id, limit=limit, offset=offset)
-
-
-@router.post("/change-requests/{request_id}/accept", response_model=ChangeRequestRead)
-async def accept_change_request(request_id: uuid.UUID, ctx: CanReview, db: DB):
-    return await change_requests.accept(db, ctx.organization_id, ctx.user.id, request_id)
-
-
-@router.post("/change-requests/{request_id}/decline", response_model=ChangeRequestRead)
-async def decline_change_request(
-    request_id: uuid.UUID, data: DecisionRequest, ctx: CanReview, db: DB
-):
-    return await change_requests.decline(
-        db, ctx.organization_id, ctx.user.id, request_id, data.comment
     )
 
 

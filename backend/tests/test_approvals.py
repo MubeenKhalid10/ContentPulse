@@ -120,8 +120,9 @@ async def test_changes_requested_revision_and_resubmit(client, internet, design_
     assert task["status"] == "in_progress" and task["assignee"]["id"] == designer.user["id"]
     assert task["review"]["status"] == "changes_requested"
     assert task["review"]["comments"][0]["body"] == "Reduce the text on slide 3."
+    # A request with no scope is a design request: the approved copy stays locked.
     studio = (await admin.get(f"/api/v1/content/{post['id']}")).json()
-    assert studio["review"]["status"] == "changes_requested" and studio["editable"] is True
+    assert studio["review"]["status"] == "changes_requested" and studio["editable"] is False
 
     key = await upload(designer, task_id, "slide-1-v2.png")
     uploaded = (

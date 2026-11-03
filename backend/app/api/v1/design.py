@@ -90,6 +90,14 @@ async def delete_design(task_id: uuid.UUID, ctx: CanAdmin, db: DB):
     return await service.delete_design(db, ctx.organization_id, ctx.user.id, task_id)
 
 
+@router.delete("/{task_id}/creatives/{version}", response_model=TaskDetail)
+async def delete_version(task_id: uuid.UUID, version: int, ctx: CanUpload, db: DB):
+    """Remove one uploaded version that has not been sent for approval yet."""
+    return await service.delete_version(
+        db, ctx.organization_id, ctx.user.id, ctx.role, task_id, version
+    )
+
+
 @router.post("/{task_id}/withdraw", response_model=TaskDetail)
 async def withdraw(task_id: uuid.UUID, ctx: CanUpload, db: DB):
     """The designer takes a design back before an admin decided, to change it."""
