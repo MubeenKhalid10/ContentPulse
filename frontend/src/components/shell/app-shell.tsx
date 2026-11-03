@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Logo } from "@/components/shared/logo";
+import { NotificationBell } from "@/components/shell/notification-bell";
 import { SidebarNav } from "@/components/shell/sidebar-nav";
 import { UserMenu } from "@/components/shell/user-menu";
 import { WelcomeTour } from "@/components/shell/welcome-tour";
@@ -72,8 +73,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Skip to main content
       </a>
       <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col border-r bg-sidebar lg:flex">
-        <div className="flex h-14 items-center px-4">
+        <div className="flex h-14 items-center justify-between px-4">
           <Logo />
+          <NotificationBell />
         </div>
         <SidebarNav me={me.data} />
         <div className="border-t p-2">
@@ -115,6 +117,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </SheetContent>
           </Sheet>
           <Logo />
+          <span className="ml-auto">
+            <NotificationBell />
+          </span>
         </header>
         <main id="main" tabIndex={-1} className="mx-auto outline-none w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-10">
           {children}

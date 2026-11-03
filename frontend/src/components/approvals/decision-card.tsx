@@ -143,7 +143,7 @@ export function DecisionCard({ approval: a }: { approval: ApprovalDetail }) {
             <p className="text-sm text-muted-foreground">
               Approved {a.stage === "copy" ? "copy is" : "work is"} locked. Request changes to let the creator edit it again.
             </p>
-            <Button variant="outline" onClick={() => setChangesOpen(true)}>
+            <Button variant="outline" disabled={finalize.isPending} onClick={() => setChangesOpen(true)}>
               <RotateCcwIcon />
               Request changes
             </Button>

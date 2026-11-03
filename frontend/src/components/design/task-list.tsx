@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { POST_STATUS_TONE } from "@/lib/tones";
-import { ChangeRequestTag } from "@/components/approvals/change-request";
 import { isSwitchingList, ListLoading } from "@/components/shared/loading";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { DayGroups } from "@/components/shared/day-groups";
@@ -36,12 +35,12 @@ import type { DesignTask, DesignTaskFilter } from "@/types/api";
 const PAGE = 30;
 const TABS: { value: DesignTaskFilter; label: string }[] = [
   { value: "todo", label: "Designs to create" },
-  { value: "changes", label: "Changes requested" },
+  { value: "changes", label: "Design Change Requests" },
   { value: "approval", label: "Sent for approval" },
 ];
 const EMPTY: Record<DesignTaskFilter, string> = {
   todo: "No open design tasks. A post appears here once an admin approves its copy.",
-  changes: "Nothing sent back. Designs an approver asks you to change appear here.",
+  changes: "No design changes requested. When an admin asks you to change a design, it appears here.",
   approval: "No designs sent for approval yet.",
   submitted: "No designs waiting for approval.",
   done: "No approved designs yet.",
@@ -225,7 +224,6 @@ function TaskRow({ task }: { task: DesignTask }) {
             {postStatusLabel(task.post)}
           </Tag>
         )}
-        <ChangeRequestTag request={task.change_request} />
         <span className="ml-auto text-xs text-muted-foreground">
           {timeOfDay(task.updated_at)}
         </span>

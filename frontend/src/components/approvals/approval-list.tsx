@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import { APPROVAL_STATUS_TONE } from "@/lib/tones";
 import { isSwitchingList, ListLoading } from "@/components/shared/loading";
 import { ChangeRequestTag } from "@/components/approvals/change-request";
-import { ChangeRequestQueue } from "@/components/approvals/change-request-queue";
 import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import { PlatformTag, Tag } from "@/components/shared/tag";
 import { DayGroups } from "@/components/shared/day-groups";
@@ -40,30 +39,44 @@ import type {
 } from "@/types/api";
 
 const PAGE = 30;
-/** "ready" lists posts whose content and design are both approved. */
-type View = ApprovalStage | "ready" | "requests";
-const VIEWS: { value: View; label: string }[] = [
-  { value: "copy", label: "Content approval" },
-  { value: "design", label: "Design approval" },
-  { value: "ready", label: "Ready to publish" },
-  { value: "requests", label: "Change requests" },
+/** Pending Approvals: what waits for a decision. Review History: what was already decided. */
+type Section = "pending" | "history";
+const SECTIONS: { value: Section; label: string }[] = [
+  { value: "pending", label: "Pending Approvals" },
+  { value: "history", label: "Review History" },
+];
+const STAGES: { value: ApprovalStage; label: string }[] = [
+  { value: "copy", label: "Content" },
+  { value: "design", label: "Design" },
+];
+const HISTORY_FILTERS: { value: ApprovalFilter; label: string }[] = [
+  { value: "reviewed", label: "All reviewed" },
+  { value: "approved", label: "Approved" },
+  { value: "changes_requested", label: "Changes requested" },
+  { value: "rejected", label: "Rejected" },
 ];
 
 export function ApprovalList() {
-  const [{ stage: savedStage, platform }, setFilters] = usePersistedState<{
-    stage: View;
+  const [saved, setFilters] = usePersistedState<{
+    section?: Section;
+    stage?: string;
     platform: "" | Platform;
-  }>("approvals", { stage: "copy", platform: "" });
-  // Older saved filters have no stage.
-  const view: View = savedStage ?? "copy";
-  const ready = view === "ready";
-  // An approval tab lists what waits for a decision. Ready to publish is the
-  // approved designs: a design is only approved after its content.
-  const stage: ApprovalStage = view === "copy" || view === "requests" ? "copy" : "design";
-  const shownStatus: ApprovalFilter = ready ? "approved" : "pending";
-  const setStage = (stage: View) => setFilters((f) => ({ ...f, stage }));
-  const setPlatform = (platform: "" | Platform) =>
-    setFilters((f) => ({ ...f, platform }));
+    outcome?: ApprovalFilter;
+  }>("approvals", { section: "pending", stage: "copy", platform: "" });
+  // Older saved filters had other tabs ("ready", "requests"); anything unknown starts over.
+  const section: Section = saved.section === "history" ? "history" : "pending";
+  const stage: ApprovalStage = saved.stage === "design" ? "design" : "copy";
+  const platform = saved.platform ?? "";
+  const outcome: ApprovalFilter = HISTORY_FILTERS.some((f) => f.value === saved.outcome)
+    ? saved.outcome!
+    : "reviewed";
+  const shownStatus: ApprovalFilter = section === "pending" ? "pending" : outcome;
+  const patch = (next: Partial<typeof saved>) => {
+    setFilters((f) => ({ ...f, ...next }));
+    setLimit(PAGE);
+    setSelected([]);
+  };
+  const setPlatform = (platform: "" | Platform) => patch({ platform });
   const [limit, setLimit] = useState(PAGE);
   const approvals = useApprovals(stage, shownStatus, platform, limit);
   const counts = approvals.data?.counts;
@@ -107,29 +120,16 @@ export function ApprovalList() {
       />
       <div className="grid min-w-0 grid-cols-1 gap-6">
         <div className="flex flex-wrap items-center gap-3">
-          <Tabs
-            value={view}
-            onValueChange={(v) => {
-              setStage(v as View);
-              setLimit(PAGE);
-              setSelected([]);
-            }}
-          >
+          <Tabs value={section} onValueChange={(v) => patch({ section: v as Section })}>
             <TabsList variant="line">
-              {VIEWS.map((s) => {
+              {SECTIONS.map((x) => {
                 const count =
-                  (s.value === "ready"
-                    ? approvals.data?.ready_count
-                    : s.value === "requests"
-                      ? approvals.data?.change_request_count
-                      : approvals.data?.stage_pending?.[s.value]) ?? 0;
+                  x.value === "pending"
+                    ? (approvals.data?.stage_pending?.[stage] ?? 0)
+                    : 0;
                 return (
-                  <TabsTrigger
-                    key={s.value}
-                    value={s.value}
-                    className="text-base"
-                  >
-                    {s.label}
+                  <TabsTrigger key={x.value} value={x.value} className="text-base">
+                    {x.label}
                     {count > 0 && (
                       <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[11px] tabular-nums text-primary-foreground">
                         {count}
@@ -140,31 +140,46 @@ export function ApprovalList() {
               })}
             </TabsList>
           </Tabs>
-          {view !== "requests" && (
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <SimpleSelect
+              aria-label="Stage"
+              value={stage}
+              onChange={(v) => patch({ stage: v })}
+              options={STAGES.map((x) => ({
+                value: x.value,
+                label:
+                  section === "pending"
+                    ? `${x.label} (${approvals.data?.stage_pending?.[x.value] ?? 0})`
+                    : x.label,
+              }))}
+              className="w-44"
+            />
+            {section === "history" && (
+              <SimpleSelect
+                aria-label="Outcome"
+                value={outcome}
+                onChange={(v) => patch({ outcome: v as ApprovalFilter })}
+                options={HISTORY_FILTERS}
+                className="w-44"
+              />
+            )}
             <SimpleSelect
               aria-label="Platform"
               value={platform || "all"}
               onChange={(v) => setPlatform(v === "all" ? "" : (v as Platform))}
-              options={[
-                { value: "all", label: "Any platform" },
-                ...PLATFORM_OPTIONS,
-              ]}
-              className="w-40 sm:ml-auto"
+              options={[{ value: "all", label: "Any platform" }, ...PLATFORM_OPTIONS]}
+              className="w-40"
             />
-          )}
+          </div>
         </div>
         <p className="-mt-3 text-sm text-muted-foreground">
-          {view === "requests"
-            ? "Creators asking to reopen locked content or designs. Accept to reopen only what they asked for, or decline with a reason."
-            : ready
-            ? "Posts with both the content and the design approved. Open one to share it."
+          {section === "history"
+            ? "Everything an admin already decided, with the reviewer, the date and the comments. Open one to see the whole history of the post."
             : stage === "copy"
               ? "Check the written post. Approving it sends the post to design."
               : "Check the finished design with the copy. Approving the design also approves the post: it becomes Ready to publish."}
         </p>
-        {view === "requests" ? (
-          <ChangeRequestQueue />
-        ) : (ready ? counts?.approved : counts?.all) === 0 && !platform ? (
+        {counts?.all === 0 && !platform ? (
           <Card>
             <CardContent className="grid justify-items-center gap-4 py-12 text-center">
               <span className="grid size-12 place-items-center rounded-full bg-muted">
@@ -172,18 +187,12 @@ export function ApprovalList() {
               </span>
               <div className="grid max-w-md gap-1.5">
                 <p className="text-lg font-medium">
-                  {ready
-                    ? "No posts ready yet"
-                    : stage === "copy"
-                      ? "No copy to approve yet"
-                      : "No designs to approve yet"}
+                  {stage === "copy" ? "No copy to approve yet" : "No designs to approve yet"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {ready
-                    ? "Posts appear here once both their content and design are approved."
-                    : stage === "copy"
-                      ? "Posts appear here when a writer submits their copy for approval."
-                      : "Posts appear here after the copy is approved and the design is added and submitted."}
+                  {stage === "copy"
+                    ? "Posts appear here when a writer submits their copy for approval."
+                    : "Posts appear here after the copy is approved and the design is added and submitted."}
                 </p>
               </div>
             </CardContent>
@@ -242,8 +251,8 @@ export function ApprovalList() {
               </>
             ) : (
               <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                {ready
-                  ? "No posts ready on this platform."
+                {section === "history"
+                  ? "Nothing matches these filters yet."
                   : `You're all caught up. No ${stage === "copy" ? "copy" : "designs"} waiting for review.`}
               </p>
             )}
@@ -286,7 +295,7 @@ export function ApprovalList() {
                 ? "Approve selected copy"
                 : "Approve selected designs"}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+          <Button size="sm" variant="ghost" disabled={approveAll.isPending} onClick={() => setSelected([])}>
             Clear
           </Button>
         </div>
@@ -342,11 +351,15 @@ function ApprovalRow({
           >
             {a.post.title ?? "Untitled post"}
           </Link>
-          <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>
-            {approvalStatusLabel(a.status, a.stage)}
-          </Tag>
+          {/* One status tag: the latest change request when there is one, else the decision. */}
+          {a.change_request ? (
+            <ChangeRequestTag request={a.change_request} />
+          ) : (
+            <Tag tone={APPROVAL_STATUS_TONE[a.status]} dot>
+              {approvalStatusLabel(a.status, a.stage)}
+            </Tag>
+          )}
           {a.round > 1 && <Tag tone="orange">Round {a.round}</Tag>}
-          <ChangeRequestTag request={a.change_request} />
         </div>
         {a.topic_title && (
           <p className="truncate text-xs font-medium text-muted-foreground">

@@ -5,10 +5,19 @@ import { CheckCircle2Icon, MessageSquareWarningIcon, XCircleIcon } from "lucide-
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { approvalStatusLabel, COMMENT_KIND_LABEL } from "@/lib/approvals";
 import { timeAgo } from "@/lib/format";
-import type { ReviewSummary } from "@/types/api";
+import type { ChangeRequest, ReviewSummary } from "@/types/api";
 
 /** The latest review decision and its comments, for whoever has to act on it. */
-export function ReviewBanner({ review, children }: { review: ReviewSummary | null; children?: React.ReactNode }) {
+export function ReviewBanner({
+  review,
+  request,
+  children,
+}: {
+  review: ReviewSummary | null;
+  /** The open change request, when there is one: shown in this same box, never in a second one. */
+  request?: ChangeRequest | null;
+  children?: React.ReactNode;
+}) {
   if (!review || review.status === "pending") return null;
   const decisions = review.comments.filter((c) => c.kind !== "resubmitted");
   // A content review has no design attached; a design review always has one.
@@ -18,6 +27,53 @@ export function ReviewBanner({ review, children }: { review: ReviewSummary | nul
       ? `${approvalStatusLabel(review.status, stage)} (round ${review.round})`
       : approvalStatusLabel(review.status, stage);
   const Icon = { changes_requested: MessageSquareWarningIcon, approved: CheckCircle2Icon, rejected: XCircleIcon }[review.status];
+
+  if (review.status === "changes_requested" && request) {
+    const admin = request.requested_by?.name ?? request.requested_by?.email ?? "An admin";
+    // Anything said in this round beyond the instructions themselves.
+    const others = decisions.filter((c) => c.body.trim() !== (request.note ?? "").trim());
+    return (
+      <Alert className="mb-6" data-testid="change-request">
+        <MessageSquareWarningIcon />
+        <AlertTitle>{title}</AlertTitle>
+        <AlertDescription className="grid gap-3">
+          <section className="grid gap-1">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requested by</h3>
+            <p className="text-sm text-foreground">
+              {admin}, {timeAgo(request.created_at)}
+            </p>
+          </section>
+          {request.note && (
+            <section className="grid gap-1">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What to change</h3>
+              <p className="whitespace-pre-wrap rounded-md bg-background/60 px-3 py-2 text-sm text-foreground">
+                {request.note}
+              </p>
+            </section>
+          )}
+          {others.length > 0 && (
+            <section className="grid gap-1">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">More from this review</h3>
+              <ul className="grid gap-1.5">
+                {others.map((c, i) => (
+                  <li key={i} className="rounded-md bg-background/60 px-3 py-2 text-sm text-foreground">
+                    <span className="text-xs text-muted-foreground">
+                      {c.author?.name ?? c.author?.email ?? "Reviewer"} {COMMENT_KIND_LABEL[c.kind]}:
+                    </span>
+                    <p className="whitespace-pre-wrap">{c.body}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {children && (
+            <p className="text-sm font-medium text-foreground">Make the changes above, then resubmit for approval.</p>
+          )}
+          {children}
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <Alert variant={review.status === "rejected" ? "destructive" : "default"} className="mb-6">
