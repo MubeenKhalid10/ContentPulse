@@ -36,7 +36,7 @@ export function PreviewCard({ approval: a }: { approval: ApprovalDetail }) {
           <div className="mx-auto grid w-full max-w-2xl gap-3">
             {files[0]?.file_type.startsWith("image/") && (
               // Signed, short-lived URLs: next/image can't optimize them.
-              <SignedImage src={files[0].url} alt="Featured image" className="aspect-[1.91/1] w-full rounded-xl border object-cover" />
+              <SignedImage src={files[0].url} alt="Featured image" className="max-h-[34rem] w-full rounded-xl border bg-muted object-contain" />
             )}
             {a.content && (
               <ArticlePreview
