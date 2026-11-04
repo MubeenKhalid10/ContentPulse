@@ -19,3 +19,5 @@ Hashtags go only in the "hashtags" field and stay within the playbook's limit. M
 <platform_playbook platform="Instagram">
 {platform_playbook}
 </platform_playbook>
+
+Never repeat the hook or the call to action inside the body: the hook, body and call to action are shown one after another as separate parts, so the body continues from the hook and stops before the call to action.

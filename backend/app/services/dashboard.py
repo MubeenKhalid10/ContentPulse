@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import Role
 from app.models.audit import AuditLog
 from app.models.enums import (
     PostStatus,
@@ -13,7 +14,7 @@ from app.models.enums import (
     TrendStatus,
 )
 from app.models.organization import Organization
-from app.models.post import Post
+from app.models.post import Post, PostVersion
 from app.models.topic import TopicCandidate
 from app.models.trend import Trend
 from app.models.user import User
@@ -177,6 +178,11 @@ async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSumm
 # --- Overview (the dashboard page) --------------------------------------------------
 
 PERIODS = (7, 30, 90)
+APPROVAL_STAGE_STATUSES = (
+    PostStatus.CONTENT_REVIEW,
+    PostStatus.PENDING_APPROVAL,
+    PostStatus.CHANGES_REQUESTED,
+)
 PIPELINE = {
     "draft": (PostStatus.DRAFT,),
     "design": (
@@ -224,7 +230,12 @@ async def _metric(
 
 
 async def overview(
-    db: AsyncSession, organization_id: uuid.UUID, days: int = 7
+    db: AsyncSession,
+    organization_id: uuid.UUID,
+    days: int = 7,
+    *,
+    role: Role = Role.ADMIN,
+    user_id: uuid.UUID | None = None,
 ) -> DashboardOverview:
     """Everything the dashboard page shows, for the last `days` days."""
     days = days if days in PERIODS else 7
@@ -322,9 +333,37 @@ async def overview(
             )
         )
 
-    recent = await db.scalars(
-        select(Post).where(Post.organization_id == org).order_by(Post.updated_at.desc()).limit(6)
-    )
+    # Admins see everything (with who wrote it); creators their own posts; viewers
+    # nothing that is in an approval stage.
+    recent_query = select(Post).where(Post.organization_id == org)
+    if role == Role.CREATOR:
+        recent_query = recent_query.where(Post.created_by == user_id)
+    elif role == Role.VIEWER:
+        recent_query = recent_query.where(Post.status.notin_(APPROVAL_STAGE_STATUSES))
+    recent = await db.scalars(recent_query.order_by(Post.updated_at.desc()).limit(8))
+
+    recent_list = list(recent)
+    copy_by_post: dict[uuid.UUID, str] = {}
+    creator_by_post: dict[uuid.UUID, str] = {}
+    if role == Role.ADMIN and recent_list:
+        people = await db.execute(
+            select(User.id, User.full_name, User.email).where(
+                User.id.in_({p.created_by for p in recent_list if p.created_by})
+            )
+        )
+        names = {r[0]: (r[1] or r[2]) for r in people}
+        creator_by_post = {p.id: names[p.created_by] for p in recent_list if p.created_by in names}
+    if recent_list:
+        rows = await db.execute(
+            select(
+                PostVersion.post_id, PostVersion.version_number, PostVersion.hook, PostVersion.body
+            ).where(PostVersion.post_id.in_([p.id for p in recent_list]))
+        )
+        versions = {(r[0], r[1]): " ".join(f"{r[2] or ''} {r[3] or ''}".split()) for r in rows}
+        for p in recent_list:
+            text = versions.get((p.id, p.current_version))
+            if text:
+                copy_by_post[p.id] = text[:240]
 
     return DashboardOverview(
         days=days,
@@ -346,7 +385,10 @@ async def overview(
                 platform=str(p.platform),
                 status=str(p.status),
                 updated_at=p.updated_at,
+                excerpt=copy_by_post.get(p.id),
+                version=p.current_version,
+                creator_name=creator_by_post.get(p.id),
             )
-            for p in recent
+            for p in recent_list
         ],
     )

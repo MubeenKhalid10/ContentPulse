@@ -71,6 +71,8 @@ services:
         sync: false
 
       # Design files: Supabase Storage through its S3-compatible endpoint.
+      # Required to keep uploads: without S3_BUCKET they go to the container's
+      # disk, which Render wipes on every redeploy and restart.
       - key: S3_BUCKET
         sync: false
       - key: S3_ENDPOINT_URL

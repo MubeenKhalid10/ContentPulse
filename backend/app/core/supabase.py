@@ -62,6 +62,36 @@ class JWKSCache:
 jwks_cache = JWKSCache()
 
 
+async def _fetch_auth_user(token: str, settings: Settings) -> dict[str, Any]:
+    url = f"{(settings.supabase_url or '').rstrip('/')}/auth/v1/user"
+    headers = {"Authorization": f"Bearer {token}", "apikey": settings.supabase_anon_key or ""}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, headers=headers)
+        if resp.status_code in (401, 403):
+            raise Unauthorized("Session expired. Please sign in again.")
+        resp.raise_for_status()
+        body = resp.json()
+        if not isinstance(body, dict):
+            raise ValueError("unexpected response body")
+        return body
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("Could not load the Supabase user: %s", exc)
+        raise ServiceUnavailable("Could not verify the sign-in. Try again shortly.") from exc
+
+
+async def email_confirmed(token: str, settings: Settings) -> bool:
+    """Whether Supabase has confirmed this identity's email.
+
+    Asked of Supabase itself: `user_metadata` in the token is editable by the
+    user (supabase.auth.updateUser), so its `email_verified` proves nothing.
+    """
+    if not settings.supabase_url or not settings.supabase_anon_key:
+        raise Unauthorized("Supabase sign-in is not configured.")
+    user = await _fetch_auth_user(token, settings)
+    return bool(user.get("email_confirmed_at"))
+
+
 async def verify_supabase_token(token: str, settings: Settings) -> dict[str, Any]:
     try:
         header = jwt.get_unverified_header(token)

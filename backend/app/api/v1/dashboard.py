@@ -33,4 +33,6 @@ async def overview(
     db: DB,
     days: Annotated[int, Query(description="Period length: 7, 30 or 90 days")] = 7,
 ) -> DashboardOverview:
-    return await dashboard_service.overview(db, ctx.organization_id, days)
+    return await dashboard_service.overview(
+        db, ctx.organization_id, days, role=ctx.membership.role, user_id=ctx.user.id
+    )

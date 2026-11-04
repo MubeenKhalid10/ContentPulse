@@ -36,6 +36,26 @@ def test_sslmode_disable_and_other_params_kept():
     assert url.endswith("/app?application_name=cp")
 
 
+def test_verify_full_with_root_cert_verifies_against_that_ca(tmp_path):
+    import certifi
+
+    cafile = tmp_path / "ca.crt"
+    cafile.write_bytes(open(certifi.where(), "rb").read())
+    url, args = async_database_url(
+        f"postgresql://u:p@aws-0-eu.pooler.supabase.com:5432/postgres"
+        f"?sslmode=verify-full&sslrootcert={cafile}"
+    )
+    assert "sslrootcert" not in url and "sslmode" not in url
+    context = args["ssl"]
+    assert context.verify_mode == ssl.CERT_REQUIRED and context.check_hostname
+    assert context.cert_store_stats()["x509_ca"] > 0
+
+
+def test_require_keeps_encryption_without_verification():
+    _, args = async_database_url("postgres://u:p@db.example.com/app?sslmode=require")
+    assert args["ssl"].verify_mode == ssl.CERT_NONE
+
+
 def test_cors_origins_accept_plain_or_json(monkeypatch):
     from app.core.config import Settings
 

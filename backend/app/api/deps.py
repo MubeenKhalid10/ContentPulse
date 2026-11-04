@@ -108,9 +108,11 @@ async def _fused_org_context(
     token = _extract_token(request, settings)
     if not token or organization_id is None:
         return None
+    local_claims: dict | None = None
     if settings.auth_provider == "local":
         try:
-            who = User.id == uuid.UUID(decode_local_token(token, settings)["sub"])
+            local_claims = decode_local_token(token, settings)
+            who = User.id == uuid.UUID(local_claims["sub"])
         except ValueError:
             return None
     else:
@@ -129,6 +131,9 @@ async def _fused_org_context(
         )
     ).first()
     if row is None or not row[0].is_active:
+        return None
+    # A session ended by sign-out or a password change: let the regular path reject it.
+    if local_claims is not None and local_claims.get("ver", 0) != row[0].token_version:
         return None
     user, membership, organization = row
     return OrgContext(user=user, organization=organization, membership=membership)

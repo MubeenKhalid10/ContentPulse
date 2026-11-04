@@ -19,7 +19,7 @@ from app.core.security import (
     read_password_reset_token,
     verify_password,
 )
-from app.core.supabase import verify_supabase_token
+from app.core.supabase import email_confirmed, verify_supabase_token
 from app.models.enums import AuthProvider, MemberStatus
 from app.models.organization import Organization, OrganizationMember
 from app.models.user import User
@@ -184,14 +184,16 @@ async def user_from_token(db: AsyncSession, token: str, settings: Settings) -> U
             raise Unauthorized("Session expired. Please sign in again.")
     else:
         claims = await verify_supabase_token(token, settings)
-        user = await _resolve_supabase_user(db, claims)
+        user = await _resolve_supabase_user(db, claims, token, settings)
 
     if user is None or not user.is_active:
         raise Unauthorized("Account not found or disabled.")
     return user
 
 
-async def _resolve_supabase_user(db: AsyncSession, claims: dict) -> User:
+async def _resolve_supabase_user(
+    db: AsyncSession, claims: dict, token: str, settings: Settings
+) -> User:
     """Link a Supabase identity to a platform user, provisioning on first sight."""
     subject = str(claims["sub"])
     user = await db.scalar(select(User).where(User.external_auth_id == subject))
@@ -201,17 +203,17 @@ async def _resolve_supabase_user(db: AsyncSession, claims: dict) -> User:
     email = claims.get("email")
     if not email:
         raise Unauthorized("Identity token has no email claim.")
+    # Whoever links first owns the email here (invites, reclaiming an account),
+    # so only an identity whose email Supabase has confirmed may link.
+    if not await email_confirmed(token, settings):
+        raise Unauthorized("Confirm your email first: check your inbox for the link.")
     user = await get_user_by_email(db, email)
     if user is None:
         user = User(email=normalize_email(email), auth_provider=AuthProvider.SUPABASE)
         db.add(user)
-    else:
-        if not (claims.get("user_metadata") or {}).get("email_verified"):
-            raise Unauthorized("Confirm your email first: check your inbox for the link.")
-        # Supabase identities can be deleted and recreated. A verified
-        # same-email identity may reclaim the existing platform user so their
-        # organizations and roles are preserved; an unverified claim above
-        # cannot take over that user.
+    # Otherwise: Supabase identities can be deleted and recreated. A confirmed
+    # same-email identity reclaims the existing platform user so their
+    # organizations and roles are preserved.
     user.external_auth_id = subject
     user.auth_provider = AuthProvider.SUPABASE
     if not user.full_name:

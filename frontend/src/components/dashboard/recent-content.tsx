@@ -18,7 +18,7 @@ import type { DashboardOverview, DashboardSummary } from "@/types/api";
 
 export function RecentContent({ data }: { data?: DashboardOverview }) {
   return (
-    <Card>
+    <Card className="h-full xl:flex xl:flex-col">
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <CardTitle>Recent content</CardTitle>
@@ -30,7 +30,7 @@ export function RecentContent({ data }: { data?: DashboardOverview }) {
           </Link>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
         {!data ? (
           <Skeleton className="h-40 w-full" />
         ) : data.recent_posts.length === 0 ? (
@@ -43,23 +43,36 @@ export function RecentContent({ data }: { data?: DashboardOverview }) {
               <li key={p.id}>
                 <Link
                   href={withFrom(`/posts/${p.id}`, "/dashboard")}
-                  className="-mx-2 grid gap-1.5 rounded-md px-2 py-2.5 hover:bg-muted/60"
+                  className="-mx-2 grid gap-1.5 rounded-md px-2 py-3 hover:bg-muted/60"
                 >
-                  <span className="truncate text-sm font-medium">
-                    {p.title?.trim() || "Untitled post"}
-                  </span>
                   <span className="flex flex-wrap items-center gap-2">
-                    <PlatformTag platform={p.platform} />
+                    <span className="truncate text-sm font-semibold">
+                      {p.title?.trim() || "Untitled post"}
+                    </span>
                     <Tag tone={POST_STATUS_TONE[p.status]} dot>
                       {postStatusLabel(p)}
                     </Tag>
-                    <time
-                      dateTime={p.updated_at}
-                      className="ml-auto text-xs text-muted-foreground"
-                    >
-                      {timeAgo(p.updated_at)}
-                    </time>
                   </span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <PlatformTag platform={p.platform} />
+                    {p.creator_name && (
+                      <span className="ml-auto">
+                        <Tag tone="neutral">{p.creator_name}</Tag>
+                      </span>
+                    )}
+                  </span>
+                  {p.excerpt && (
+                    <span className="line-clamp-2 text-sm text-muted-foreground">
+                      {p.excerpt}
+                    </span>
+                  )}
+                  <time
+                    dateTime={p.updated_at}
+                    className="text-xs text-muted-foreground"
+                  >
+                    {p.version > 0 ? `Version ${p.version} · ` : ""}
+                    Updated {timeAgo(p.updated_at)}
+                  </time>
                 </Link>
               </li>
             ))}

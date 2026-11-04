@@ -73,6 +73,9 @@ class PostBrief(BaseModel):
     platform: str
     status: str
     updated_at: datetime
+    excerpt: str | None = None
+    version: int = 0
+    creator_name: str | None = None
 
 
 class DashboardOverview(BaseModel):

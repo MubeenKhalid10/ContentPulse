@@ -803,3 +803,25 @@ async def test_post_colors_override_the_brand_for_this_post_only(
     assert (await viewer.patch(url, json={"colors": ["#000000"]})).status_code == 403
     too_many = await admin.patch(url, json={"colors": [f"#00000{i:x}" for i in range(13)]})
     assert too_many.status_code == 422
+
+
+async def test_a_failed_local_store_leaves_no_temp_file(client, tmp_path, monkeypatch):
+    from app.core.config import get_settings
+    from app.storage import set_storage
+    from app.storage.local import LocalStorage
+
+    monkeypatch.setattr(get_settings(), "local_storage_dir", str(tmp_path))
+    storage = LocalStorage(get_settings())
+    set_storage(storage)
+    try:
+        target = await storage.upload_target("designs/x.png", "image/png", 1_000)
+
+        def broken_write(key, chunks_path, content_type):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(storage, "write", broken_write)
+        with pytest.raises(OSError):
+            await client.put(target.url, content=PNG, headers=target.headers)
+        assert list((tmp_path / ".incoming").iterdir()) == []
+    finally:
+        set_storage(None)
