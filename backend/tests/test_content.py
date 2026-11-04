@@ -389,6 +389,24 @@ async def test_empty_post_cant_move_on(client, internet, content_ai):
     assert resp.status_code == 409
 
 
+async def test_copy_over_the_platform_limits_cant_be_submitted(client, internet, content_ai):
+    admin, org = await setup_org(client)
+    post = await generated(admin, await approved_strategy(admin, org))
+    url = f"{API}/{post['id']}"
+    limit = post["limits"]["max_length"]
+    assert limit  # the playbook's default for the platform
+    long = await admin.patch(url, json={"base_version": 1, "body": "word " * (limit // 4)})
+    assert long.status_code == 200
+    blocked = await admin.post(f"{url}/submit-for-review")
+    assert blocked.status_code == 422, blocked.text
+    assert "over the" in blocked.json()["error"]["message"]
+    assert (await admin.get(url)).json()["status"] == "draft"
+    fixed = await admin.patch(url, json={"base_version": 2, "body": "Short and sweet."})
+    assert fixed.status_code == 200
+    ok = await admin.post(f"{url}/submit-for-review")
+    assert ok.status_code == 200 and ok.json()["status"] == "content_review"
+
+
 async def test_filters(client, internet, content_ai):
     admin, org = await setup_org(client)
     post = await generated(admin, await approved_strategy(admin, org))
