@@ -36,12 +36,18 @@ function useOrgQuery<T>(
   key: (id: string) => readonly unknown[],
   path: (id: string) => string,
   enabled = true,
+  live?: { refetchInterval: number },
 ) {
   const orgId = useOrgId();
   return useQuery({
     queryKey: key(orgId ?? "none"),
     queryFn: () => api<T>(path(orgId!)),
     enabled: !!orgId && enabled,
+    ...(live && {
+      refetchInterval: live.refetchInterval,
+      refetchOnWindowFocus: true,
+      staleTime: 5_000,
+    }),
   });
 }
 
@@ -59,6 +65,9 @@ export const useAttention = () =>
   useOrgQuery<Attention>(
     (id) => [...keys.dashboard(id), "attention"],
     () => "/dashboard/attention",
+    true,
+    // Other people's work changes these too (a creator submits, another admin decides).
+    { refetchInterval: 30_000 },
   );
 /** The dashboard page: metrics for the last `days` days (7, 30 or 90). */
 export const useDashboardOverview = (days: number) =>

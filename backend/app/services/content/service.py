@@ -49,7 +49,7 @@ from app.services import audit
 from app.services.approvals import workflow as approvals
 from app.services.audit import AuditAction
 from app.services.content import blog, generation
-from app.services.content.copy import check_copy
+from app.services.content.copy import check_copy, limit_problems
 from app.services.design import brief_state
 from app.services.design import service as design
 from app.services.design.lookup import current_brief
@@ -669,6 +669,30 @@ ACTIONS: dict[str, PostStatus] = {
 }
 
 
+async def _require_within_limits(db: AsyncSession, organization_id: uuid.UUID, post: Post) -> None:
+    """Copy over the admin's platform limits can't be sent for approval."""
+    current = await _current(db, post)
+    if current is None:
+        return
+    rule = (await get_rules(db, organization_id))[Platform(post.platform)]
+    problems = limit_problems(
+        hook=current.hook,
+        body=current.body,
+        cta=current.cta,
+        hashtags=list(current.hashtags or []),
+        max_length=rule.max_length,
+        # Blog posts carry no hashtags in the editor; only the length limit applies.
+        hashtag_limit=None if post.platform == Platform.BLOG else rule.hashtag_limit,
+        platform_label=PLATFORM_LABELS[post.platform],
+    )
+    if problems:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "This copy is over your platform limits: " + " ".join(problems),
+            details=[{"field": "copy", "message": p} for p in problems],
+        )
+
+
 async def transition(
     db: AsyncSession,
     organization_id: uuid.UUID,
@@ -695,6 +719,7 @@ async def transition(
             raise InvalidStateTransition("Generate or write the post before moving it on.")
         if await generation.active_job(db, post.id):
             raise Conflict("This post is being generated. Wait for it to finish.")
+        await _require_within_limits(db, organization_id, post)
     previous = post.status
     if target == P.CONTENT_REVIEW:
         await approvals.submit_copy(db, post, user_id)
@@ -721,6 +746,7 @@ async def resubmit(
     post = await _get_post(db, organization_id, post_id, lock=True)
     if await generation.active_job(db, post.id):
         raise Conflict("This post is being generated. Wait for it to finish.")
+    await _require_within_limits(db, organization_id, post)
     await approvals.submit_post(db, post, user_id, note)
     await db.commit()
     return await post_detail(db, organization_id, post.id)

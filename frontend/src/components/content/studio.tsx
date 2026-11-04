@@ -60,7 +60,7 @@ import { useResubmitPost } from "@/hooks/use-approvals";
 import { type PostAction, useCreateVariant, useDeletePost, usePost, usePostAction, useRegenerate } from "@/hooks/use-content";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { fullText, postStatusLabel } from "@/lib/content";
+import { copyLimitProblems, postStatusLabel } from "@/lib/content";
 import { PLATFORM_LABEL } from "@/lib/topics";
 import type { PostDetail } from "@/types/api";
 
@@ -149,7 +149,7 @@ export function ContentStudio({ id }: { id: string }) {
       <GenerationBanner post={p} canGenerate={canGenerate} generating={generating} />
       <LockedNotice post={p} />
       <ReviewBanner review={p.review} request={p.change_request}>
-        {p.status === "changes_requested" && canEdit && <ResubmitControl postId={p.id} />}
+        {p.status === "changes_requested" && canEdit && <ResubmitControl post={p} />}
       </ReviewBanner>
 
       {p.current ? (
@@ -224,7 +224,22 @@ function LockedNotice({ post }: { post: PostDetail }) {
   );
 }
 
-function ResubmitControl({ postId }: { postId: string }) {
+/** Says why submitting is switched off: the copy is over the admin's platform limits. */
+function LimitNotice({ problems }: { problems: string[] }) {
+  return (
+    <div role="alert" className="max-w-sm text-right text-xs text-destructive">
+      <p className="font-medium">Can&apos;t submit: over the platform limit.</p>
+      {problems.map((p) => (
+        <p key={p}>{p}</p>
+      ))}
+      <p className="text-muted-foreground">Shorten it, save, then submit.</p>
+    </div>
+  );
+}
+
+function ResubmitControl({ post }: { post: PostDetail }) {
+  const postId = post.id;
+  const limitProblems = copyLimitProblems(post.current, post.limits, post.platform);
   const resubmit = useResubmitPost();
   const [note, setNote] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -244,10 +259,23 @@ function ResubmitControl({ postId }: { postId: string }) {
         onChange={(e) => setNote(e.target.value)}
         className="min-w-48 flex-1 bg-background"
       />
-      <Button type="submit" size="sm" disabled={resubmit.isPending} pending={resubmit.isPending}>
+      <Button
+        type="submit"
+        size="sm"
+        disabled={resubmit.isPending || limitProblems.length > 0}
+        pending={resubmit.isPending}
+      >
         <SendIcon />
         {resubmit.isPending ? "Resubmitting…" : "Resubmit for approval"}
       </Button>
+      {limitProblems.length > 0 && (
+        <div role="alert" className="w-full text-xs text-destructive">
+          <p className="font-medium">Can&apos;t resubmit: over the platform limit.</p>
+          {limitProblems.map((p) => (
+            <p key={p}>{p}</p>
+          ))}
+        </div>
+      )}
       <span className="w-full text-xs text-muted-foreground">
         Save your edits first: unsaved changes are not sent. Fixed the copy? Resubmit with the current design. Need
         a new design? Use “Update design” at the top.
@@ -389,11 +417,8 @@ function StudioActions({
     action.mutate({ id: post.id, action: kind }, { onSuccess: () => toast.success(ACTION_COPY[kind]), onError });
   const busy = action.isPending || generating;
   const hasCopy = post.current_version > 0;
-  const copyLength = post.current
-    ? fullText(post.current.hook, post.current.body, post.current.cta, post.current.hashtags).length
-    : 0;
-  const overCharacterLimit =
-    post.limits.max_length != null && copyLength > post.limits.max_length;
+  // The admin's limits for this platform: copy over them can't be sent for approval.
+  const limitProblems = copyLimitProblems(post.current, post.limits, post.platform);
   const s = post.status;
   const canVariant = canGenerate && post.editable && !!post.content_strategy_id;
   // Withdrawing from review is the writer's call; taking a post back from
@@ -430,7 +455,7 @@ function StudioActions({
         {canEdit && s === "draft" && (
           <Button
             size="sm"
-            disabled={busy || !hasCopy || overCharacterLimit}
+            disabled={busy || !hasCopy || limitProblems.length > 0}
             pending={action.isPending && action.variables?.action === "submit-for-review"}
             onClick={() => setConfirm("submit")}
           >
@@ -542,6 +567,7 @@ function StudioActions({
       {canEdit && s === "draft" && !hasCopy && (
         <span className="text-right text-xs text-muted-foreground">Write the copy first to submit it for approval.</span>
       )}
+      {canEdit && s === "draft" && limitProblems.length > 0 && <LimitNotice problems={limitProblems} />}
     </div>
   );
 }

@@ -91,16 +91,23 @@ export function ReviewPage({ id }: { id: string }) {
 
       <ChangeRequestNotice request={a.change_request} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="grid min-w-0 grid-cols-1 content-start gap-6 lg:col-span-2">
+      {/* A post that is ready to publish shows only its preview. */}
+      {a.post.status === "final" ? (
+        <div className="mx-auto grid w-full max-w-3xl min-w-0 gap-6">
           <PreviewCard approval={a} />
         </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-1 content-start gap-6 lg:col-span-2">
+            <PreviewCard approval={a} />
+          </div>
 
-        <div className="grid min-w-0 grid-cols-1 content-start gap-6">
-          <DecisionCard approval={a} />
-          <CommentsCard approval={a} />
+          <div className="grid min-w-0 grid-cols-1 content-start gap-6">
+            <DecisionCard approval={a} />
+            <CommentsCard approval={a} />
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

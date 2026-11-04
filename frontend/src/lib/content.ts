@@ -1,4 +1,5 @@
-import type { DesignFormat, PostStatus } from "@/types/api";
+import { PLATFORM_LABEL } from "@/lib/topics";
+import type { DesignFormat, Platform, PostStatus } from "@/types/api";
 
 /** Status tags. Each says in words where the post is (color is a hint only),
  * and content vs design approval are never both called "approval". */
@@ -73,6 +74,30 @@ export function wordCount(...parts: (string | null | undefined)[]) {
 }
 
 /** The post as it would be published; matches the backend's length check. */
+/** Why this copy can't be sent for approval: it is over the admin's limits for the platform. */
+export function copyLimitProblems(
+  copy: { hook?: string | null; body?: string | null; cta?: string | null; hashtags: string[] } | null | undefined,
+  limits: { max_length: number | null; hashtag_limit: number | null },
+  platform: Platform,
+): string[] {
+  if (!copy) return [];
+  const label = PLATFORM_LABEL[platform];
+  const problems: string[] = [];
+  const length = fullText(copy.hook, copy.body, copy.cta, copy.hashtags).length;
+  if (limits.max_length != null && length > limits.max_length) {
+    problems.push(
+      `${length.toLocaleString()} characters: ${(length - limits.max_length).toLocaleString()} over the ${label} limit of ${limits.max_length.toLocaleString()}.`,
+    );
+  }
+  // Blog posts carry no hashtags in the editor, so only the length limit applies there.
+  if (platform !== "blog" && limits.hashtag_limit != null && copy.hashtags.length > limits.hashtag_limit) {
+    problems.push(
+      `${copy.hashtags.length} hashtags: ${label} allows ${limits.hashtag_limit}.`,
+    );
+  }
+  return problems;
+}
+
 export function fullText(hook?: string | null, body?: string | null, cta?: string | null, hashtags: string[] = []) {
   const parts = [hook, body, cta].map((p) => p?.trim()).filter(Boolean) as string[];
   if (hashtags.length) parts.push(hashtags.join(" "));

@@ -92,12 +92,12 @@ function Caption({ text, platform, lead }: { text: string; platform: Social; lea
 }
 
 /** The creative as the feed shows it: one image, or a swipeable carousel. */
-function Media({ files, square = false }: { files: CreativeFile[]; square?: boolean }) {
+function Media({ files }: { files: CreativeFile[] }) {
   if (!files.length) return null;
   const renderFile = (f: CreativeFile, n: number) =>
     f.file_type.startsWith("image/") ? (
       // Signed, short-lived URLs: next/image can't optimize them.
-      <SignedImage src={f.url} alt={files.length > 1 ? `Design, image ${n + 1} of ${files.length}` : "Design"} className={cn("w-full bg-muted object-cover", square ? "aspect-square" : "max-h-[34rem] object-contain")} />
+      <SignedImage src={f.url} alt={files.length > 1 ? `Design, image ${n + 1} of ${files.length}` : "Design"} className="max-h-[34rem] w-full bg-muted object-contain" />
     ) : f.file_type.startsWith("video/") ? (
       <video src={f.url} controls className="max-h-[34rem] w-full bg-black" aria-label={f.file_name} />
     ) : (
@@ -176,7 +176,7 @@ function SocialPostFrame({ platform, text, files }: { platform: Social; text: st
           <Avatar name={name} logo={logo} size="size-8" />
           <span className="text-sm font-semibold">{handle.slice(1)}</span>
         </header>
-        <Media files={files} square />
+        <Media files={files} />
         <div className="grid gap-2 px-3 py-2.5">
           <div className="flex items-center gap-4">
             <HeartIcon className="size-5" />
