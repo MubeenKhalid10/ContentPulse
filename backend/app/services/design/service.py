@@ -603,7 +603,7 @@ def _content_type(file_name: str, declared: str) -> str:
     if content_type not in ALLOWED_TYPES:
         raise _file_error(
             f"“{file_name}” isn't a supported file. Upload images (PNG, JPG, WebP, GIF, "
-            "SVG), PDFs or videos (MP4, MOV, WebM)."
+            "SVG) or videos (MP4, MOV, WebM)."
         )
     return content_type
 

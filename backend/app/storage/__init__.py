@@ -15,14 +15,13 @@ from typing import Protocol
 from app.core.config import Settings, get_settings
 from app.core.logging import logger
 
-# Creatives designers deliver: images, PDFs (print/slide decks) and short videos.
+# Creatives designers deliver: images and short videos (no documents such as PDF or DOC).
 ALLOWED_TYPES = {
     "image/png",
     "image/jpeg",
     "image/webp",
     "image/gif",
     "image/svg+xml",
-    "application/pdf",
     "video/mp4",
     "video/quicktime",
     "video/webm",

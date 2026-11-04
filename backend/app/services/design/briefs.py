@@ -30,7 +30,7 @@ from app.workers.tasks import enqueue, schedule_retry
 JOB_TYPE = "design_brief"
 # Recommended canvas per platform and format.
 DIMENSIONS: dict[tuple[Platform, str], str] = {
-    (Platform.LINKEDIN, "carousel"): "1080×1350 (4:5), exported as PDF",
+    (Platform.LINKEDIN, "carousel"): "1080×1350 (4:5), one image per slide",
     (Platform.LINKEDIN, "single_image"): "1200×1200 (1:1)",
     (Platform.LINKEDIN, "infographic"): "1080×1350 (4:5)",
     (Platform.LINKEDIN, "video"): "1920×1080 (16:9)",

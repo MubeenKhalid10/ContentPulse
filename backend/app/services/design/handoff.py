@@ -21,7 +21,7 @@ from app.services.topics.platforms import PLATFORM_LABELS
 # What each platform needs from the exported file, and what its UI covers.
 PLATFORM_SPECS: dict[Platform, dict[str, str]] = {
     Platform.LINKEDIN: {
-        "files": "PNG or JPG for images (under 5 MB each); PDF for carousels (under 100 MB); "
+        "files": "PNG or JPG for images (under 5 MB each), one file per carousel slide; "
         "MP4 for video.",
         "safe_zone": "Keep key text 60 px from every edge. The feed crops previews to 1.91:1, so "
         "don't put essentials only at the top or bottom of tall images.",
@@ -84,8 +84,6 @@ def _file_names(t: TaskDetail) -> str:
     if t.format in ("carousel", "reel", "video") and t.slide_structure:
         n = len(t.slide_structure)
         names = f"`{base}_v1_01.png` … `{base}_v1_{n:02d}.png`"
-        if t.format == "carousel" and t.post.platform == Platform.LINKEDIN:
-            names += f" (plus one combined `{base}_v1.pdf`)"
         return names
     return f"`{base}_v1.png`"
 
