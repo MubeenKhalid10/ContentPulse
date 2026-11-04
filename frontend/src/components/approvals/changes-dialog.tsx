@@ -39,6 +39,9 @@ export function ChangesDialog({
   const approved = a.status === "approved";
   const mutation = approved ? reopen : changes;
   const copyStage = a.stage === "copy";
+  const MIN_NOTE = 10;
+  const used = note.trim().length;
+  const tooShort = used < MIN_NOTE;
   return (
     <AlertDialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
       <AlertDialogContent>
@@ -60,18 +63,26 @@ export function ChangesDialog({
           rows={4}
           maxLength={4000}
           placeholder="e.g. Shorten the headline and use the brand blue on slide 3."
-          required
-          minLength={10}
+          aria-describedby={tooShort ? "changes-min-length" : undefined}
           disabled={mutation.isPending}
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
         <p className="-mt-2 text-right text-xs tabular-nums text-muted-foreground">{note.length} / 4000</p>
+        {tooShort && (
+          <p
+            id="changes-min-length"
+            role="status"
+            className="rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-medium text-amber-950 dark:border-amber-500/50 dark:bg-amber-500/15 dark:text-amber-100"
+          >
+            Please use at least {MIN_NOTE} characters to request changes (you are currently using {used}).
+          </p>
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={mutation.isPending}>Cancel</AlertDialogCancel>
           {/* A plain button: the dialog stays open if the request fails. */}
           <Button
-            disabled={note.trim().length < 10 || mutation.isPending}
+            disabled={tooShort || mutation.isPending}
             pending={mutation.isPending}
             onClick={() =>
               mutation.mutate(
