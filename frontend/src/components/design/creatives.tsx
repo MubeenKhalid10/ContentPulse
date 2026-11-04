@@ -26,6 +26,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ConfirmDialog } from "@/components/content/confirm-dialog";
 import {
   useDeleteCreativeVersion,
+  useCancelImage,
   useGenerateImage,
   useSubmitTask,
   useUploadCreatives,
@@ -44,7 +45,6 @@ const TYPE_NAMES: Record<string, string> = {
   "image/webp": "WebP",
   "image/gif": "GIF",
   "image/svg+xml": "SVG",
-  "application/pdf": "PDF",
   "video/mp4": "MP4",
   "video/quicktime": "MOV",
   "video/webm": "WebM",
@@ -94,6 +94,8 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
   const generate = useGenerateImage();
   const drawing =
     generate.isPending || task.image_job?.status === "queued" || task.image_job?.status === "running";
+  // Uploading, submitting or drawing an AI image: files can't be added or sent meanwhile.
+  const locked = busy || drawing;
 
   const send = async (andSubmit: boolean) => {
     setSubmitting(andSubmit);
@@ -154,20 +156,23 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
         )}
         <button
           type="button"
+          // Locked while files are uploading or being submitted, or an AI image is being made.
+          disabled={locked}
           onClick={() => input.current?.click()}
           onDragOver={(e) => {
             e.preventDefault();
-            setDragging(true);
+            if (!locked) setDragging(true);
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
-            add(e.dataTransfer.files);
+            if (!locked) add(e.dataTransfer.files);
           }}
           className={cn(
             "grid justify-items-center gap-1.5 rounded-xl border border-dashed p-6 text-center text-sm transition-colors hover:bg-muted/50",
             dragging && "border-primary bg-primary/5",
+            locked && "pointer-events-none cursor-not-allowed opacity-50",
           )}
         >
           <UploadCloudIcon className="size-6 text-muted-foreground" />
@@ -182,6 +187,7 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
           multiple
           accept={task.allowed_types.join(",")}
           className="sr-only"
+          disabled={locked}
           aria-label="Choose design files"
           onChange={(e) => {
             add(e.target.files);
@@ -199,7 +205,7 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
                   size="icon-sm"
                   variant="ghost"
                   aria-label={`Remove ${file.name}`}
-                  disabled={upload.isPending}
+                  disabled={locked}
                   onClick={() => setFiles((current) => current.filter((_, j) => j !== i))}
                 >
                   <XIcon />
@@ -208,7 +214,7 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
             ))}
           </ol>
         )}
-        <Input aria-label="Note for this version" placeholder="Note for reviewers (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+        <Input aria-label="Note for this version" placeholder="Note for reviewers (optional)" disabled={locked} value={note} onChange={(e) => setNote(e.target.value)} />
         {upload.isPending && (
           <div className="grid gap-1" role="status">
             <div
@@ -230,7 +236,7 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
           <div className="grid gap-1.5">
             <Button
               onClick={() => send(true)}
-              disabled={busy || drawing || (!files.length && !canResubmitCurrent)}
+              disabled={locked || (!files.length && !canResubmitCurrent)}
               pending={busy && submitting}
             >
               <SendIcon />
@@ -250,14 +256,14 @@ export function CreativeUploader({ task, canSubmit }: { task: DesignTaskDetail; 
               Submitting locks the design until an admin approves it or asks for changes.
             </p>
             {files.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => send(false)} disabled={busy} pending={busy && !submitting}>
+              <Button variant="ghost" size="sm" onClick={() => send(false)} disabled={locked} pending={busy && !submitting}>
                 <UploadCloudIcon />
                 Upload only (don&apos;t submit yet)
               </Button>
             )}
           </div>
         ) : (
-          <Button onClick={() => send(false)} disabled={!files.length || busy} pending={busy}>
+          <Button onClick={() => send(false)} disabled={!files.length || locked} pending={busy}>
             <UploadCloudIcon />
             {upload.isPending ? "Uploading…" : "Upload"}
           </Button>
@@ -309,16 +315,18 @@ function GenerateImage({
 }) {
   const job = task.image_job;
   const status = job?.status;
+  const cancel = useCancelImage();
+  const cancelled = status === "failed" && job?.error === "Image generation was cancelled.";
   // Say how it ended, since the person may have scrolled away while it was drawing.
   const wasRunning = useRef(false);
   useEffect(() => {
     if (wasRunning.current && status === "succeeded") {
       toast.success("AI image ready", { description: "Check it under Design versions, then submit it." });
-    } else if (wasRunning.current && status === "failed") {
+    } else if (wasRunning.current && status === "failed" && !cancelled) {
       toast.error("The AI image couldn't be created");
     }
     wasRunning.current = status === "queued" || status === "running";
-  }, [status]);
+  }, [status, cancelled]);
   return (
     <div className="grid gap-2">
       <Button
@@ -334,12 +342,33 @@ function GenerateImage({
         {drawing ? <LoaderCircleIcon className="animate-spin" /> : <SparklesIcon />}
         {drawing ? "Creating image…" : "Generate image with AI"}
       </Button>
+      {drawing && (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={cancel.isPending || generate.isPending}
+          pending={cancel.isPending}
+          onClick={() =>
+            cancel.mutate(task.id, {
+              onSuccess: () => toast.success("Image generation cancelled"),
+              onError: (e) => toast.error(errorMessage(e)),
+            })
+          }
+        >
+          <XIcon />
+          Cancel image generation
+        </Button>
+      )}
       {unsent && !drawing && (
         <p className="text-xs text-muted-foreground">A design is already uploaded. Remove it to generate one with AI.</p>
       )}
       {drawing ? (
         <p className="text-xs text-muted-foreground" role="status">
           Using the brief, the post and this post&apos;s colors. This usually takes under a minute.
+        </p>
+      ) : cancelled ? (
+        <p className="text-xs text-muted-foreground" role="status">
+          Image generation was cancelled. Generate again, or upload your own files below.
         </p>
       ) : job?.status === "failed" ? (
         <Alert variant="destructive">

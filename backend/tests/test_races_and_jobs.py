@@ -153,6 +153,33 @@ async def test_an_image_that_arrives_after_the_post_was_archived_is_dropped(
     assert detail["status"] == "archived"
 
 
+async def test_cancelling_an_ai_image_drops_it_when_it_arrives(client, internet, db):
+    images = BlockedImages()
+    set_ai_provider(DesignAI())
+    set_image_provider(images)
+    try:
+        admin, org = await setup_org(client)
+        _, task = await in_design(admin, org)
+        assert (await admin.post(f"{TASKS}/{task['id']}/generate-image")).status_code == 202
+        await asyncio.wait_for(images.started.wait(), 10)
+
+        cancelled = await admin.post(f"{TASKS}/{task['id']}/generate-image/cancel")
+        assert cancelled.status_code == 200
+        assert cancelled.json()["image_job"]["status"] == "failed"
+        images.release.set()
+        await runner.wait_idle()
+    finally:
+        set_image_provider(None)
+        set_ai_provider(None)
+
+    job = await db.scalar(select(AIGenerationJob).where(AIGenerationJob.type == "design_image"))
+    assert job.status == JobStatus.FAILED and "cancelled" in job.error
+    assert await db.scalar(select(func.count()).select_from(CreativeAsset)) == 0
+    # Cancelling again, with nothing running, is harmless.
+    again = await admin.post(f"{TASKS}/{task['id']}/generate-image/cancel")
+    assert again.status_code == 200
+
+
 class BlockedAI(ContentAI):
     """Holds the post text back until the test lets it through."""
 
