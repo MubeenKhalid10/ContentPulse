@@ -123,6 +123,12 @@ async def generate_image(task_id: uuid.UUID, ctx: CanUpload, db: DB):
     return await images.start(db, ctx.organization_id, ctx.user.id, ctx.role, task_id)
 
 
+@router.post("/{task_id}/generate-image/cancel", response_model=TaskDetail)
+async def cancel_image(task_id: uuid.UUID, ctx: CanUpload, db: DB):
+    """Stop the AI image being created for this task."""
+    return await images.cancel(db, ctx.organization_id, ctx.user.id, ctx.role, task_id)
+
+
 @router.post("/{task_id}/start", response_model=TaskDetail)
 async def start(task_id: uuid.UUID, ctx: CanUpload, db: DB):
     return await service.start(db, ctx.organization_id, ctx.user.id, ctx.role, task_id)

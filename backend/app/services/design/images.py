@@ -33,6 +33,13 @@ from app.storage import get_storage
 from app.workers.tasks import enqueue, schedule_retry
 
 JOB_TYPE = "design_image"
+CANCELLED_MESSAGE = "Image generation was cancelled."
+
+
+class _Cancelled(Exception):
+    """The person cancelled while the image was being drawn: drop the result."""
+
+
 EXTENSIONS = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 
 
@@ -143,6 +150,20 @@ async def start(
     return await design.task_detail(db, organization_id, brief.id)
 
 
+async def cancel(
+    db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, role, task_id: uuid.UUID
+) -> TaskDetail:
+    """Stop the image being generated for this task. A request already sent to the image
+    provider can't be recalled, but its picture is thrown away instead of being added."""
+    brief, _ = await design._workable(db, organization_id, user_id, role, task_id)
+    job = await active_job(db, brief.id)
+    if job is not None:
+        job.status, job.error = JobStatus.FAILED, CANCELLED_MESSAGE
+        job.completed_at = utcnow()
+        await db.commit()
+    return await design.task_detail(db, organization_id, brief.id)
+
+
 def _image_error_message(exc: AIError) -> str:
     # Our own daily cap (llm_limits.json rpd); a provider's explanation wins.
     if exc.kind == AIErrorKind.QUOTA_EXHAUSTED and not exc.public:
@@ -164,10 +185,14 @@ async def run(job_id: uuid.UUID) -> None:
         try:
             await _run(db, job)
             job.status = JobStatus.SUCCEEDED
+        except _Cancelled:
+            return  # cancel() already marked the job; nothing was added
         except AIError as exc:
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
             job = require(job, "job")
+            if job.status != JobStatus.RUNNING:
+                return  # cancelled meanwhile: don't retry or overwrite it
             if await schedule_retry(db, job, exc, "design.image"):
                 return
             logger.warning("Design image job %s failed: %s", job_id, exc.message)
@@ -178,6 +203,8 @@ async def run(job_id: uuid.UUID) -> None:
             await db.rollback()
             job = await db.get(AIGenerationJob, job_id)
             job = require(job, "job")
+            if job.status != JobStatus.RUNNING:
+                return  # cancelled meanwhile
             job.status, job.error = JobStatus.FAILED, "Image generation failed unexpectedly."
         job.completed_at = utcnow()
         await db.commit()
@@ -251,6 +278,9 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
     # waiting for a design. The raw image stays stored; nothing else changes.
     await db.refresh(post, with_for_update=True)
     await db.refresh(brief, with_for_update=True)
+    await db.refresh(job, attribute_names=["status"])
+    if job.status != JobStatus.RUNNING:
+        raise _Cancelled
     if brief.status not in design.ACTIVE or post.status not in design.UPLOADABLE:
         raise AIError(
             AIErrorKind.BAD_REQUEST, "The post isn't waiting for a design any more.", public=True
