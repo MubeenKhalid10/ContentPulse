@@ -38,8 +38,11 @@ export function useApprovals(
     queryFn: () => apiList<ApprovalPage>("/approvals", params),
     enabled: !!orgId,
     placeholderData: keepPreviousData,
-    refetchInterval: SIGNED_LINK_REFRESH_MS,
     ...signedLinkQuery,
+    // The queue and its counts also change from other people's work: keep them fresh
+    // (still well inside the signed-link lifetime).
+    staleTime: 10_000,
+    refetchInterval: 30_000,
   });
 }
 
