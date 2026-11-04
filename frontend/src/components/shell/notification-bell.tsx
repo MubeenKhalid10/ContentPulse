@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useMarkNotificationsRead, useNotifications } from "@/hooks/use-notifications";
-import { timeAgo } from "@/lib/format";
+import { dayLabel, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** Approval news for this person: change requests, resubmissions, decisions, replies. */
@@ -23,6 +23,12 @@ export function NotificationBell() {
   const markRead = useMarkNotificationsRead();
   const unread = notifications.data?.unread ?? 0;
   const items = notifications.data?.items ?? [];
+  // Newest first, split under Today / Yesterday / date headings.
+  const days = new Map<string, typeof items>();
+  for (const n of items) {
+    const day = dayLabel(n.created_at);
+    days.set(day, [...(days.get(day) ?? []), n]);
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -45,7 +51,7 @@ export function NotificationBell() {
           </span>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
+      <DropdownMenuContent align="end" className="max-h-[28rem] w-80 overflow-y-auto">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center justify-between">
             Notifications
@@ -59,27 +65,32 @@ export function NotificationBell() {
               </button>
             )}
           </DropdownMenuLabel>
-          {items.length === 0 && (
-            <p className="px-2 py-6 text-center text-sm text-muted-foreground">Nothing new.</p>
-          )}
-          {items.map((n) => (
-            <DropdownMenuItem
-              key={n.id}
-              className="items-start"
-              onClick={() => {
-                if (!n.read_at) markRead.mutate(n.id);
-                router.push(n.link);
-              }}
-            >
-              <span className="grid min-w-0 flex-1 gap-0.5 leading-snug">
-                <span className={cn("text-sm", !n.read_at && "font-medium")}>{n.title}</span>
-                {n.body && <span className="line-clamp-2 text-xs text-muted-foreground">{n.body}</span>}
-                <span className="text-xs text-muted-foreground">{timeAgo(n.created_at)}</span>
-              </span>
-              {!n.read_at && <span aria-label="Unread" className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
-            </DropdownMenuItem>
-          ))}
         </DropdownMenuGroup>
+        {items.length === 0 && (
+          <p className="px-2 py-6 text-center text-sm text-muted-foreground">Nothing new.</p>
+        )}
+        {[...days].map(([day, rows]) => (
+          <DropdownMenuGroup key={day}>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">{day}</DropdownMenuLabel>
+            {rows.map((n) => (
+              <DropdownMenuItem
+                key={n.id}
+                className="items-start"
+                onClick={() => {
+                  if (!n.read_at) markRead.mutate(n.id);
+                  router.push(n.link);
+                }}
+              >
+                <span className="grid min-w-0 flex-1 gap-0.5 leading-snug">
+                  <span className={cn("text-sm", !n.read_at && "font-medium")}>{n.title}</span>
+                  {n.body && <span className="line-clamp-2 text-xs text-muted-foreground">{n.body}</span>}
+                  <span className="text-xs text-muted-foreground">{timeAgo(n.created_at)}</span>
+                </span>
+                {!n.read_at && <span aria-label="Unread" className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuGroup>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
