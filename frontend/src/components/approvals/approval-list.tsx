@@ -40,10 +40,11 @@ import type {
 
 const PAGE = 30;
 /** Pending Approvals: what waits for a decision. Review History: what was already decided. */
-type Section = "pending" | "history";
+type Section = "pending" | "history" | "ready";
 const SECTIONS: { value: Section; label: string }[] = [
   { value: "pending", label: "Pending Approvals" },
   { value: "history", label: "Review History" },
+  { value: "ready", label: "Ready to Publish" },
 ];
 const STAGES: { value: ApprovalStage; label: string }[] = [
   { value: "copy", label: "Content" },
@@ -64,13 +65,25 @@ export function ApprovalList() {
     outcome?: ApprovalFilter;
   }>("approvals", { section: "pending", stage: "copy", platform: "" });
   // Older saved filters had other tabs ("ready", "requests"); anything unknown starts over.
-  const section: Section = saved.section === "history" ? "history" : "pending";
-  const stage: ApprovalStage = saved.stage === "design" ? "design" : "copy";
-  const platform = saved.platform ?? "";
-  const outcome: ApprovalFilter = HISTORY_FILTERS.some((f) => f.value === saved.outcome)
+  const section: Section =
+    saved.section === "history" || saved.section === "ready"
+      ? saved.section
+      : "pending";
+  // Ready to Publish is its own list: approved designs, whatever the dropdowns say.
+  const ready = section === "ready";
+  const stage: ApprovalStage =
+    ready || saved.stage === "design" ? "design" : "copy";
+  const platform = ready ? "" : (saved.platform ?? "");
+  const outcome: ApprovalFilter = HISTORY_FILTERS.some(
+    (f) => f.value === saved.outcome,
+  )
     ? saved.outcome!
     : "reviewed";
-  const shownStatus: ApprovalFilter = section === "pending" ? "pending" : outcome;
+  const shownStatus: ApprovalFilter = ready
+    ? "approved"
+    : section === "pending"
+      ? "pending"
+      : outcome;
   const patch = (next: Partial<typeof saved>) => {
     setFilters((f) => ({ ...f, ...next }));
     setLimit(PAGE);
@@ -80,6 +93,10 @@ export function ApprovalList() {
   const [limit, setLimit] = useState(PAGE);
   const approvals = useApprovals(stage, shownStatus, platform, limit);
   const counts = approvals.data?.counts;
+  // A post sent back for changes later is no longer ready: only posts still Ready to publish.
+  const items = ready
+    ? approvals.data?.items.filter((a) => a.post.status === "final")
+    : approvals.data?.items;
   const canReview = useCan()("approval.manage");
   const approveAll = useApproveAll();
   // Submissions ticked to be approved together (only while they wait for a decision).
@@ -119,8 +136,11 @@ export function ApprovalList() {
         description="Every post is approved twice: first the written copy, then the finished design."
       />
       <div className="grid min-w-0 grid-cols-1 gap-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <Tabs value={section} onValueChange={(v) => patch({ section: v as Section })}>
+        <div className="flex flex-wrap items-center gap-3 md:flex-nowrap">
+          <Tabs
+            value={section}
+            onValueChange={(v) => patch({ section: v as Section })}
+          >
             <TabsList variant="line">
               {SECTIONS.map((x) => {
                 const count =
@@ -128,7 +148,11 @@ export function ApprovalList() {
                     ? (approvals.data?.stage_pending?.[stage] ?? 0)
                     : 0;
                 return (
-                  <TabsTrigger key={x.value} value={x.value} className="text-base">
+                  <TabsTrigger
+                    key={x.value}
+                    value={x.value}
+                    className="text-base"
+                  >
                     {x.label}
                     {count > 0 && (
                       <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[11px] tabular-nums text-primary-foreground">
@@ -140,46 +164,55 @@ export function ApprovalList() {
               })}
             </TabsList>
           </Tabs>
-          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <SimpleSelect
-              aria-label="Stage"
-              value={stage}
-              onChange={(v) => patch({ stage: v })}
-              options={STAGES.map((x) => ({
-                value: x.value,
-                label:
-                  section === "pending"
-                    ? `${x.label} (${approvals.data?.stage_pending?.[x.value] ?? 0})`
-                    : x.label,
-              }))}
-              className="w-44"
-            />
-            {section === "history" && (
+          {!ready && (
+            <div className="flex flex-wrap items-center gap-2 md:ml-auto md:flex-nowrap">
               <SimpleSelect
-                aria-label="Outcome"
-                value={outcome}
-                onChange={(v) => patch({ outcome: v as ApprovalFilter })}
-                options={HISTORY_FILTERS}
-                className="w-44"
+                aria-label="Stage"
+                value={stage}
+                onChange={(v) => patch({ stage: v })}
+                options={STAGES.map((x) => ({
+                  value: x.value,
+                  label:
+                    section === "pending"
+                      ? `${x.label} (${approvals.data?.stage_pending?.[x.value] ?? 0})`
+                      : x.label,
+                }))}
+                className="w-36"
               />
-            )}
-            <SimpleSelect
-              aria-label="Platform"
-              value={platform || "all"}
-              onChange={(v) => setPlatform(v === "all" ? "" : (v as Platform))}
-              options={[{ value: "all", label: "Any platform" }, ...PLATFORM_OPTIONS]}
-              className="w-40"
-            />
-          </div>
+              {section === "history" && (
+                <SimpleSelect
+                  aria-label="Outcome"
+                  value={outcome}
+                  onChange={(v) => patch({ outcome: v as ApprovalFilter })}
+                  options={HISTORY_FILTERS}
+                  className="w-36"
+                />
+              )}
+              <SimpleSelect
+                aria-label="Platform"
+                value={platform || "all"}
+                onChange={(v) =>
+                  setPlatform(v === "all" ? "" : (v as Platform))
+                }
+                options={[
+                  { value: "all", label: "Any platform" },
+                  ...PLATFORM_OPTIONS,
+                ]}
+                className="w-36"
+              />
+            </div>
+          )}
         </div>
         <p className="-mt-3 text-sm text-muted-foreground">
-          {section === "history"
-            ? "Everything an admin already decided, with the reviewer, the date and the comments. Open one to see the whole history of the post."
-            : stage === "copy"
-              ? "Check the written post. Approving it sends the post to design."
-              : "Check the finished design with the copy. Approving the design also approves the post: it becomes Ready to publish."}
+          {ready
+            ? "Posts whose copy and design are both approved. Open one to preview it, then copy or share it."
+            : section === "history"
+              ? "Everything an admin already decided, with the reviewer, the date and the comments. Open one to see the whole history of the post."
+              : stage === "copy"
+                ? "Check the written post. Approving it sends the post to design."
+                : "Check the finished design with the copy. Approving the design also approves the post: it becomes Ready to publish."}
         </p>
-        {counts?.all === 0 && !platform ? (
+        {!ready && counts?.all === 0 && !platform ? (
           <Card>
             <CardContent className="grid justify-items-center gap-4 py-12 text-center">
               <span className="grid size-12 place-items-center rounded-full bg-muted">
@@ -187,7 +220,9 @@ export function ApprovalList() {
               </span>
               <div className="grid max-w-md gap-1.5">
                 <p className="text-lg font-medium">
-                  {stage === "copy" ? "No copy to approve yet" : "No designs to approve yet"}
+                  {stage === "copy"
+                    ? "No copy to approve yet"
+                    : "No designs to approve yet"}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {stage === "copy"
@@ -200,23 +235,35 @@ export function ApprovalList() {
         ) : (
           <>
             {approvals.isPending || isSwitchingList(approvals, limit) ? (
-              <ListLoading label="Loading approvals…" rows={3} rowClassName="h-24" />
+              <ListLoading
+                label="Loading approvals…"
+                rows={3}
+                rowClassName="h-24"
+              />
             ) : approvals.isError ? (
               <Alert variant="destructive">
                 <AlertTriangleIcon />
                 <AlertDescription className="grid gap-2">
-                  <span>Couldn&apos;t load approvals. {errorMessage(approvals.error)}</span>
-                  <Button size="sm" variant="outline" className="w-fit" onClick={() => approvals.refetch()}>
+                  <span>
+                    Couldn&apos;t load approvals.{" "}
+                    {errorMessage(approvals.error)}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-fit"
+                    onClick={() => approvals.refetch()}
+                  >
                     <RefreshCwIcon />
                     Retry
                   </Button>
                 </AlertDescription>
               </Alert>
-            ) : approvals.data?.items.length ? (
+            ) : items?.length ? (
               <>
                 <div aria-busy={approvals.isPlaceholderData}>
                   <DayGroups
-                    items={approvals.data.items}
+                    items={items}
                     dateOf={eventAt}
                     label="Approvals"
                     render={(a) => (
@@ -251,9 +298,11 @@ export function ApprovalList() {
               </>
             ) : (
               <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                {section === "history"
-                  ? "Nothing matches these filters yet."
-                  : `You're all caught up. No ${stage === "copy" ? "copy" : "designs"} waiting for review.`}
+                {ready
+                  ? "Nothing is ready to publish yet. Posts appear here once their copy and design are both approved."
+                  : section === "history"
+                    ? "Nothing matches these filters yet."
+                    : `You're all caught up. No ${stage === "copy" ? "copy" : "designs"} waiting for review.`}
               </p>
             )}
           </>
@@ -295,7 +344,12 @@ export function ApprovalList() {
                 ? "Approve selected copy"
                 : "Approve selected designs"}
           </Button>
-          <Button size="sm" variant="ghost" disabled={approveAll.isPending} onClick={() => setSelected([])}>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={approveAll.isPending}
+            onClick={() => setSelected([])}
+          >
             Clear
           </Button>
         </div>
@@ -378,7 +432,10 @@ function ApprovalRow({
             <span>Reviewed by {a.reviewer.name ?? a.reviewer.email}</span>
           )}
           {a.comment_count > 0 && (
-            <span className="inline-flex items-center gap-1" aria-label={`${a.comment_count} comments`}>
+            <span
+              className="inline-flex items-center gap-1"
+              aria-label={`${a.comment_count} comments`}
+            >
               <MessageSquareIcon className="size-3" aria-hidden />
               {a.comment_count}
             </span>
