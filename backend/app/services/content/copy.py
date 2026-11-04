@@ -130,6 +130,29 @@ def full_text(hook: str | None, body: str | None, cta: str | None, hashtags: lis
     return "\n\n".join(parts)
 
 
+def limit_problems(
+    *,
+    hook: str | None,
+    body: str | None,
+    cta: str | None,
+    hashtags: list[str],
+    max_length: int | None,
+    hashtag_limit: int | None,
+    platform_label: str,
+) -> list[str]:
+    """What exceeds the admin's limits for this platform (empty when the copy fits)."""
+    problems: list[str] = []
+    text = full_text(hook, body, cta, hashtags)
+    if max_length and len(text) > max_length:
+        problems.append(
+            f"{len(text):,} characters: {len(text) - max_length:,} over the "
+            f"{platform_label} limit of {max_length:,}."
+        )
+    if hashtag_limit is not None and len(hashtags) > hashtag_limit:
+        problems.append(f"{len(hashtags)} hashtags; the playbook allows {hashtag_limit}.")
+    return problems
+
+
 def check_copy(
     *,
     hook: str | None,
@@ -147,13 +170,15 @@ def check_copy(
     for term in forbidden_terms:
         if term.strip() and re.search(rf"(?<!\w){re.escape(term.strip())}(?!\w)", text, re.I):
             warnings.append(f"Uses the forbidden term “{term.strip()}”.")
-    if max_length and len(text) > max_length:
-        warnings.append(
-            f"{len(text):,} characters: {len(text) - max_length:,} over the "
-            f"{platform_label} limit of {max_length:,}."
-        )
-    if hashtag_limit is not None and len(hashtags) > hashtag_limit:
-        warnings.append(f"{len(hashtags)} hashtags; the playbook allows {hashtag_limit}.")
+    warnings += limit_problems(
+        hook=hook,
+        body=body,
+        cta=cta,
+        hashtags=hashtags,
+        max_length=max_length,
+        hashtag_limit=hashtag_limit,
+        platform_label=platform_label,
+    )
     if not (cta or "").strip():
         warnings.append("No call to action.")
     return warnings
