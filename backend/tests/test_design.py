@@ -320,10 +320,17 @@ async def test_upload_validation(client, internet, design_ai):
     )
     assert too_big.status_code == 400 and "100 MB" in too_big.json()["error"]["message"]
     guessed = await admin.post(f"{url}/uploads", json={"file_name": "deck.pdf", "file_size": 10})
-    assert (
-        guessed.status_code == 200
-        and guessed.json()["headers"]["Content-Type"] == "application/pdf"
+    # Documents (PDF, DOC) are not accepted: images and videos only.
+    assert guessed.status_code == 400 and guessed.json()["error"]["code"] == "FILE_UPLOAD_FAILED"
+    doc = await admin.post(
+        f"{url}/uploads",
+        json={
+            "file_name": "brief.docx",
+            "file_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "file_size": 10,
+        },
     )
+    assert doc.status_code == 400
 
     ticket = (
         await admin.post(
