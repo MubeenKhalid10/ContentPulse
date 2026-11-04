@@ -7,22 +7,33 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from jwt.algorithms import ECAlgorithm
+from sqlalchemy import select
 
+from app.core import supabase as supabase_module
 from app.core.config import Settings, get_settings
 from app.core.supabase import jwks_cache
 from app.main import app
 
+ORIGINAL_FETCH_AUTH_USER = supabase_module._fetch_auth_user
 SUPABASE_URL = "https://testproject.supabase.co"
 ISSUER = f"{SUPABASE_URL}/auth/v1"
 
 
 class FakeSupabase:
-    """Signs tokens like Supabase Auth and serves its JWKS."""
+    """Signs tokens like Supabase Auth and serves its JWKS and /auth/v1/user."""
 
     def __init__(self) -> None:
         self.keys: dict[str, ec.EllipticCurvePrivateKey] = {}
         self.jwks_fetches = 0
+        self.confirmed: dict[str, bool] = {}  # subject -> email confirmed
+        self.user_lookups = 0
         self.rotate()
+
+    def user(self, token: str) -> dict:
+        self.user_lookups += 1
+        sub = jwt.decode(token, options={"verify_signature": False})["sub"]
+        confirmed = self.confirmed.get(sub, True)
+        return {"id": sub, "email_confirmed_at": "2026-11-01T00:00:00Z" if confirmed else None}
 
     def rotate(self) -> str:
         kid = uuid.uuid4().hex
@@ -50,8 +61,10 @@ class FakeSupabase:
         email_verified: bool = True,
     ) -> str:
         now = int(time.time())
+        sub = sub or str(uuid.uuid5(uuid.NAMESPACE_DNS, email))
+        self.confirmed[sub] = email_verified
         claims = {
-            "sub": sub or str(uuid.uuid5(uuid.NAMESPACE_DNS, email)),
+            "sub": sub,
             "email": email,
             "aud": aud,
             "iss": iss,
@@ -76,7 +89,11 @@ def supabase(monkeypatch):
         self._keys = {k["kid"]: jwt.PyJWK(k) for k in fake.jwks()["keys"]}
         self._fetched_at = time.monotonic()
 
+    async def fetch_user(token: str, settings: Settings) -> dict:
+        return fake.user(token)
+
     monkeypatch.setattr(type(jwks_cache), "_refresh", refresh)
+    monkeypatch.setattr(supabase_module, "_fetch_auth_user", fetch_user)
     jwks_cache.clear()
     settings = Settings(
         _env_file=None,
@@ -258,6 +275,56 @@ async def test_an_unverified_email_cannot_claim_an_existing_account(client, supa
     assert (await client.get("/api/v1/auth/me", headers=unverified)).status_code == 401
     verified = bearer(supabase.token("seat@example.com"))
     assert (await client.get("/api/v1/auth/me", headers=verified)).status_code == 200
+
+
+async def test_an_unconfirmed_new_identity_is_not_provisioned(client, supabase, db):
+    from app.models import User
+
+    # Holding the email first would let it accept that address's invites later.
+    unverified = bearer(supabase.token("early@example.com", email_verified=False))
+    resp = await client.get("/api/v1/auth/me", headers=unverified)
+    assert resp.status_code == 401
+    assert resp.json()["error"]["message"].startswith("Confirm your email first")
+    assert await db.scalar(select(User).where(User.email == "early@example.com")) is None
+
+
+async def test_editable_metadata_cannot_vouch_for_the_email(client, supabase):
+    # supabase.auth.updateUser lets a user set their own user_metadata.
+    claims = jwt.decode(
+        supabase.token("forger@example.com", email_verified=False),
+        options={"verify_signature": False},
+    )
+    claims["user_metadata"]["email_verified"] = True
+    token = jwt.encode(
+        claims,
+        supabase.keys[supabase.current],
+        algorithm="ES256",
+        headers={"kid": supabase.current},
+    )
+    assert (await client.get("/api/v1/auth/me", headers=bearer(token))).status_code == 401
+
+
+async def test_confirmation_is_asked_once_per_identity(client, supabase):
+    token = bearer(supabase.token("once@example.com"))
+    for _ in range(3):
+        assert (await client.get("/api/v1/auth/me", headers=token)).status_code == 200
+    assert supabase.user_lookups == 1  # linked identities skip the lookup
+
+
+async def test_unreachable_user_endpoint_is_not_a_finished_session(client, supabase, monkeypatch):
+    monkeypatch.setattr(supabase_module, "_fetch_auth_user", ORIGINAL_FETCH_AUTH_USER)
+
+    real_get = httpx.AsyncClient.get
+
+    async def unreachable(self, url, **kw):
+        if str(url).startswith(SUPABASE_URL):
+            raise httpx.ConnectError("getaddrinfo failed")
+        return await real_get(self, url, **kw)
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", unreachable)
+    resp = await client.get("/api/v1/auth/me", headers=bearer(supabase.token("x@example.com")))
+    assert resp.status_code == 503
+    assert resp.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
 
 
 async def test_invites_with_supabase_identities(client, supabase):

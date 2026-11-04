@@ -66,7 +66,11 @@ async def upload(token: str, request: Request) -> dict:
     if received == 0:
         _discard(tmp_path)
         raise AppError(ErrorCode.FILE_UPLOAD_FAILED, "The file is empty.")
-    storage.write(claims["key"], tmp_path, content_type)
+    try:
+        storage.write(claims["key"], tmp_path, content_type)
+    except Exception:
+        _discard(tmp_path)
+        raise
     return {"key": claims["key"], "size": received}
 
 

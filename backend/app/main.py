@@ -36,6 +36,13 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
             "link there. Set FRONTEND_URL to your site's public address.",
             settings.frontend_url,
         )
+    if settings.is_production and not settings.s3_bucket:
+        logger.warning(
+            "S3_BUCKET is not set in production: uploaded files are stored in %s on this "
+            "server's disk, which hosts like Render wipe on every redeploy and restart. "
+            "Set the S3_* variables to keep them.",
+            settings.local_storage_dir,
+        )
     recovered = (
         await recover_stale_jobs()
         + await trend_tasks.recover_stale_runs()
@@ -68,6 +75,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
         docs_url=None if settings.is_production else "/docs",
+        openapi_url=None if settings.is_production else "/openapi.json",
         redoc_url=None,
     )
     app.add_middleware(RateLimitMiddleware)  # inside CORS, so 429s carry CORS headers

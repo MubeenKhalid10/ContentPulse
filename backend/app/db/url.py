@@ -7,9 +7,12 @@ driver needs the ``postgresql+asyncpg`` scheme and rejects libpq's
 matching connect arguments.
 """
 
+import logging
 import ssl
 from typing import Any
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
+
+logger = logging.getLogger(__name__)
 
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "db", "postgres"}
 # libpq-only options asyncpg doesn't understand.
@@ -71,7 +74,19 @@ def async_database_url(raw: str) -> tuple[str, dict[str, Any]]:
     host = (parts.hostname or "").lower()
     remote = host not in _LOCAL_HOSTS and not host.endswith(".local")
     if sslmode in _SSL_REQUIRED or ssl_param in {"require", "true", "1"}:
-        connect_args["ssl"] = _ssl_context(verify=sslmode.startswith("verify"))
+        # Full verification: sslmode=verify-full&sslrootcert=/path/to/ca.crt
+        # (Supabase signs with its own CA: Database settings > SSL > download).
+        verify = sslmode.startswith("verify")
+        if query.get("sslrootcert") and not verify:
+            logger.warning(
+                "sslrootcert is ignored unless sslmode is verify-ca or verify-full: "
+                "the database certificate is not being checked."
+            )
+        connect_args["ssl"] = _ssl_context(
+            verify=verify,
+            cafile=query.get("sslrootcert") or None,
+            check_hostname=sslmode != "verify-ca",
+        )
     elif sslmode == "disable" or ssl_param in {"disable", "false", "0"}:
         connect_args["ssl"] = False
     elif remote and sslmode != "prefer":
@@ -87,8 +102,18 @@ def async_database_url(raw: str) -> tuple[str, dict[str, Any]]:
     return url, connect_args
 
 
-def _ssl_context(*, verify: bool) -> ssl.SSLContext:
-    context = ssl.create_default_context()
+def _ssl_context(
+    *, verify: bool, cafile: str | None = None, check_hostname: bool = True
+) -> ssl.SSLContext:
+    try:
+        context = ssl.create_default_context(cafile=cafile if verify else None)
+    except (OSError, ssl.SSLError):
+        # Never echo the URL: it holds the password.
+        raise ValueError(
+            "DATABASE_URL has an unreadable sslrootcert file. Check the path."
+        ) from None
+    if verify and not check_hostname:
+        context.check_hostname = False
     if not verify:
         # Encrypted, but without CA pinning: providers' poolers often present
         # certificates the system store can't chain (sslmode=require semantics).
