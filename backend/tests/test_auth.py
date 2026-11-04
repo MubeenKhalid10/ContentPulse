@@ -1,4 +1,4 @@
-from tests.conftest import PASSWORD, register
+from tests.conftest import PASSWORD, create_org, register
 
 
 async def test_register_returns_session_and_me(client):
@@ -81,3 +81,15 @@ async def test_logout_clears_cookie(client):
     resp = await client.post("/api/v1/auth/logout")
     assert resp.status_code == 204
     assert (await client.get("/api/v1/auth/me")).status_code == 401
+
+
+async def test_signed_out_token_is_rejected_on_organization_routes(client):
+    admin = await register(client, "gone@example.com")
+    org = await create_org(admin)
+    headers = {"X-Organization-Id": org["id"]}
+    assert (await admin.get("/api/v1/dashboard/summary", headers=headers)).status_code == 200
+
+    assert (await admin.post("/api/v1/auth/logout")).status_code == 204
+    resp = await admin.get("/api/v1/dashboard/summary", headers=headers)
+    assert resp.status_code == 401
+    assert resp.json()["error"]["message"] == "Session expired. Please sign in again."

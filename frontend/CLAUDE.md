@@ -13,3 +13,13 @@
 - Run targeted tests first, then the broader suite when appropriate.
 - Do not modify or deploy production infrastructure unless explicitly authorized.
 - Before reading additional files, explain briefly why they are needed if the scope is expanding significantly.
+
+# Browser Testing Policy
+
+Browser testing uses my Firefox through the Firefox MCP (`mcp__firefox__*`) only.
+
+- Never use `claude-in-chrome` or any Chrome MCP tool. If Firefox MCP is unavailable, stop and tell me; do not fall back to another browser.
+- Start by calling the Firefox tabs-context tool to confirm my existing session, and reuse its tabs. Do not launch another browser or profile.
+- Use Firefox for UI and responsive checks, auth flows, forms, navigation, screenshots, and console/JS error inspection.
+- Interactions must actually go through the Firefox MCP tools.
+- If a bug turns up, fix it in source and re-test in the same session. Report tests run, bugs found, fixes, pass/fail, and remaining issues.
