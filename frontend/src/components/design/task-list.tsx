@@ -174,9 +174,11 @@ export function DesignTaskList() {
               <div aria-busy={tasks.isPlaceholderData}>
                 <DayGroups
                   items={tasks.data.items}
-                  dateOf={(t) => t.updated_at}
+                  dateOf={(t) => dateShown(t, filters.status)}
                   label="Design tasks"
-                  render={(task) => <TaskRow key={task.id} task={task} />}
+                  render={(task) => (
+                    <TaskRow key={task.id} task={task} shown={dateShown(task, filters.status)} />
+                  )}
                 />
               </div>
               {tasks.data.total > tasks.data.items.length && (
@@ -204,7 +206,12 @@ export function DesignTaskList() {
   );
 }
 
-function TaskRow({ task }: { task: DesignTask }) {
+/** The date a list is sorted and grouped by: creation for to-do and changes, else last update. */
+function dateShown(task: DesignTask, status: DesignTaskFilter) {
+  return status === "todo" || status === "changes" ? task.created_at : task.updated_at;
+}
+
+function TaskRow({ task, shown }: { task: DesignTask; shown: string }) {
   return (
     <li className="relative grid gap-1.5 rounded-xl bg-card p-4 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40">
       <div className="flex flex-wrap items-center gap-2">
@@ -225,7 +232,7 @@ function TaskRow({ task }: { task: DesignTask }) {
           </Tag>
         )}
         <span className="ml-auto text-xs text-muted-foreground">
-          {timeOfDay(task.updated_at)}
+          {timeOfDay(shown)}
         </span>
       </div>
       {task.headline && (
