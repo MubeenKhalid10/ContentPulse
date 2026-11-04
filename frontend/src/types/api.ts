@@ -200,6 +200,9 @@ export interface DashboardPostBrief {
   platform: Platform;
   status: PostStatus;
   updated_at: string;
+  excerpt: string | null;
+  version: number;
+  creator_name: string | null;
 }
 
 export interface DashboardOverview {

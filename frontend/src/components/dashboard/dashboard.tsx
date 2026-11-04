@@ -154,22 +154,29 @@ export function Dashboard() {
         )}
 
         {!simple && (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-            {/* Main column */}
-            <div className="grid min-w-0 content-start gap-6">
-              {can("trends.read") && <TrendingTopics data={data} />}
+          <div className="grid gap-6">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+              {/* Main column */}
+              {/* On wide screens the card is taken out of the flow, so the row is as
+                  tall as the side column and the list scrolls instead of stretching it. */}
+              <div className="relative min-w-0 xl:min-h-80">
+                <div className="xl:absolute xl:inset-0">
+                  <RecentContent data={data} />
+                </div>
+              </div>
 
-              <RecentContent data={data} />
+              {/* Side column */}
+              <aside
+                aria-label="At a glance"
+                className="grid min-w-0 content-start gap-6"
+              >
+                {can("trends.manage") && <SourceHealth />}
+                <PlatformBreakdown data={data} />
+              </aside>
             </div>
 
-            {/* Side column */}
-            <aside
-              aria-label="At a glance"
-              className="grid min-w-0 content-start gap-6"
-            >
-              {can("trends.manage") && <SourceHealth />}
-              <PlatformBreakdown data={data} />
-            </aside>
+            {/* Full width, below both columns */}
+            {can("trends.read") && <TrendingTopics data={data} />}
           </div>
         )}
       </div>

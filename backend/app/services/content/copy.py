@@ -88,11 +88,24 @@ def normalize_hashtags(tags: list[str], limit: int | None) -> tuple[list[str], l
     return out, corrections
 
 
+def _without_repeats(hook: str, body: str, cta: str) -> str:
+    """The model sometimes restates the hook at the start of the body and the call to
+    action at its end; the parts are shown one after another, so that reads twice."""
+    trimmed = body
+    if trimmed.startswith(hook):
+        trimmed = trimmed[len(hook) :].strip()
+    if cta and trimmed.endswith(cta):
+        trimmed = trimmed[: -len(cta)].strip()
+    return trimmed or body
+
+
 def parse_output(data: dict[str, Any], *, refs: set[str], hashtag_limit: int | None) -> PostCopy:
     hook = str(data.get("hook") or "").strip()
     body = str(data.get("body") or "").strip()
     if not hook or not body:
         raise InvalidCopy("The AI returned a post without a hook or body.")
+    cta = str(data.get("cta") or "").strip()
+    body = _without_repeats(hook, body, cta)
     hashtags, corrections = normalize_hashtags(list(data.get("hashtags") or []), hashtag_limit)
     cited = [r for r in data.get("evidence") or [] if r in refs]
     if len(cited) < len(data.get("evidence") or []):
@@ -101,7 +114,7 @@ def parse_output(data: dict[str, Any], *, refs: set[str], hashtag_limit: int | N
     return PostCopy(
         hook=hook,
         body=body,
-        cta=str(data.get("cta") or "").strip(),
+        cta=cta,
         hashtags=hashtags,
         visual_concept=str(data.get("visual_concept") or "").strip() or None,
         design_format=design_format if design_format in DESIGN_FORMATS else None,
