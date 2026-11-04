@@ -193,6 +193,8 @@ export function useUploadCreatives() {
       queryClient.setQueryData([...root(orgId!), "detail", task.id], task);
       queryClient.invalidateQueries({ queryKey: root(orgId!) });
       queryClient.invalidateQueries({ queryKey: ["org", orgId, "content"] });
+      queryClient.invalidateQueries({ queryKey: ["org", orgId, "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["org", orgId, "approvals"] });
     },
   });
 }
