@@ -244,9 +244,9 @@ async def list_approvals(
     if (statuses := FILTERS[status]) is not None:
         filters.append(ApprovalRequest.status.in_(statuses))
     total = await db.scalar(select(func.count()).select_from(ApprovalRequest).where(*filters))
-    # The queue is first come, first served; history shows the latest first.
+    # Newest first, so today's posts sit above yesterday's (the list is grouped by day).
     order = (
-        [ApprovalRequest.created_at]
+        [ApprovalRequest.created_at.desc()]
         if status == "pending"
         else [nulls_last(ApprovalRequest.reviewed_at.desc()), ApprovalRequest.created_at.desc()]
     )
