@@ -295,11 +295,7 @@ async def list_tasks(
     total = await db.scalar(select(func.count()).select_from(DesignBrief).where(*filters))
     # Newest first by the date the list shows (todo: when the task was created; changes:
     # when the change was requested, which is the brief's last update).
-    order = (
-        [DesignBrief.created_at.desc()]
-        if status == "todo"
-        else [DesignBrief.updated_at.desc()]
-    )
+    order = [DesignBrief.created_at.desc()] if status == "todo" else [DesignBrief.updated_at.desc()]
     rows = list(
         await db.scalars(
             select(DesignBrief)
