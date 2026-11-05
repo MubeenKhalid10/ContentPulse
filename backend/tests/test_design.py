@@ -200,7 +200,8 @@ async def test_back_to_draft_cancels_and_resend_keeps_designer(client, internet,
 
     await admin.post(f"/api/v1/content/{post['id']}/back-to-draft")
     assert (await admin.get(f"{API}/{task['id']}")).json()["status"] == "cancelled"
-    assert (await admin.get(API)).json()["counts"]["cancelled"] == 1
+    # The Rejected tab counts designs of rejected posts only, not withdrawn copy.
+    assert (await admin.get(API)).json()["counts"]["cancelled"] == 0
 
     resent = await send_to_design(admin, post["id"])
     new_task = (await admin.get(f"{API}/{resent['design_task']['id']}")).json()
