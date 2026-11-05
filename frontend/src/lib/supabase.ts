@@ -92,6 +92,9 @@ export function supabaseErrorMessage(message: string): string {
   if (m.includes("invalid login credentials")) return "Invalid email or password.";
   if (m.includes("email not confirmed")) return "Confirm your email first: check your inbox for the link.";
   if (m.includes("already registered")) return "An account with this email already exists. Sign in instead.";
+  if (m.includes("at least one character of each")) {
+    return "Your password must include a lowercase letter, an uppercase letter, a number and a special character (like ! @ # $ %).";
+  }
   if (m.includes("rate limit")) return "Too many attempts. Wait a minute and try again.";
   return message;
 }
