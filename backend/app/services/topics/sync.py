@@ -37,10 +37,20 @@ async def _settings(db: AsyncSession, organization_id: uuid.UUID) -> Organizatio
     )
 
 
-async def analysis_fields(db: AsyncSession, trend: Trend) -> dict:
-    """Topic fields derived from the trend and its alignment analysis."""
-    settings = await _settings(db, trend.organization_id)
-    rules = await get_rules(db, trend.organization_id)
+async def analysis_fields(
+    db: AsyncSession,
+    trend: Trend,
+    *,
+    settings: OrganizationSettings | None = None,
+    rules=None,
+) -> dict:
+    """Topic fields derived from the trend and its alignment analysis.
+
+    Bulk callers pass `settings` and `rules` loaded once, instead of one fetch per topic."""
+    if settings is None:
+        settings = await _settings(db, trend.organization_id)
+    if rules is None:
+        rules = await get_rules(db, trend.organization_id)
     alignment = trend.alignment or {}
     angles = [
         {
@@ -97,9 +107,11 @@ async def refresh_platform_fit(db: AsyncSession, organization_id: uuid.UUID) -> 
         t.id: t
         for t in (await db.scalars(select(Trend).where(Trend.id.in_(trend_ids))) if topics else [])
     }
+    settings = await _settings(db, organization_id)
+    rules = await get_rules(db, organization_id)
     for topic in topics:
         if trend := trends.get(topic.trend_id):
-            fields = await analysis_fields(db, trend)
+            fields = await analysis_fields(db, trend, settings=settings, rules=rules)
             topic.recommended_platforms = fields["recommended_platforms"]
             topic.platform_fit = fields["platform_fit"]
     await db.commit()
