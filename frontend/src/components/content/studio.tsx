@@ -224,19 +224,6 @@ function LockedNotice({ post }: { post: PostDetail }) {
   );
 }
 
-/** Says why submitting is switched off: the copy is over the admin's platform limits. */
-function LimitNotice({ problems }: { problems: string[] }) {
-  return (
-    <div role="alert" className="max-w-sm text-right text-xs text-destructive">
-      <p className="font-medium">Can&apos;t submit: over the platform limit.</p>
-      {problems.map((p) => (
-        <p key={p}>{p}</p>
-      ))}
-      <p className="text-muted-foreground">Shorten it, save, then submit.</p>
-    </div>
-  );
-}
-
 function ResubmitControl({ post }: { post: PostDetail }) {
   const postId = post.id;
   const limitProblems = copyLimitProblems(post.current, post.limits, post.platform);
@@ -269,12 +256,9 @@ function ResubmitControl({ post }: { post: PostDetail }) {
         {resubmit.isPending ? "Resubmitting…" : "Resubmit for approval"}
       </Button>
       {limitProblems.length > 0 && (
-        <div role="alert" className="w-full text-xs text-destructive">
-          <p className="font-medium">Can&apos;t resubmit: over the platform limit.</p>
-          {limitProblems.map((p) => (
-            <p key={p}>{p}</p>
-          ))}
-        </div>
+        <p role="alert" className="w-full text-xs font-medium text-destructive">
+          Over the platform limit. Shorten it to resubmit.
+        </p>
       )}
       <span className="w-full text-xs text-muted-foreground">
         Save your edits first: unsaved changes are not sent. Fixed the copy? Resubmit with the current design. Need
@@ -433,6 +417,11 @@ function StudioActions({
   // row, which pushed the buttons toward the middle of the header while the draft was written.
   return (
     <div className="flex flex-col items-end gap-1">
+      {canEdit && s === "draft" && limitProblems.length > 0 && (
+        <p role="alert" className="order-last text-xs font-medium text-destructive">
+          Over the platform limit. Shorten it to submit.
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-end gap-1.5">
         {canShare && s === "final" && (
           <SharePostButton
@@ -567,7 +556,6 @@ function StudioActions({
       {canEdit && s === "draft" && !hasCopy && (
         <span className="text-right text-xs text-muted-foreground">Write the copy first to submit it for approval.</span>
       )}
-      {canEdit && s === "draft" && limitProblems.length > 0 && <LimitNotice problems={limitProblems} />}
     </div>
   );
 }

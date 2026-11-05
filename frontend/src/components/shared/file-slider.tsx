@@ -32,7 +32,7 @@ export function FileSlider({
     <div className="grid min-w-0 grid-cols-1 gap-2">
       <div
         ref={track}
-        className="flex min-w-0 snap-x snap-mandatory items-center overflow-x-auto [scrollbar-width:none] motion-safe:scroll-smooth focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="flex min-w-0 snap-x snap-mandatory items-start overflow-x-auto [scrollbar-width:none] motion-safe:scroll-smooth focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         role="group"
         aria-roledescription="carousel"
         aria-label={`${label}, use the arrow keys to move between files`}

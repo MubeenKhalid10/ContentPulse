@@ -71,7 +71,7 @@ export function NotificationBell() {
         )}
         {[...days].map(([day, rows]) => (
           <DropdownMenuGroup key={day}>
-            <DropdownMenuLabel className="text-xs text-muted-foreground">{day}</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-sm font-extrabold text-foreground">{day}</DropdownMenuLabel>
             {rows.map((n) => (
               <DropdownMenuItem
                 key={n.id}

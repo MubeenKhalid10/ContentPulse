@@ -72,6 +72,7 @@ FILTERS: dict[str, list[DesignBriefStatus] | None] = {
 SENT_BACK = DesignBrief.post_id.in_(
     select(Post.id).where(Post.status == PostStatus.CHANGES_REQUESTED)
 )
+REJECTED_POST = DesignBrief.post_id.in_(select(Post.id).where(Post.status == PostStatus.REJECTED))
 
 
 def _filter_clause(name: str):
@@ -81,6 +82,9 @@ def _filter_clause(name: str):
         return and_(clause, ~SENT_BACK)
     if name == "changes":
         return and_(clause, SENT_BACK)
+    if name == "cancelled":
+        # The Rejected tab: designs whose post an approver rejected (not withdrawn copy).
+        return and_(clause, REJECTED_POST)
     return clause
 
 
@@ -289,10 +293,11 @@ async def list_tasks(
     counts = dict(zip(FILTERS, row, strict=True))
     filters.append(_filter_clause(status))
     total = await db.scalar(select(func.count()).select_from(DesignBrief).where(*filters))
-    # Newest first by the date the list shows (todo and changes: when the task was created).
+    # Newest first by the date the list shows (todo: when the task was created; changes:
+    # when the change was requested, which is the brief's last update).
     order = (
         [DesignBrief.created_at.desc()]
-        if status in ("todo", "changes")
+        if status == "todo"
         else [DesignBrief.updated_at.desc()]
     )
     rows = list(

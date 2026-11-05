@@ -37,6 +37,7 @@ const TABS: { value: DesignTaskFilter; label: string }[] = [
   { value: "todo", label: "Designs to create" },
   { value: "changes", label: "Design Change Requests" },
   { value: "approval", label: "Sent for approval" },
+  { value: "cancelled", label: "Rejected" },
 ];
 const EMPTY: Record<DesignTaskFilter, string> = {
   todo: "No open design tasks. A post appears here once an admin approves its copy.",
@@ -44,7 +45,7 @@ const EMPTY: Record<DesignTaskFilter, string> = {
   approval: "No designs sent for approval yet.",
   submitted: "No designs waiting for approval.",
   done: "No approved designs yet.",
-  cancelled: "No cancelled tasks.",
+  cancelled: "No rejected designs. Designs for posts an approver rejects will remain here.",
   all: "No design tasks yet.",
 };
 
@@ -78,6 +79,18 @@ export function DesignTaskList() {
       <PageHeader
         title="Add designs"
         description="Posts that need a visual. Open a task, upload the finished design, then submit it for approval."
+        actions={
+          isDesigner && (
+            <div className="flex shrink-0 items-center gap-2">
+              <Switch
+                id="mine"
+                checked={filters.mine}
+                onCheckedChange={(mine) => update({ mine })}
+              />
+              <Label htmlFor="mine">Assigned to me</Label>
+            </div>
+          )
+        }
       />
       {counts?.all === 0 && !filters.q && !filters.platform && !filters.mine ? (
         <Card>
@@ -129,16 +142,6 @@ export function DesignTaskList() {
               onChange={(q) => update({ q })}
               className={FILTER_SEARCH}
             />
-            {isDesigner && (
-              <div className="flex shrink-0 items-center gap-2">
-                <Switch
-                  id="mine"
-                  checked={filters.mine}
-                  onCheckedChange={(mine) => update({ mine })}
-                />
-                <Label htmlFor="mine">Assigned to me</Label>
-              </div>
-            )}
             <SimpleSelect
               aria-label="Platform"
               value={filters.platform || "all"}
@@ -206,9 +209,10 @@ export function DesignTaskList() {
   );
 }
 
-/** The date a list is sorted and grouped by: creation for to-do and changes, else last update. */
+/** The date a list is sorted and grouped by: creation for to-do, else last update
+ * (for changes, that is when the change was requested). */
 function dateShown(task: DesignTask, status: DesignTaskFilter) {
-  return status === "todo" || status === "changes" ? task.created_at : task.updated_at;
+  return status === "todo" ? task.created_at : task.updated_at;
 }
 
 function TaskRow({ task, shown }: { task: DesignTask; shown: string }) {

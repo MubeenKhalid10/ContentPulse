@@ -111,11 +111,30 @@ export function useRegister() {
 /** Sign out everywhere this browser is signed in (Supabase + API cookie). */
 export async function signOutEverywhere() {
   const supabase = await getSupabase().catch(() => null);
-  await Promise.allSettled([
-    supabase?.auth.signOut(),
-    api<void>("/auth/logout", { method: "POST" }),
+  const timeout = new Promise((resolve) => setTimeout(resolve, 4000));
+  await Promise.race([
+    Promise.allSettled([
+      supabase?.auth.signOut(),
+      api<void>("/auth/logout", { method: "POST" }),
+    ]),
+    timeout,
   ]);
+  clearStaleSupabaseCookies();
   setActiveOrgId(null);
+}
+
+/**
+ * Leftover Supabase cookies (e.g. after switching the app to local auth) make the
+ * proxy think a session exists and bounce /login back to the app, which loops.
+ */
+function clearStaleSupabaseCookies() {
+  if (typeof document === "undefined") return;
+  for (const part of document.cookie.split(";")) {
+    const name = part.split("=")[0]?.trim();
+    if (name && /^sb-[^-]+-auth-token(\.\d+)?$/.test(name)) {
+      document.cookie = `${name}=; Max-Age=0; path=/`;
+    }
+  }
 }
 
 export function useLogout() {
