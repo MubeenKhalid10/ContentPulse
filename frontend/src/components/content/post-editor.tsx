@@ -281,12 +281,7 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
             />
           </div>
           <span className="text-xs text-muted-foreground" aria-live="polite">
-            {over && max != null ? (
-              <span className="inline-flex items-center gap-1 font-medium text-destructive">
-                <AlertTriangleIcon className="size-3.5" aria-hidden />
-                {(length - max).toLocaleString()} characters over the {PLATFORM_LABEL[post.platform]} limit
-              </span>
-            ) : isDirty ? (
+            {isDirty ? (
               <span className="font-medium text-foreground">Unsaved changes</span>
             ) : (
               "No changes to save"
