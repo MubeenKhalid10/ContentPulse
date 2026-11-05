@@ -103,6 +103,9 @@ export function StrategyForm({
   // Editing a plan that already has its post: just save.
   const hasPost = !!editing && (topicPosts.data?.items ?? []).some((p) => p.content_strategy_id === editing.id);
   const saving = create.isPending || update.isPending || generate.isPending;
+  // Several platforms are drafted one after another, so the mutation alone flickers between them.
+  const [suggestingAll, setSuggestingAll] = useState(false);
+  const drafting = suggest.isPending || suggestingAll;
   useDialogBusy(saving);
   // Which footer button started the save, so only that one spins.
   const [writing, setWriting] = useState(false);
@@ -142,6 +145,14 @@ export function StrategyForm({
   const toggleAll = () => select(allSelected ? [platforms[0]] : platforms);
 
   const runSuggestAll = async () => {
+    setSuggestingAll(true);
+    try {
+      await suggestAll();
+    } finally {
+      setSuggestingAll(false);
+    }
+  };
+  const suggestAll = async () => {
     // Two platforms at a time: all at once exhausts the AI models' per-minute limits, and then
     // the later platforms fall back to the plain rule-based draft. A platform that fails keeps
     // its place; the others are still filled in.
@@ -297,8 +308,8 @@ export function StrategyForm({
 
   return (
     <form noValidate className="grid gap-5" onSubmit={submitWith(canGenerate && !hasPost)}>
-      {/* Nothing in the plan can change (or be cancelled) while it is being saved or written. */}
-      <fieldset disabled={saving} className="contents">
+      {/* Nothing in the plan can change (or be cancelled) while it is being saved, written or drafted. */}
+      <fieldset disabled={saving || drafting} className="contents">
       <DialogHeader>
         <DialogTitle>{editing ? "Edit plan" : "Plan a post"}</DialogTitle>
         <DialogDescription>
@@ -307,11 +318,11 @@ export function StrategyForm({
         </DialogDescription>
       </DialogHeader>
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         {!editing ? (
           <fieldset className="grid gap-2">
             <legend className="mb-1 text-sm font-medium">Platforms</legend>
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
+            <div className="flex min-h-8 flex-wrap items-center gap-x-5 gap-y-2">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input type="checkbox" className="size-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" checked={allSelected} onChange={toggleAll} />
                 All platforms
@@ -346,9 +357,9 @@ export function StrategyForm({
           />
         </FormField>
         )}
-        <Button type="button" variant="outline" onClick={multi ? runSuggestAll : runSuggest} disabled={suggest.isPending} pending={suggest.isPending}>
+        <Button type="button" variant="outline" onClick={multi ? runSuggestAll : runSuggest} disabled={drafting} pending={drafting}>
           {ai.data?.engine === "ai" ? <SparklesIcon /> : <WandSparklesIcon />}
-          {suggest.isPending
+          {drafting
             ? "Drafting…"
             : ai.data?.engine === "ai"
               ? "Draft Plan with AI"
