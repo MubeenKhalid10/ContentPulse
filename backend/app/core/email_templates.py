@@ -7,7 +7,6 @@ from html import escape
 ROLE_BLURB = {
     "admin": "set up the organization, invite the team and approve posts",
     "creator": "choose topics, plan and write posts, and add designs",
-    "viewer": "read everything and share finished posts",
 }
 
 

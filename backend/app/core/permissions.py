@@ -13,8 +13,6 @@ class Role(StrEnum):
     ADMIN = "admin"
     # Finds topics, writes posts, adds the design and submits for approval.
     CREATOR = "creator"
-    # Reads everything and shares finished posts.
-    VIEWER = "viewer"
 
 
 class Permission(StrEnum):
@@ -80,10 +78,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.DESIGN_UPLOAD,
             P.DESIGN_SUBMIT,
         }
-    ),
-    # Approvals are the admin's desk: others follow a post's status on the post itself.
-    Role.VIEWER: frozenset(
-        p for p in Permission if p.value.endswith(".read") and p != P.APPROVAL_READ
     ),
 }
 

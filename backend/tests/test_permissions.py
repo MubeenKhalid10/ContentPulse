@@ -5,14 +5,8 @@ def test_admin_has_every_permission():
     assert set(permissions_for(Role.ADMIN)) == {p.value for p in Permission}
 
 
-def test_viewer_is_read_only():
-    perms = permissions_for(Role.VIEWER)
-    assert perms
-    assert all(p.endswith(".read") for p in perms)
-
-
-def test_there_are_three_roles():
-    assert [r.value for r in Role] == ["admin", "creator", "viewer"]
+def test_there_are_two_roles():
+    assert [r.value for r in Role] == ["admin", "creator"]
 
 
 def test_creator_finds_writes_designs_and_submits_but_never_approves():
