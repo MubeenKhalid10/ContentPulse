@@ -51,7 +51,10 @@ async def list_organizations(user: CurrentUser, db: DB):
 
 
 @router.post("", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
-async def create_organization(data: OrganizationCreate, user: CurrentUser, db: DB):
+async def create_organization(
+    data: OrganizationCreate, user: CurrentUser, db: DB, settings: AppSettings
+):
+    auth_service.require_verified_email(user, settings)
     return await org_service.create_organization(db, user, data)
 
 

@@ -111,3 +111,39 @@ def read_password_reset_token(token: str, settings: Settings) -> tuple[uuid.UUID
 
 def password_matches_fingerprint(password_hash: str | None, fingerprint: str) -> bool:
     return secrets.compare_digest(_password_fingerprint(password_hash), fingerprint)
+
+
+_VERIFY_PURPOSE = "email_verification"
+
+
+def create_email_verification_token(user_id: uuid.UUID, email: str, settings: Settings) -> str:
+    """A link token proving control of `email`. Bound to the address, so changing
+    the account's email makes older links useless."""
+    now = datetime.now(UTC)
+    payload = {
+        "sub": str(user_id),
+        "iss": "contentpulse",
+        "purpose": _VERIFY_PURPOSE,
+        "email": email,
+        "iat": now,
+        "exp": now + timedelta(hours=settings.email_verification_ttl_hours),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def read_email_verification_token(token: str, settings: Settings) -> tuple[uuid.UUID, str]:
+    """Return (user_id, email) or raise Unauthorized."""
+    invalid = "This confirmation link is invalid or has expired. Ask for a new one."
+    try:
+        claims = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            issuer="contentpulse",
+            options={"require": ["sub", "exp", "purpose", "email"]},
+        )
+        if claims["purpose"] != _VERIFY_PURPOSE:
+            raise Unauthorized(invalid)
+        return uuid.UUID(claims["sub"]), str(claims["email"])
+    except (jwt.InvalidTokenError, ValueError) as exc:
+        raise Unauthorized(invalid) from exc
