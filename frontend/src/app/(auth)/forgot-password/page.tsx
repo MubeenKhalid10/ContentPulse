@@ -61,7 +61,10 @@ export default function ForgotPasswordPage() {
           "Reset emails aren't set up on this server yet. Ask whoever runs ContentPulse for your team to help you get back in.",
         );
       }
-      await api("/auth/password-reset", { method: "POST", body: { email } });
+      await api("/auth/password-reset", {
+        method: "POST",
+        body: { email, captcha_token: captchaToken ?? undefined },
+      });
       return email;
     },
     onSettled: () => {

@@ -49,6 +49,8 @@ export interface Me {
   email: string;
   organization_id: string | null;
   role: Role | null;
+  /** False only for a local account that hasn't confirmed its email address yet. */
+  email_verified: boolean;
   permissions: Permission[];
   memberships: MembershipSummary[];
 }
