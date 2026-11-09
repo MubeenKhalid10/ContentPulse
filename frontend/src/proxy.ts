@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIE = "cp_session";
 // Supabase mode: @supabase/ssr stores the session as sb-<ref>-auth-token (chunked as .0, .1, ...).
 const SUPABASE_COOKIE = /^sb-[^-]+-auth-token(\.\d+)?$/;
-const PUBLIC_PATHS = ["/login", "/register", "/invite", "/forgot-password", "/reset-password", "/auth"];
+const PUBLIC_PATHS = ["/login", "/register", "/invite", "/forgot-password", "/reset-password", "/verify-email", "/auth"];
 
 /**
  * Optimistic redirect only: checks that a session cookie exists. The backend

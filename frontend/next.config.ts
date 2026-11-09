@@ -20,13 +20,15 @@ const ENFORCED_CSP = ["frame-ancestors 'none'", "base-uri 'self'", "object-src '
 // Check the browser console for violations, then tighten and enforce it.
 const REPORT_ONLY_CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   // Supabase auth, and presigned uploads straight to S3.
   "connect-src 'self' https://*.supabase.co https://*.amazonaws.com",
   "media-src 'self' blob: https:",
+  // Cloudflare Turnstile renders its challenge in an iframe.
+  "frame-src https://challenges.cloudflare.com",
   ENFORCED_CSP,
 ].join("; ");
 

@@ -22,8 +22,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errorMessage, setActiveOrgId } from "@/lib/api";
+import { VerifyEmailNotice } from "@/components/auth/verify-email-notice";
 import {
   meQueryKey,
+  useAuthConfig,
   useLogout,
   useMe,
   useSwitchOrganization,
@@ -40,6 +42,7 @@ export function CreateOrganization() {
   const queryClient = useQueryClient();
   const logout = useLogout();
   const me = useMe();
+  const authConfig = useAuthConfig();
   const switchOrganization = useSwitchOrganization();
   const existing = me.data?.memberships ?? [];
   const form = useForm<Input, unknown, Output>({
@@ -71,6 +74,10 @@ export function CreateOrganization() {
       router.replace("/dashboard");
     },
   });
+
+  if (me.data && !me.data.email_verified && authConfig.data?.email_verification) {
+    return <VerifyEmailNotice email={me.data.email} />;
+  }
 
   return (
     <div className="grid gap-4">

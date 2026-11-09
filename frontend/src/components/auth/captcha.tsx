@@ -14,7 +14,8 @@ export function AuthCaptcha({
   const { data: config } = useAuthConfig();
   const [status, setStatus] = useState<"pending" | "ready" | "failed">("pending");
   if (!config) return null;
-  if (config.provider !== "supabase") return null;
+  // Local sign-in only receives a site key when the server can check the answer.
+  if (!config.turnstile_site_key && config.provider !== "supabase") return null;
   if (!config.turnstile_site_key) {
     return (
       <Alert variant="destructive">
