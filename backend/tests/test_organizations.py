@@ -140,15 +140,15 @@ async def test_tenant_isolation(client):
 async def test_role_permissions_enforced(client):
     admin = await register(client, "admin@acme.example.com")
     org = await create_org(admin)
-    viewer = await add_member(client, admin, org["id"], "viewer@acme.example.com", "viewer")
+    creator2 = await add_member(client, admin, org["id"], "creator2@acme.example.com", "creator")
     manager = await add_member(client, admin, org["id"], "cm@acme.example.com", "creator")
 
     # Everyone can read.
-    for actor in (viewer, manager):
+    for actor in (creator2, manager):
         assert (await actor.get(f"{API}/{org['id']}/brand")).status_code == 200
 
     # Only admins write organization data and see the audit history.
-    for actor in (viewer, manager):
+    for actor in (creator2, manager):
         resp = await actor.patch(f"{API}/{org['id']}/brand", json={"tone": "Edgy"})
         assert resp.status_code == 403
         assert resp.json()["error"]["code"] == "FORBIDDEN"

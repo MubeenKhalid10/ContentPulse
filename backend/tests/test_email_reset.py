@@ -152,7 +152,7 @@ async def test_invitation_without_smtp_returns_link_only(client, outbox):
     ).json()
     r = await client.post(
         f"/api/v1/organizations/{org['id']}/invitations",
-        json={"email": "new2@example.com", "role": "viewer"},
+        json={"email": "new2@example.com", "role": "creator"},
         headers=auth,
     )
     assert r.json()["email_sent"] is False and r.json()["invite_url"]

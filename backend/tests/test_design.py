@@ -379,10 +379,7 @@ async def test_design_permissions(client, internet, design_ai):
     dee = await add_member(client, admin, org["id"], "dee@acme.example.com", "creator")
     dan = await add_member(client, admin, org["id"], "dan@acme.example.com", "creator")
     manager = await add_member(client, admin, org["id"], "max@acme.example.com", "creator")
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
 
-    assert (await viewer.get(url)).status_code == 200
-    assert (await viewer.post(f"{url}/start")).status_code == 403
     # Creators edit the brief and deliver designs; only admins hand out work.
     assert (await manager.patch(url, json={"designer_notes": "Bold"})).status_code == 200
     assert (
@@ -393,10 +390,7 @@ async def test_design_permissions(client, internet, design_ai):
     assert (
         await dee.post(f"{url}/assign", json={"assignee_id": dan.user["id"]})
     ).status_code == 403
-    # Admins assign; only designers (people who can upload) are valid assignees.
-    assert (
-        await admin.post(f"{url}/assign", json={"assignee_id": viewer.user["id"]})
-    ).status_code == 422
+    # Admins assign.
     assigned = await admin.post(f"{url}/assign", json={"assignee_id": dee.user["id"]})
     assert assigned.status_code == 200
     # Creators can't take a task from someone else, or deliver on it: only the
@@ -582,9 +576,6 @@ async def test_ai_image_failures_are_explained(client, internet, design_ai, fake
     task = (await admin.get(f"{API}/{task['id']}")).json()
     assert task["image_job"]["status"] == "failed" and "billing" in task["image_job"]["error"]
     assert task["creatives"] == []
-
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
-    assert (await viewer.post(f"{API}/{task['id']}/generate-image")).status_code == 403
 
 
 async def test_gemini_free_tier_without_images_is_explained():
@@ -807,8 +798,6 @@ async def test_post_colors_override_the_brand_for_this_post_only(
     task = (await admin.patch(url, json={"colors": None})).json()
     assert "colors" not in task["brand_requirements"]
 
-    viewer = await add_member(client, admin, org["id"], "vee@acme.example.com", "viewer")
-    assert (await viewer.patch(url, json={"colors": ["#000000"]})).status_code == 403
     too_many = await admin.patch(url, json={"colors": [f"#00000{i:x}" for i in range(13)]})
     assert too_many.status_code == 422
 

@@ -218,11 +218,11 @@ async def test_preferences_are_isolated_between_organizations(client, db):
 
 async def test_unauthorized_and_invalid_changes(client, db):
     admin, org = await setup(client)
-    viewer = await add_member(client, admin, org["id"], "viewer@acme.example.com", "viewer")
+    creator2 = await add_member(client, admin, org["id"], "creator2@acme.example.com", "creator")
     creator = await add_member(client, admin, org["id"], "cm@acme.example.com", "creator")
 
-    assert (await viewer.get(f"{API}/sources")).status_code == 200
-    assert (await toggle(viewer, "reddit", False)).status_code == 403
+    assert (await creator2.get(f"{API}/sources")).status_code == 200
+    assert (await toggle(creator2, "reddit", False)).status_code == 403
     assert (await toggle(creator, "reddit", False)).status_code == 403
     resp = await client.patch(f"{API}/sources/reddit", json={"enabled": False})
     assert resp.status_code == 401
