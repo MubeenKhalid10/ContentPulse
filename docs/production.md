@@ -28,6 +28,14 @@ Fly or Railway all work. Work through this list before inviting a real client.
 - **Email.** Set `SMTP_HOST`, `SMTP_FROM` and the login (see `.env.example`) so
   invitations are emailed and "Forgot password" works in local sign-in mode. Use a
   sending domain with SPF and DKIM set up, or messages land in spam.
+- **Sign-up protection (local sign-in).** With SMTP set, new accounts must confirm their
+  email before creating an organization (`REQUIRE_EMAIL_VERIFICATION`, on by default once
+  SMTP exists). For a CAPTCHA, create a free Cloudflare Turnstile site and set both
+  `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`: sign-up, sign-in and password-reset
+  requests then need a solved challenge, and the check fails closed if Cloudflare is
+  unreachable. Existing accounts are marked confirmed by the migration. People who join
+  by invitation are confirmed when they accept. With Supabase none of this applies:
+  Supabase confirms emails and runs its own CAPTCHA.
 - **AI limits.** `backend/llm_limits.json` holds free-tier figures. Set your account's
   real limits there or in `LLM_LIMITS`, including the daily image cap (`rpd` for
   `kie/*` and `cloudflare/*`). Optionally cap daily requests with `LLM_ORG_DAILY_REQUEST_BUDGET` (per organization) or `LLM_DAILY_REQUEST_BUDGET` (whole app).
