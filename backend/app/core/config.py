@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     cookie_secure: bool | None = None
     invite_ttl_hours: int = 72
     password_reset_ttl_minutes: int = 30
+    email_verification_ttl_hours: int = 48
 
     # Email (optional). Set SMTP_HOST and SMTP_FROM to email invitations and
     # password-reset links. Unset = invitations show a link to copy and share,
@@ -96,6 +97,15 @@ class Settings(BaseSettings):
     supabase_anon_key: str | None = None
     supabase_jwt_secret: str | None = None
     turnstile_site_key: str | None = None
+    # Cloudflare Turnstile for LOCAL sign-in (free CAPTCHA). Set both keys to
+    # require a solved challenge on sign-up, sign-in and password-reset requests;
+    # the secret stays on the server. (Supabase mode uses Supabase's own CAPTCHA
+    # setting and only needs TURNSTILE_SITE_KEY above.)
+    turnstile_secret_key: str | None = None
+    # LOCAL sign-in: require new accounts to confirm their email address before
+    # they can create an organization. Empty = on when SMTP is configured (the
+    # confirmation link has to be emailed), off otherwise.
+    require_email_verification: bool | None = None
 
     # AI (used from Sprint 4 onward)
     # LLM for AI alignment and content generation. Unset = rule-based analysis
@@ -405,6 +415,19 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _verification_needs_email(self) -> "Settings":
+        if (
+            self.auth_provider == "local"
+            and self.require_email_verification
+            and not self.email_enabled
+        ):
+            raise ValueError(
+                "REQUIRE_EMAIL_VERIFICATION needs SMTP_HOST and SMTP_FROM: "
+                "the confirmation link has to be emailed."
+            )
+        return self
+
     @field_validator("cors_origins")
     @classmethod
     def _bare_origins(cls, value: list[str]) -> list[str]:
@@ -414,6 +437,23 @@ class Settings(BaseSettings):
     @property
     def email_enabled(self) -> bool:
         return bool(self.smtp_host and self.smtp_from)
+
+    @property
+    def captcha_enabled(self) -> bool:
+        """Our own Turnstile check (local sign-in only; Supabase checks its own)."""
+        return (
+            self.auth_provider == "local"
+            and bool(self.turnstile_site_key)
+            and bool(self.turnstile_secret_key)
+        )
+
+    @property
+    def email_verification_required(self) -> bool:
+        if self.auth_provider != "local":
+            return False  # Supabase confirms email addresses itself
+        if self.require_email_verification is None:
+            return self.email_enabled
+        return self.require_email_verification
 
     @property
     def is_production(self) -> bool:

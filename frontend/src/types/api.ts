@@ -4,7 +4,7 @@ import type { LogoPosition } from "@/lib/logo";
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed";
 
-export type Role = "admin" | "creator" | "viewer";
+export type Role = "admin" | "creator";
 export type MemberStatus = "active" | "invited" | "disabled";
 export type Platform = "linkedin" | "x" | "instagram" | "facebook" | "blog";
 export type TrendFrequency =
@@ -49,6 +49,8 @@ export interface Me {
   email: string;
   organization_id: string | null;
   role: Role | null;
+  /** False only for a local account that hasn't confirmed its email address yet. */
+  email_verified: boolean;
   permissions: Permission[];
   memberships: MembershipSummary[];
 }

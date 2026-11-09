@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Header, Request, Response, status
 
 from app.api.deps import DB, AppSettings, CurrentUser, OptionalUser, _extract_token
+from app.core.captcha import require_captcha
 from app.core.config import Settings
 from app.core.ratelimit import (
     INVITE_PER_IP,
@@ -14,6 +15,8 @@ from app.core.ratelimit import (
     REGISTER_PER_IP,
     RESET_PER_ACCOUNT,
     RESET_PER_IP,
+    VERIFY_PER_IP,
+    VERIFY_SEND_PER_ACCOUNT,
     limiter,
     per_ip,
 )
@@ -31,6 +34,7 @@ from app.schemas.auth import (
     ProfileUpdate,
     RegisterRequest,
     SessionResponse,
+    VerifyEmailRequest,
 )
 from app.services import auth as auth_service
 
@@ -73,7 +77,13 @@ async def auth_config(settings: AppSettings) -> AuthConfig:
             supabase_anon_key=settings.supabase_anon_key,
             turnstile_site_key=settings.turnstile_site_key,
         )
-    return AuthConfig(provider="local", password_reset=settings.email_enabled)
+    return AuthConfig(
+        provider="local",
+        password_reset=settings.email_enabled,
+        email_verification=settings.email_verification_required,
+        # Only handed out when the server can also check the answer.
+        turnstile_site_key=settings.turnstile_site_key if settings.captcha_enabled else None,
+    )
 
 
 @router.post(
@@ -83,8 +93,9 @@ async def auth_config(settings: AppSettings) -> AuthConfig:
     dependencies=[per_ip(REGISTER_PER_IP)],
 )
 async def register(
-    data: RegisterRequest, response: Response, db: DB, settings: AppSettings
+    data: RegisterRequest, request: Request, response: Response, db: DB, settings: AppSettings
 ) -> SessionResponse:
+    await require_captcha(request, data.captcha_token, settings)
     user = await auth_service.register(db, data, settings)
     return await _start_session(db, user, response, settings)
 
@@ -93,6 +104,7 @@ async def register(
 async def login(
     data: LoginRequest, request: Request, response: Response, db: DB, settings: AppSettings
 ) -> SessionResponse:
+    await require_captcha(request, data.captcha_token, settings)
     # Per account from one address (so an attacker's attempts can't lock the
     # real owner out), plus a generous account-wide cap against many addresses.
     email = data.email.lower()
@@ -108,8 +120,9 @@ async def login(
     dependencies=[per_ip(RESET_PER_IP)],
 )
 async def request_password_reset(
-    data: PasswordResetRequest, db: DB, settings: AppSettings
+    data: PasswordResetRequest, request: Request, db: DB, settings: AppSettings
 ) -> dict[str, str]:
+    await require_captcha(request, data.captcha_token, settings)
     await limiter.check(RESET_PER_ACCOUNT, data.email.lower())
     await auth_service.request_password_reset(db, data.email, settings)
     # Same answer whether or not the account exists.
@@ -126,6 +139,28 @@ async def confirm_password_reset(
 ) -> SessionResponse:
     user = await auth_service.reset_password(db, data.token, data.password, settings)
     return await _start_session(db, user, response, settings)
+
+
+@router.post(
+    "/email/verify",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[per_ip(VERIFY_PER_IP)],
+)
+async def verify_email(data: VerifyEmailRequest, db: DB, settings: AppSettings) -> None:
+    """Confirm an address from the emailed link. No sign-in needed: the link may be
+    opened in another browser or on a phone."""
+    await auth_service.verify_email(db, data.token, settings)
+
+
+@router.post(
+    "/email/resend",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[per_ip(VERIFY_PER_IP)],
+)
+async def resend_verification(user: CurrentUser, settings: AppSettings) -> dict[str, str]:
+    await limiter.check(VERIFY_SEND_PER_ACCOUNT, str(user.id))
+    await auth_service.resend_verification(user, settings)
+    return {"detail": "If your address still needs confirming, a new link is on its way."}
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

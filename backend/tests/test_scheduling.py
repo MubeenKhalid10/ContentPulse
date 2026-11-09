@@ -95,8 +95,8 @@ async def test_background_discovery_needs_settings_permission(client):
 
     admin, org = await setup(client)
     url = f"/api/v1/organizations/{org['id']}/settings"
-    viewer = await add_member(client, admin, org["id"], "v@acme.example.com", "viewer")
-    assert (await viewer.patch(url, json={"background_discovery": False})).status_code == 403
+    creator2 = await add_member(client, admin, org["id"], "v@acme.example.com", "creator")
+    assert (await creator2.patch(url, json={"background_discovery": False})).status_code == 403
     outsider = await register(client, "out@other.example.com")
     resp = await outsider.patch(url, json={"background_discovery": False})
     assert resp.status_code in (403, 404)

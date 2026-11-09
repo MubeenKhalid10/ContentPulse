@@ -362,13 +362,13 @@ async def test_stale_jobs_are_recovered(client, db):
 async def test_knowledge_rbac_and_isolation(client, site, embeddings):
     admin, org, base = await setup_org(client)
     await crawl(admin, base)
-    viewer = await add_member(client, admin, org["id"], "viewer@acme.example.com", "viewer")
+    creator2 = await add_member(client, admin, org["id"], "creator2@acme.example.com", "creator")
     designer = await add_member(client, admin, org["id"], "designer@acme.example.com", "creator")
 
-    assert (await viewer.get(f"{base}/documents")).status_code == 200
-    assert (await viewer.post(f"{base}/search", json={"query": "agents"})).status_code == 200
-    assert (await viewer.post(f"{base}/crawl", json={})).status_code == 403
-    assert (await viewer.post(f"{base}/reindex")).status_code == 403
+    assert (await creator2.get(f"{base}/documents")).status_code == 200
+    assert (await creator2.post(f"{base}/search", json={"query": "agents"})).status_code == 200
+    assert (await creator2.post(f"{base}/crawl", json={})).status_code == 403
+    assert (await creator2.post(f"{base}/reindex")).status_code == 403
     assert (await designer.get(f"{base}/documents")).status_code == 200  # creators read it
     assert (await designer.post(f"{base}/crawl", json={})).status_code == 403  # admins change it
 

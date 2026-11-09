@@ -13,6 +13,8 @@ export interface AuthConfig {
   supabase_anon_key: string | null;
   /** Local mode: the server can email reset links (SMTP is set up). */
   password_reset?: boolean;
+  /** Local mode: new accounts must confirm their email before creating an organization. */
+  email_verification?: boolean;
   turnstile_site_key?: string | null;
 }
 

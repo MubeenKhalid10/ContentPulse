@@ -503,12 +503,7 @@ async def test_alignment_permissions(client, internet, fake_ai):
     admin, org = await setup_org(client)
     await discover(admin)
     trend = await gpt6_trend(admin)
-    viewer = await add_member(client, admin, org["id"], "v@acme.example.com", "viewer")
     manager = await add_member(client, admin, org["id"], "cm@acme.example.com", "creator")
-    assert (await viewer.post(f"{API}/{trend['id']}/analyze")).status_code == 403
-    assert (
-        await viewer.patch(f"{API}/{trend['id']}/relevance", json={"relevance_level": None})
-    ).status_code == 403
     assert (await manager.post(f"{API}/{trend['id']}/analyze")).status_code == 202
     await runner.wait_idle()
 

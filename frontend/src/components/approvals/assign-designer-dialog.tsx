@@ -37,9 +37,9 @@ export function AssignDesignerDialog({
   const members = useMembers();
   const assign = useAssignTask();
   const [assigningId, setAssigningId] = useState<string | null>(null);
-  // Admins and creators can add designs (viewers cannot).
+  // Admins and creators can add designs.
   const designers = (members.data ?? []).filter(
-    (m) => m.status === "active" && (m.role === "admin" || m.role === "creator"),
+    (m) => m.status === "active",
   );
 
   return (

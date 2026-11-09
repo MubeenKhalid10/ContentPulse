@@ -522,12 +522,6 @@ async def test_blog_permissions_and_isolation(client, internet, blog_ai):
     url = f"{CONTENT}/{post['id']}"
     strategies = f"/api/v1/topics/{strategy['topic_id']}/strategies"
 
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
-    assert (await viewer.get(url)).status_code == 200
-    resp = await viewer.post(strategies, json={"platform": "blog", "post_type": "Explainer"})
-    assert resp.status_code == 403
-    resp = await viewer.patch(url, json={"base_version": 1, "blog": {"slug": "x"}})
-    assert resp.status_code == 403
     creator = await add_member(client, admin, org["id"], "dee@acme.example.com", "creator")
     assert (
         await creator.patch("/api/v1/platform-rules/blog", json={"tone": "x"})

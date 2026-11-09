@@ -76,7 +76,7 @@ export function useSetupSteps() {
       done: (members.data?.length ?? 0) > 1,
       title: "Invite your team",
       detail:
-        "Creators who write and design posts, and viewers. Optional if you work alone.",
+        "Creators who write and design posts. Optional if you work alone.",
       href: "/team",
       optional: true,
     },

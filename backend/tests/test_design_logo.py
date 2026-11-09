@@ -200,8 +200,6 @@ async def test_creator_moves_the_logo_for_one_post_or_turns_it_off(
     back = await creator.patch(url, json={"logo_position": None})
     assert "logo_position" not in back.json()["brand_requirements"]
     assert (await creator.patch(url, json={"logo_position": "middle"})).status_code == 422
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
-    assert (await viewer.patch(url, json={"logo_position": "top_right"})).status_code == 403
 
 
 async def test_a_broken_logo_link_never_costs_the_image(
@@ -254,11 +252,11 @@ async def test_upload_view_replace_and_remove_the_logo(client, internet):
     assert resp.json()["has_logo_file"] is True
 
     # Any member sees it, through a fresh signed link.
-    viewer = await add_member(client, admin, org["id"], "vi@acme.example.com", "viewer")
-    seen = await viewer.get(f"{base}/logo")
+    creator2 = await add_member(client, admin, org["id"], "vi@acme.example.com", "creator")
+    seen = await creator2.get(f"{base}/logo")
     assert seen.status_code == 307
     assert (await client.get(seen.headers["location"])).content == first
-    assert (await _put_logo(viewer, org["id"], first)).status_code == 403
+    assert (await _put_logo(creator2, org["id"], first)).status_code == 403
 
     # Replacing it removes the old file.
     from app.models.organization import Organization

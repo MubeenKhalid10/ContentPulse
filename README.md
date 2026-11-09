@@ -76,7 +76,6 @@ Three roles:
 |---|---|
 | **Admin** | Everything: organization setup, team, discovery, **approving posts** |
 | **Creator** | Shortlist topics, plan and write posts, add the design and submit for approval |
-| **Viewer** | See everything and share finished posts; no changes |
 
 One post, start to finish (about 7 clicks):
 

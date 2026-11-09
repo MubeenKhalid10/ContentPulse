@@ -218,11 +218,9 @@ async def test_topic_permissions_and_isolation(client, internet, fake_ai):
     topic = await gpt6_topic(admin)
 
     designer = await add_member(client, admin, org["id"], "dee@acme.example.com", "creator")
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
+    creator2 = await add_member(client, admin, org["id"], "vic@acme.example.com", "creator")
     manager = await add_member(client, admin, org["id"], "max@acme.example.com", "creator")
-    assert (await viewer.get(f"{API}/{topic['id']}")).status_code == 200
-    assert (await viewer.post(f"{API}/{topic['id']}/shortlist")).status_code == 403
-    assert (await viewer.patch(f"{API}/{topic['id']}", json={"title": "x"})).status_code == 403
+    assert (await creator2.get(f"{API}/{topic['id']}")).status_code == 200
     assert (await designer.get(f"{API}/{topic['id']}")).status_code == 200
     assert (await manager.post(f"{API}/{topic['id']}/shortlist")).status_code == 200
 
@@ -452,12 +450,6 @@ async def test_strategy_permissions(client, internet, fake_ai):
         await admin.post(base, json={"platform": "linkedin", "post_type": "Carousel"})
     ).json()
 
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
-    assert (await viewer.get(base)).status_code == 200
-    assert (
-        await viewer.post(base, json={"platform": "x", "post_type": "Thread"})
-    ).status_code == 403
-    assert (await viewer.post(f"{base}/{created['id']}/approve")).status_code == 403
     creator = await add_member(client, admin, org["id"], "dee@acme.example.com", "creator")
     assert (
         await creator.post(base, json={"platform": "x", "post_type": "Thread"})

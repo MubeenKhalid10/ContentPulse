@@ -178,11 +178,6 @@ async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSumm
 # --- Overview (the dashboard page) --------------------------------------------------
 
 PERIODS = (7, 30, 90)
-APPROVAL_STAGE_STATUSES = (
-    PostStatus.CONTENT_REVIEW,
-    PostStatus.PENDING_APPROVAL,
-    PostStatus.CHANGES_REQUESTED,
-)
 PIPELINE = {
     "draft": (PostStatus.DRAFT,),
     "design": (
@@ -333,13 +328,10 @@ async def overview(
             )
         )
 
-    # Admins see everything (with who wrote it); creators their own posts; viewers
-    # nothing that is in an approval stage.
+    # Admins see everything (with who wrote it); creators their own posts.
     recent_query = select(Post).where(Post.organization_id == org)
     if role == Role.CREATOR:
         recent_query = recent_query.where(Post.created_by == user_id)
-    elif role == Role.VIEWER:
-        recent_query = recent_query.where(Post.status.notin_(APPROVAL_STAGE_STATUSES))
     recent = await db.scalars(recent_query.order_by(Post.updated_at.desc()).limit(8))
 
     recent_list = list(recent)

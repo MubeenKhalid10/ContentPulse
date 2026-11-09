@@ -48,7 +48,12 @@ export function useLogin() {
       captchaToken?: string;
     }): Promise<{ user: Me }> => {
       const supabase = await getSupabase();
-      if (!supabase) return api<Session>("/auth/login", { method: "POST", body });
+      if (!supabase) {
+        return api<Session>("/auth/login", {
+          method: "POST",
+          body: { email: body.email, password: body.password, captcha_token: body.captchaToken },
+        });
+      }
       if (!body.captchaToken) throw authFailure("Complete the CAPTCHA challenge.", 400);
       const { email, password, captchaToken } = body;
       const { error } = await supabase.auth.signInWithPassword({
@@ -84,7 +89,15 @@ export function useRegister() {
     }): Promise<RegisterResult> => {
       const supabase = await getSupabase();
       if (!supabase) {
-        const session = await api<Session>("/auth/register", { method: "POST", body });
+        const session = await api<Session>("/auth/register", {
+          method: "POST",
+          body: {
+            email: body.email,
+            password: body.password,
+            full_name: body.full_name,
+            captcha_token: body.captchaToken,
+          },
+        });
         return { user: session.user, needsConfirmation: false };
       }
       if (!body.captchaToken) throw authFailure("Complete the CAPTCHA challenge.", 400);

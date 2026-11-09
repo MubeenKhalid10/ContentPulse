@@ -78,8 +78,8 @@ async def test_viewers_and_other_organizations_cannot_use_versions(client, db):
     await add_version(admin, task_id, "first.png")
     await add_version(admin, task_id, "second.png")
 
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
-    assert (await viewer.post(f"{API}/{task_id}/versions/1/use")).status_code == 403
+    creator2 = await add_member(client, admin, org["id"], "vic@acme.example.com", "creator")
+    assert (await creator2.post(f"{API}/{task_id}/versions/1/use")).status_code == 403
 
     outsider = await register(client, "out@other.example.com")
     await create_org(outsider, name="Other Co")

@@ -24,6 +24,9 @@ class User(UUIDPk, Timestamps, Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=true(), nullable=False
     )
+    # Set when the person proved they control the address (confirmation link,
+    # accepted invitation). Local sign-in only; Supabase confirms by itself.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Local sessions carry this number; changing it signs every session out
     # (password change/reset, logout).

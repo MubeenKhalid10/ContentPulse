@@ -451,15 +451,6 @@ async def test_content_permissions_and_isolation(client, internet, content_ai):
     post = await generated(admin, strategy)
     url = f"{API}/{post['id']}"
 
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
-    assert (await viewer.get(url)).status_code == 200
-    assert (await viewer.get(f"{url}/versions")).status_code == 200
-    assert (await viewer.patch(url, json={"base_version": 1, "hook": "x"})).status_code == 403
-    assert (await viewer.post(f"{url}/regenerate", json={})).status_code == 403
-    assert (
-        await viewer.post(f"{API}/generate", json={"strategy_id": strategy["id"]})
-    ).status_code == 403
-
     manager = await add_member(client, admin, org["id"], "max@acme.example.com", "creator")
     resp = await manager.patch(url, json={"base_version": 1, "hook": "Manager edit"})
     assert resp.status_code == 200 and resp.json()["current"]["created_by"] == manager.user["id"]

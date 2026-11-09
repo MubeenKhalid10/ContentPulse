@@ -318,12 +318,11 @@ async def test_review_workflow_and_permissions(client, internet):
     admin, org = await setup(client)
     await discover(admin)
     manager = await add_member(client, admin, org["id"], "cm@acme.example.com", "creator")
-    viewer = await add_member(client, admin, org["id"], "viewer@acme.example.com", "viewer")
+    creator2 = await add_member(client, admin, org["id"], "creator2@acme.example.com", "creator")
     trend = (await admin.get(API)).json()["items"][0]
 
-    # Viewers read; content managers review (shortlist/reject) but can't run discovery.
-    assert (await viewer.get(API)).status_code == 200
-    assert (await viewer.post(f"{API}/{trend['id']}/shortlist")).status_code == 403
+    # Creators read; content managers review (shortlist/reject) but can't run discovery.
+    assert (await creator2.get(API)).status_code == 200
     assert (await manager.post(f"{API}/discover", json={})).status_code == 403
     resp = await manager.post(f"{API}/{trend['id']}/shortlist")
     assert resp.status_code == 200 and resp.json()["status"] == "shortlisted"

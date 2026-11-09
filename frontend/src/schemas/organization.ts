@@ -67,5 +67,5 @@ export const settingsSchema = z.object({
 
 export const inviteSchema = z.object({
   email: z.email("Enter a valid email address."),
-  role: z.enum(["admin", "creator", "viewer"]),
+  role: z.enum(["admin", "creator"]),
 });
