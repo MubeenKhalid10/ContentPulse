@@ -483,7 +483,7 @@ goes through `app/ai/gateway.py`. Full guide: [docs/llm-gateway.md](docs/llm-gat
 
 - Spec role lists omit some reads that the workflow needs. Content managers also get
   `content.read` and `approval.read`; designers get `organization.read` (to see brand
-  guidelines). Viewers get every `*.read`.
+  guidelines). Only two roles exist: admin and creator.
 - `organization_services` has a `kind` (service / product / expertise) to cover the
   spec's "Services, Products, Expertise" without three tables.
 - Trends are organization-scoped (each org tracks its own markets and keywords).
