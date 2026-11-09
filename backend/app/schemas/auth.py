@@ -10,15 +10,21 @@ from app.schemas.common import Name
 Password = Annotated[str, StringConstraints(min_length=10, max_length=128)]
 
 
+CaptchaToken = Annotated[str, StringConstraints(max_length=4096)] | None
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: Password
     full_name: Name
+    # Cloudflare Turnstile response; only checked when CAPTCHA is configured.
+    captcha_token: CaptchaToken = None
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: Annotated[str, StringConstraints(min_length=1, max_length=128)]
+    captcha_token: CaptchaToken = None
 
 
 class AcceptInviteRequest(BaseModel):
@@ -43,6 +49,8 @@ class MeResponse(BaseModel):
     email: str
     organization_id: uuid.UUID | None
     role: Role | None
+    # False only for a local account that hasn't confirmed its email address yet.
+    email_verified: bool
     permissions: list[str]
     memberships: list[MembershipSummary]
 
@@ -60,6 +68,8 @@ class AuthConfig(BaseModel):
     provider: Literal["local", "supabase"]
     # Local mode: true when the server can email reset links (SMTP is set up).
     password_reset: bool = False
+    # Local mode: new accounts must confirm their email before creating an organization.
+    email_verification: bool = False
     supabase_url: str | None = None
     # The anon/publishable key is designed to be public (row-level security
     # protects data); never the service-role key.
@@ -77,6 +87,11 @@ class InvitePreview(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
+    captcha_token: CaptchaToken = None
+
+
+class VerifyEmailRequest(BaseModel):
+    token: Annotated[str, StringConstraints(min_length=20, max_length=2000)]
 
 
 class ProfileUpdate(BaseModel):

@@ -40,6 +40,11 @@ RESET_PER_IP = Rule("reset", 10, 3600, "Too many reset requests. Try again later
 RESET_PER_ACCOUNT = Rule(
     "reset-account", 3, 3600, "A reset link was sent recently. Check your inbox."
 )
+# Confirmation emails: each one can email a stranger, so keep resends scarce.
+VERIFY_SEND_PER_ACCOUNT = Rule(
+    "verify-send", 5, 3600, "A confirmation email was sent recently. Check your inbox."
+)
+VERIFY_PER_IP = Rule("verify", 30, 3600, "Too many confirmation attempts. Try again later.")
 INVITE_PER_IP = Rule("invite", 30, 3600, "Too many invitation attempts. Try again later.")
 # Sending invitations (each one can email a stranger): per admin and per organization.
 INVITE_SEND_PER_USER = Rule(

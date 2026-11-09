@@ -26,6 +26,8 @@ def smtp_on(monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "smtp_host", "smtp.example.com")
     monkeypatch.setattr(settings, "smtp_from", "ContentPulse <no-reply@example.com>")
+    # These tests are about reset and invitation emails; confirmation has its own file.
+    monkeypatch.setattr(settings, "require_email_verification", False)
     return settings
 
 

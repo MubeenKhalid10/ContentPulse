@@ -7,15 +7,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.email import send_email
-from app.core.email_templates import password_reset_email
-from app.core.errors import AppError, Conflict, ErrorCode, Forbidden, NotFound, Unauthorized
+from app.core.email_templates import email_verification_email, password_reset_email
+from app.core.errors import (
+    AppError,
+    Conflict,
+    ErrorCode,
+    Forbidden,
+    NotFound,
+    ServiceUnavailable,
+    Unauthorized,
+)
 from app.core.permissions import Role, permissions_for
 from app.core.security import (
+    create_email_verification_token,
     create_password_reset_token,
     decode_local_token,
     hash_invite_token,
     hash_password,
     password_matches_fingerprint,
+    read_email_verification_token,
     read_password_reset_token,
     verify_password,
 )
@@ -50,6 +60,58 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     return await db.scalar(select(User).where(User.email == normalize_email(email)))
 
 
+def is_email_verified(user: User) -> bool:
+    """Supabase confirms addresses itself; local accounts carry `email_verified_at`."""
+    return user.email_verified_at is not None or user.auth_provider != AuthProvider.LOCAL
+
+
+def require_verified_email(user: User, settings: Settings) -> None:
+    """Gate for creating an organization when email verification is on."""
+    if settings.email_verification_required and not is_email_verified(user):
+        raise Forbidden("Confirm your email address first: check your inbox for the link.")
+
+
+async def send_verification_email(user: User, settings: Settings) -> bool:
+    """Email the confirmation link. False when email isn't set up or wasn't accepted."""
+    token = create_email_verification_token(user.id, user.email, settings)
+    link = f"{settings.frontend_url.rstrip('/')}/verify-email#token={token}"
+    text, html = email_verification_email(
+        name=user.full_name,
+        verify_url=link,
+        expires_in_hours=settings.email_verification_ttl_hours,
+        site_url=settings.frontend_url.rstrip("/"),
+    )
+    return await send_email(
+        settings,
+        to=user.email,
+        subject="Confirm your ContentPulse email",
+        body=text,
+        html=html,
+    )
+
+
+async def verify_email(db: AsyncSession, token: str, settings: Settings) -> None:
+    """Mark the address in a confirmation link as verified (idempotent)."""
+    _require_local(settings)
+    user_id, email = read_email_verification_token(token, settings)
+    user = await db.get(User, user_id)
+    if user is None or not user.is_active or user.email != email:
+        raise Unauthorized("This confirmation link is invalid or has expired. Ask for a new one.")
+    if user.email_verified_at is None:
+        user.email_verified_at = datetime.now(UTC)
+        await db.commit()
+
+
+async def resend_verification(user: User, settings: Settings) -> None:
+    _require_local(settings)
+    if is_email_verified(user):
+        return
+    if not settings.email_enabled:
+        raise ServiceUnavailable("Email isn't set up on this server, so we can't send the link.")
+    if not await send_verification_email(user, settings):
+        raise ServiceUnavailable("We couldn't send the email right now. Try again shortly.")
+
+
 async def register(db: AsyncSession, data: RegisterRequest, settings: Settings) -> User:
     _require_local(settings)
     email = normalize_email(data.email)
@@ -74,6 +136,9 @@ async def register(db: AsyncSession, data: RegisterRequest, settings: Settings) 
     except IntegrityError as exc:
         await db.rollback()
         raise Conflict("An account with this email already exists.") from exc
+    if settings.email_verification_required:
+        # Best effort: if it doesn't arrive, the person can ask for another.
+        await send_verification_email(user, settings)
     return user
 
 
@@ -261,6 +326,7 @@ async def build_me(
         email=user.email,
         organization_id=active[1].id if active else None,
         role=role,
+        email_verified=is_email_verified(user),
         permissions=permissions_for(role) if role else [],
         memberships=[
             MembershipSummary(
@@ -332,6 +398,9 @@ async def accept_invite(
         user.full_name = data.full_name
     now = datetime.now(UTC)
     user.last_login_at = now
+    if user.email_verified_at is None and settings.auth_provider == "local":
+        # The invitation link went to this address, so accepting it proves control.
+        user.email_verified_at = now
     member.status = MemberStatus.ACTIVE
     member.joined_at = now
     member.invite_token_hash = None
