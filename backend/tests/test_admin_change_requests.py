@@ -115,8 +115,8 @@ async def test_instructions_are_required_and_only_admins_ask(client, internet, d
     url = f"{API}/{item['id']}/request-changes"
     assert (await admin.post(url, json={"comment": "fix", "scope": "both"})).status_code == 422
     assert (await admin.post(url, json={"scope": "both"})).status_code == 422
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
-    for actor in (designer, viewer):
+    creator2 = await add_member(client, admin, org["id"], "vic@acme.example.com", "creator")
+    for actor in (designer, creator2):
         assert (await actor.post(url, json={"comment": NOTE})).status_code == 403
         assert (
             await actor.post(f"{API}/{item['id']}/reopen", json={"comment": NOTE})
@@ -287,5 +287,5 @@ async def test_an_unsent_upload_can_be_removed_but_a_reviewed_one_cannot(
     assert removed.status_code == 200
     assert [c["version"] for c in removed.json()["creatives"]] == [1]
     assert (await designer.delete(f"{url}/creatives/2")).status_code == 404
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
-    assert (await viewer.delete(f"{url}/creatives/1")).status_code == 403
+    creator2 = await add_member(client, admin, org["id"], "vic@acme.example.com", "creator")
+    assert (await creator2.delete(f"{url}/creatives/1")).status_code == 403

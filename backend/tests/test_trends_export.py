@@ -84,7 +84,7 @@ async def test_unauthenticated_requests_are_rejected(client):
         assert "text/csv" not in resp.headers.get("content-type", "")
 
 
-@pytest.mark.parametrize("role", ["creator", "viewer"])
+@pytest.mark.parametrize("role", ["creator"])
 async def test_non_admins_cannot_export(client, db, role):
     admin, org = await admin_with_org(client)
     await add_trend(db, org["id"], "Visible to members", END - timedelta(days=1))

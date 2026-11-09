@@ -413,7 +413,7 @@ async def test_invitations_are_rate_limited_per_admin_and_per_organization(clien
     try:
         statuses = [
             (
-                await admin.post(url, json={"email": f"p{i}@example.com", "role": "viewer"})
+                await admin.post(url, json={"email": f"p{i}@example.com", "role": "creator"})
             ).status_code
             for i in range(INVITE_SEND_PER_USER.limit + 1)
         ]

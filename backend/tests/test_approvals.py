@@ -220,7 +220,6 @@ async def test_comments_and_permissions(client, internet, design_ai):
     _, item, designer = await submitted(client, admin, org)
     url = f"{API}/{item['id']}"
     manager = await add_member(client, admin, org["id"], "max@acme.example.com", "creator")
-    viewer = await add_member(client, admin, org["id"], "vic@acme.example.com", "viewer")
 
     first = (await admin.post(f"{url}/comments", json={"body": "Love slide 1."})).json()
     assert first["comments"][0]["author"]["id"] == admin.user["id"]
@@ -231,10 +230,6 @@ async def test_comments_and_permissions(client, internet, design_ai):
     assert all(c["post_version"] == 1 and c["creative_version"] == 1 for c in second)
     third = await designer.post(post_comments, json={"body": "Fixed slide 3."})
     assert third.status_code == 200
-    assert len((await viewer.get(post_comments)).json()) == 3  # read-only access
-    assert (await viewer.post(post_comments, json={"body": "x"})).status_code == 403
-    assert (await viewer.get(url)).status_code == 403
-    assert (await viewer.post(f"{url}/comments", json={"body": "x"})).status_code == 403
     assert (await designer.post(f"{url}/comments", json={"body": "x"})).status_code == 403
     assert (await admin.post(f"{url}/comments", json={"body": "  "})).status_code == 422
     assert (await admin.get(API)).json()["items"][0]["comment_count"] == 3
