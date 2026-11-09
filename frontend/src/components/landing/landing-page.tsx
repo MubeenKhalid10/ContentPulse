@@ -25,10 +25,6 @@ const STAFF = [
     role: "Creator",
     duty: "Shortlists, writes, adds the design and sends it for approval.",
   },
-  {
-    role: "Viewer",
-    duty: "Reads everything and shares finished posts. Good for a client contact.",
-  },
 ];
 
 export function LandingPage({ signedIn }: { signedIn: boolean }) {
@@ -403,7 +399,7 @@ const FAQ = [
   },
   {
     q: "Who on my team can do what?",
-    a: "Admins set up clients, invite people and approve posts. Creators shortlist topics, write posts and add designs. Viewers can read everything and share finished posts, which suits a client contact.",
+    a: "Admins set up clients, invite people and approve posts. Creators shortlist topics, write posts and add designs.",
   },
   {
     q: "What if AI isn't set up?",

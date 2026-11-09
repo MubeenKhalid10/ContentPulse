@@ -5,13 +5,11 @@ import type { OfferingKind, Platform, Role, TrendFrequency } from "@/types/api";
 export const ROLE_OPTIONS: Option<Role>[] = [
   { value: "admin", label: "Admin" },
   { value: "creator", label: "Creator" },
-  { value: "viewer", label: "Viewer" },
 ];
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   admin: "Everything, including approving posts, organization settings and the team.",
   creator: "Shortlists topics, writes posts, adds the design and sends them to an admin for approval.",
-  viewer: "Sees everything and can share finished posts. Can't change anything.",
 };
 
 export const PLATFORM_OPTIONS: Option<Platform>[] = [
