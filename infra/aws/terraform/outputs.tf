@@ -57,3 +57,8 @@ output "creatives_bucket" {
 output "log_group" {
   value = aws_cloudwatch_log_group.app.name
 }
+
+output "db_identifier" {
+  description = "RDS instance id (deploy.sh snapshots it before each migration)."
+  value       = aws_db_instance.main.identifier
+}

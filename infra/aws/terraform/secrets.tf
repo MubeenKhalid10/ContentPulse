@@ -15,6 +15,18 @@ locals {
   secret_keys = [
     "JWT_SECRET",
     "LLM_API_KEY",
+    # Non-secret settings the stack doesn't set itself. Empty means "unset", so the
+    # app's defaults apply (e.g. no EMBEDDING_PROVIDER = keyword-only search).
+    "LLM_MODEL",
+    "LLM_FALLBACK_MODEL",
+    "LLM_FALLBACKS",
+    "EMBEDDING_PROVIDER",
+    "EMBEDDING_MODEL",
+    "IMAGE_PROVIDER",
+    "IMAGE_MODEL",
+    "TURNSTILE_SITE_KEY",
+    "TURNSTILE_SECRET_KEY",
+    "REQUIRE_EMAIL_VERIFICATION",
     "GEMINI_API_KEY",
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
