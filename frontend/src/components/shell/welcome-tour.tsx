@@ -133,7 +133,6 @@ export function WelcomeTour({ me }: { me: Me }) {
             they can export for a designer. After the design is added, they
             approve it again and the post is ready to publish.
           </li>
-          <li>Viewers can see everything and share finished posts.</li>
         </ul>
       ),
     },

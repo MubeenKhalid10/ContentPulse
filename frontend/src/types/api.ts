@@ -4,7 +4,7 @@ import type { LogoPosition } from "@/lib/logo";
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed";
 
-export type Role = "admin" | "creator" | "viewer";
+export type Role = "admin" | "creator";
 export type MemberStatus = "active" | "invited" | "disabled";
 export type Platform = "linkedin" | "x" | "instagram" | "facebook" | "blog";
 export type TrendFrequency =
