@@ -124,6 +124,8 @@ async def test_config_exposes_public_supabase_settings(client, supabase):
         "supabase_url": SUPABASE_URL,
         "supabase_anon_key": "sb_publishable_test",
         "turnstile_site_key": None,
+        # Supabase confirms emails itself, so our own confirmation step is never asked for.
+        "email_verification": False,
     }
 
 
@@ -136,7 +138,8 @@ async def test_config_exposes_the_public_turnstile_site_key(client, supabase, mo
 
 
 async def test_local_mode_publishes_no_turnstile_key(client, monkeypatch):
-    # The CAPTCHA belongs to Supabase Auth; local sign-in never shows one.
+    # A site key alone doesn't turn the CAPTCHA on in local mode: the server also needs
+    # TURNSTILE_SECRET_KEY to check answers (see test_email_verification_captcha.py).
     monkeypatch.setattr(get_settings(), "turnstile_site_key", "0x4AAAAAAATestSiteKey")
     body = (await client.get("/api/v1/auth/config")).json()
     assert body["provider"] == "local" and body["turnstile_site_key"] is None
