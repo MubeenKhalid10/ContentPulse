@@ -36,6 +36,11 @@ class S3Storage:
             config=Config(
                 signature_version="s3v4",
                 retries={"max_attempts": 3},
+                # boto3 >= 1.36 adds a CRC32 checksum to presigned PUT URLs by default,
+                # computed over an empty body; the browser's real upload then fails the
+                # check. Only checksum when S3 requires it.
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
                 # S3-compatible stores (Supabase Storage, R2, MinIO) expect
                 # bucket-in-path URLs; AWS itself prefers virtual hosts.
                 s3={"addressing_style": "path" if settings.s3_endpoint_url else "auto"},
