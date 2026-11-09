@@ -8,7 +8,8 @@
 # Steps: build both images under an immutable release tag -> push to ECR ->
 # run migrations as a one-off task from that image (the release stops here if
 # they fail, and nothing running has changed) -> point the services at the
-# release tag -> wait until stable.
+# release tag -> wait until stable. (A database snapshot is taken before the
+# migration; SKIP_DB_SNAPSHOT=1 skips it.)
 #
 # Images are only ever addressed by their release tag (the ECR repositories are
 # immutable), so a rollback is a different tag, never a re-pushed one:
@@ -77,6 +78,21 @@ if missing:
 if [ -n "$MERGED" ]; then
   aws secretsmanager put-secret-value --secret-id "$SECRET_ARN" --secret-string "$MERGED" >/dev/null
   echo "    added missing keys (empty)"
+fi
+
+# A restore point before any schema change: migrations can't always be reversed
+# (the viewer-role removal, for one, can't restore who was a viewer). Takes a few
+# minutes on a small database. SKIP_DB_SNAPSHOT=1 skips it (a throwaway stack).
+if [ "${SKIP_DB_SNAPSHOT:-}" != "1" ]; then
+  DB_ID="$(out db_identifier)"
+  SNAPSHOT="$DB_ID-pre-${RELEASE//[^A-Za-z0-9]/-}"
+  echo "==> Snapshotting the database ($SNAPSHOT)"
+  if aws rds describe-db-snapshots --db-snapshot-identifier "$SNAPSHOT" >/dev/null 2>&1; then
+    echo "    $SNAPSHOT already exists; reusing it"
+  else
+    aws rds create-db-snapshot --db-instance-identifier "$DB_ID"       --db-snapshot-identifier "$SNAPSHOT" >/dev/null
+  fi
+  aws rds wait db-snapshot-available --db-snapshot-identifier "$SNAPSHOT"
 fi
 
 # Only the migration task moves to the new image here; the running services are
