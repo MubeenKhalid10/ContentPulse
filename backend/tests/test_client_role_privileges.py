@@ -225,6 +225,8 @@ PUBLIC = {
     ("POST", "/api/v1/auth/logout"),
     ("POST", "/api/v1/auth/password-reset"),
     ("POST", "/api/v1/auth/password-reset/confirm"),
+    # The emailed confirmation link may be opened on another device; its token is the credential.
+    ("POST", "/api/v1/auth/email/verify"),
     ("GET", "/api/v1/auth/invites/{token}"),
     ("POST", "/api/v1/auth/invites/accept"),
     ("GET", "/api/v1/storage/local/{token}"),
