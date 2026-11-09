@@ -8,3 +8,6 @@ storage
 .env.*
 *.pem
 *.key
+*.tmp.py
+test-results
+.env.bak*
