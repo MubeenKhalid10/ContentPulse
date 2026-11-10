@@ -36,6 +36,8 @@ class UploadTarget:
     headers: dict[str, str]
     key: str
     expires_at: datetime
+    # Form fields to send before the file when method is POST (presigned S3 POST).
+    fields: dict[str, str] | None = None
 
 
 @dataclass

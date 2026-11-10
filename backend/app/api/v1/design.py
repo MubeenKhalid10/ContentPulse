@@ -153,6 +153,7 @@ async def request_upload(task_id: uuid.UUID, data: UploadRequest, ctx: CanUpload
         headers=target.headers,
         storage_key=target.key,
         expires_at=target.expires_at,
+        fields=target.fields or {},
     )
 
 

@@ -48,19 +48,26 @@ class S3Storage:
         )
 
     async def upload_target(self, key: str, content_type: str, max_bytes: int) -> UploadTarget:
-        # A presigned PUT can't cap the size; it's checked when the upload is registered.
-        url = await asyncio.to_thread(
-            self.client.generate_presigned_url,
-            "put_object",
-            Params={"Bucket": self.bucket, "Key": check_key(key), "ContentType": content_type},
+        # A presigned POST carries a policy S3 enforces: the exact key and type, and a
+        # size between 1 byte and max_bytes. (A presigned PUT cannot cap the size.)
+        post = await asyncio.to_thread(
+            self.client.generate_presigned_post,
+            Bucket=self.bucket,
+            Key=check_key(key),
+            Fields={"Content-Type": content_type},
+            Conditions=[
+                {"Content-Type": content_type},
+                ["content-length-range", 1, max_bytes],
+            ],
             ExpiresIn=self.ttl,
         )
         return UploadTarget(
-            url=url,
-            method="PUT",
-            headers={"Content-Type": content_type},
+            url=post["url"],
+            method="POST",
+            headers={},
             key=key,
             expires_at=datetime.now(UTC) + timedelta(seconds=self.ttl),
+            fields=post["fields"],
         )
 
     async def put(self, key: str, data: bytes, content_type: str) -> None:
@@ -103,6 +110,10 @@ class S3Storage:
         return ObjectInfo(size=resp["ContentLength"], content_type=resp.get("ContentType"))
 
     async def download_url(self, key: str, filename: str, *, inline: bool = True) -> str:
+        # SVG and HTML can carry scripts: they are only ever offered as downloads
+        # (an <img> tag still draws an SVG), matching the local store.
+        if filename.lower().endswith((".svg", ".svgz", ".html", ".htm", ".xml")):
+            inline = False
         disposition = f"{'inline' if inline else 'attachment'}; filename*=UTF-8''{quote(filename)}"
         return await asyncio.to_thread(
             self.client.generate_presigned_url,

@@ -136,7 +136,15 @@ function putFile(ticket: UploadTicket, file: File, onProgress: (loaded: number) 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(ticket.method, ticket.url);
-    for (const [name, value] of Object.entries(ticket.headers)) xhr.setRequestHeader(name, value);
+    // S3 uploads are form POSTs (the size limit is part of the signed policy);
+    // local storage takes a plain PUT with headers.
+    const form = ticket.method === "POST" ? new FormData() : null;
+    if (form) {
+      for (const [name, value] of Object.entries(ticket.fields ?? {})) form.append(name, value);
+      form.append("file", file); // must be the last field
+    } else {
+      for (const [name, value] of Object.entries(ticket.headers)) xhr.setRequestHeader(name, value);
+    }
     xhr.upload.onprogress = (e) => onProgress(e.loaded);
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) return resolve();
@@ -150,7 +158,7 @@ function putFile(ticket: UploadTicket, file: File, onProgress: (loaded: number) 
     };
     xhr.onerror = () =>
       reject(new ApiError(0, "FILE_UPLOAD_FAILED", "The upload was interrupted. Check your connection and try again."));
-    xhr.send(file);
+    xhr.send(form ?? file);
   });
 }
 

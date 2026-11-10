@@ -201,6 +201,7 @@ class UploadTicket(BaseModel):
     headers: dict[str, str]
     storage_key: str
     expires_at: datetime
+    fields: dict[str, str] = {}
 
 
 class UploadedFile(BaseModel):
