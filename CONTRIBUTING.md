@@ -17,6 +17,24 @@
 
 Nothing is pushed straight to `main`.
 
+## Never rewrite pushed commits
+
+This is what causes `! [rejected] ... (non-fast-forward)` on `git push`.
+
+- **Don't `git rebase` (or `commit --amend`, or `reset`) commits that are already on GitHub.**
+  A rebase gives them new hashes; GitHub still has the old ones, so the branch has
+  diverged and every push is rejected until someone force-pushes or merges the two
+  histories. To bring in `main`, use `git merge origin/main`.
+- **One branch per pull request.** Once a PR is merged, delete the branch (turn on
+  *Settings → General → Automatically delete head branches* in GitHub) and start the
+  next piece of work from a fresh `main`: `git switch main && git pull && git switch -c <name>`.
+  Reusing a merged branch name is how the same commits end up on two histories.
+- If a push is rejected anyway: `git fetch`, then `git merge origin/<branch>` and push
+  again. Never `git push --force`; if you truly must rewrite a branch only you use,
+  use `git push --force-with-lease`.
+- Optional local guard: copy the `pre-rebase` hook from `docs/git-pre-rebase-hook.sh` to
+  `.git/hooks/pre-rebase` (it refuses to rebase commits that are already on a remote).
+
 ## Branch names
 
 `feat/…` a new capability, `fix/…` a bug fix, `chore/…` tooling, cleanup or dependencies,
