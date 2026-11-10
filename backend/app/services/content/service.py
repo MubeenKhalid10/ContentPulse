@@ -161,6 +161,7 @@ def _generation(job: AIGenerationJob | None) -> GenerationStatus | None:
         kind=job.result.get("kind", "generate"),
         status=status,
         engine="template" if job.provider == "template" else "ai",
+        fallback_reason=(job.result.get("fallback") or {}).get("reason"),
         error=job.error
         if job.status == JobStatus.FAILED
         else ("Generation was interrupted. Try again." if status == JobStatus.FAILED else None),

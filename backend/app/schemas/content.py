@@ -43,6 +43,8 @@ class GenerationStatus(BaseModel):
     kind: str  # generate | regenerate | variant
     status: JobStatus
     engine: str  # ai | template
+    # Set when the AI couldn't write the draft and the template draft was used instead.
+    fallback_reason: str | None = None
     error: str | None
     created_at: datetime
     completed_at: datetime | None

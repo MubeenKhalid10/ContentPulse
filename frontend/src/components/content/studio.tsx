@@ -351,6 +351,33 @@ function GenerationBanner({ post, canGenerate, generating }: { post: PostDetail;
       </Alert>
     );
   }
+  if (g.status === "succeeded" && g.fallback_reason && post.current?.meta.engine === "template") {
+    return (
+      <Alert className="mb-6" role="status">
+        <AlertTriangleIcon />
+        <AlertTitle>AI couldn&apos;t write this post, so this is a template draft</AlertTitle>
+        <AlertDescription className="grid gap-2">
+          <span>
+            {g.fallback_reason} The draft restates your plan so you can keep going, and you can edit it as usual.
+          </span>
+          {canGenerate && post.editable && (
+            <div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={regenerate.isPending}
+                pending={regenerate.isPending}
+                onClick={() => regenerate.mutate({ id: post.id }, { onError: (e) => toast.error(errorMessage(e)) })}
+              >
+                <RefreshCwIcon />
+                Try AI again
+              </Button>
+            </div>
+          )}
+        </AlertDescription>
+      </Alert>
+    );
+  }
   if (g.status === "succeeded" && g.engine === "template" && post.current?.meta.engine === "template") {
     return (
       <Alert className="mb-6">

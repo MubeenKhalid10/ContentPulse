@@ -234,21 +234,56 @@ async def test_template_draft_without_ai(client, internet):
     assert v1["cta"] == "Invite readers to an AI Solutions workshop"
 
 
-async def test_ai_failure_is_recorded_and_retry_works(client, internet, content_ai):
+@pytest.mark.parametrize(
+    "failure",
+    [
+        AIError(AIErrorKind.UNAVAILABLE, "Gemini error (503)."),
+        AIError(AIErrorKind.QUOTA_EXHAUSTED, "daily quota"),
+        AIError(AIErrorKind.AUTH, "bad key"),
+        AIError(AIErrorKind.BUDGET_EXHAUSTED, "daily budget"),
+        AIError(AIErrorKind.BAD_OUTPUT, "invalid json"),
+    ],
+)
+async def test_ai_failure_falls_back_to_a_template_draft_and_retry_works(
+    client, internet, content_ai, failure
+):
     admin, org = await setup_org(client)
     strategy = await approved_strategy(admin, org)
-    content_ai.post_fail = AIError(AIErrorKind.UNAVAILABLE, "Gemini error (503).")
+    content_ai.post_fail = failure
     post = await generated(admin, strategy)
-    assert post["current_version"] == 0 and post["current"] is None
-    assert post["generation"]["status"] == "failed"
-    assert post["generation"]["error"] == USER_MESSAGES[AIErrorKind.UNAVAILABLE]
+    # Nothing stops: the person gets a template draft, plus the reason.
+    assert post["current_version"] == 1 and post["current"]["meta"]["engine"] == "template"
+    assert post["generation"]["status"] == "succeeded"
+    assert post["generation"]["engine"] == "template"
+    assert post["generation"]["fallback_reason"] == USER_MESSAGES[failure.kind]
+    assert post["generation"]["error"] is None
+    assert post["current"]["meta"]["fallback_reason"] == USER_MESSAGES[failure.kind]
 
+    # "Try AI again" is the ordinary regenerate: once the AI is back, v2 is AI-written.
     content_ai.post_fail = None
     resp = await admin.post(f"{API}/{post['id']}/regenerate", json={})
     assert resp.status_code == 202
     await runner.wait_idle()
     post = (await admin.get(f"{API}/{post['id']}")).json()
-    assert post["current_version"] == 1 and post["generation"]["status"] == "succeeded"
+    assert post["current_version"] == 2 and post["generation"]["status"] == "succeeded"
+    assert post["current"]["meta"]["engine"] == "ai"
+    assert post["generation"]["fallback_reason"] is None
+
+
+async def test_if_even_the_template_fails_the_job_fails_with_a_message(
+    client, internet, content_ai, monkeypatch
+):
+    from app.services.content import generation
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("template bug")
+
+    monkeypatch.setattr(generation, "template_copy", broken)
+    admin, org = await setup_org(client)
+    content_ai.post_fail = AIError(AIErrorKind.UNAVAILABLE, "503")
+    post = await generated(admin, await approved_strategy(admin, org))
+    assert post["current"] is None and post["generation"]["status"] == "failed"
+    assert post["generation"]["error"] == USER_MESSAGES[AIErrorKind.UNAVAILABLE]
 
 
 async def test_regenerate_keeps_old_versions_and_passes_instructions(client, internet, content_ai):
@@ -380,7 +415,13 @@ async def test_review_and_hand_off_to_design(client, internet, content_ai):
     assert "CONTENT_GENERATED" in actions and "STATUS_CHANGED" in actions
 
 
-async def test_empty_post_cant_move_on(client, internet, content_ai):
+async def test_empty_post_cant_move_on(client, internet, content_ai, monkeypatch):
+    from app.services.content import generation
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("template bug")
+
+    monkeypatch.setattr(generation, "template_copy", broken)  # nothing gets written at all
     admin, org = await setup_org(client)
     strategy = await approved_strategy(admin, org)
     content_ai.post_fail = AIError(AIErrorKind.RATE_LIMITED, "quota")
