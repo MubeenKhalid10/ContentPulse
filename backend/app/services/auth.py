@@ -231,7 +231,11 @@ async def reset_password(db: AsyncSession, token: str, password: str, settings: 
         raise Unauthorized("This reset link is invalid or has expired. Ask for a new one.")
     user.password_hash = hash_password(password)
     user.token_version += 1  # a reset ends every session signed in with the old password
-    user.last_login_at = datetime.now(UTC)
+    now = datetime.now(UTC)
+    user.last_login_at = now
+    if user.email_verified_at is None:
+        # The reset link went to this address, so using it proves control of it.
+        user.email_verified_at = now
     await db.commit()
     return user
 
