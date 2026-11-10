@@ -10,31 +10,31 @@ if (process.env.VERCEL && !process.env.API_URL) {
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// Enforced now: no framing (clickjacking of the approve buttons), no <base>
-// or <object> tricks, forms post only to this site.
-const ENFORCED_CSP = ["frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", "form-action 'self'"].join("; ");
-
-// Report-only for now: the full policy a nonce-based setup would enforce.
-// Next's own inline scripts need 'unsafe-inline' until nonces are wired in
-// (that makes every page dynamic), so this only logs what it would block.
-// Check the browser console for violations, then tighten and enforce it.
-const REPORT_ONLY_CSP = [
+// Enforced: no framing (clickjacking of the approve buttons), no <base> or <object>
+// tricks, forms post only to this site, and scripts, frames and network calls may only
+// go to the origins below. Next's own inline bootstrap scripts still need
+// 'unsafe-inline' (a nonce would make every page dynamic), so injected inline script is
+// not blocked yet, but injected *external* scripts, exfiltration to other hosts and
+// foreign frames are.
+const CSP = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   // Supabase auth, and presigned uploads straight to S3.
-  "connect-src 'self' https://*.supabase.co https://*.amazonaws.com",
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.amazonaws.com${isDev ? " ws://localhost:* ws://127.0.0.1:*" : ""}`,
   "media-src 'self' blob: https:",
   // Cloudflare Turnstile renders its challenge in an iframe.
   "frame-src https://challenges.cloudflare.com",
-  ENFORCED_CSP,
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "form-action 'self'",
 ].join("; ");
 
 const SECURITY_HEADERS = [
-  { key: "Content-Security-Policy", value: ENFORCED_CSP },
-  { key: "Content-Security-Policy-Report-Only", value: REPORT_ONLY_CSP },
+  { key: "Content-Security-Policy", value: CSP },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
