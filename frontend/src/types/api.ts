@@ -685,6 +685,8 @@ export interface GenerationStatus {
   kind: "generate" | "regenerate" | "variant";
   status: "queued" | "running" | "succeeded" | "failed";
   engine: "ai" | "template";
+  /** Set when the AI couldn't write the draft and the template draft was used instead. */
+  fallback_reason?: string | null;
   error: string | null;
   created_at: string;
   completed_at: string | null;

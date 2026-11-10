@@ -293,6 +293,11 @@ async def run(job_id: uuid.UUID) -> None:
             if await schedule_retry(db, job, exc, "content.generate"):
                 return
             logger.warning("Post generation job %s failed: %s", job_id, exc.message)
+            if getattr(exc, "ai_stage", False):
+                if await _fall_back_to_template(db, job, exc):
+                    return
+                # The fallback rolled back: reload the job before recording the failure.
+                job = require(await db.get(AIGenerationJob, job_id), "job")
             job.status, job.error = JobStatus.FAILED, exc.user_message
             job.result = {**job.result, "error_kind": exc.kind.value}
         except Exception:
@@ -305,6 +310,28 @@ async def run(job_id: uuid.UUID) -> None:
         await db.commit()
 
 
+async def _fall_back_to_template(db: AsyncSession, job: AIGenerationJob, exc: AIError) -> bool:
+    """The AI step failed for good (quota, outage after the retries, bad key, a blocked
+    or invalid answer): write the template draft instead, so the person always gets a
+    draft to work from. The reason is kept on the job and shown with a "Try AI again"
+    button. Returns False when even the template draft can't be saved."""
+    job_id = job.id
+    job.result = {
+        **job.result,
+        "fallback": {"reason": exc.user_message, "error_kind": exc.kind.value},
+    }
+    try:
+        await _run(db, job, fallback_reason=exc.user_message)
+        job.status, job.error = JobStatus.SUCCEEDED, None
+        job.completed_at = utcnow()
+        await db.commit()
+        return True
+    except Exception:
+        logger.exception("Template fallback for post generation job %s failed", job_id)
+        await db.rollback()
+        return False
+
+
 async def _copy_still_open(db: AsyncSession, post: Post) -> bool:
     """Same rule as the studio's `copy_editable`: a draft, or a post sent back
     with its copy (not only its design) to change."""
@@ -315,7 +342,10 @@ async def _copy_still_open(db: AsyncSession, post: Post) -> bool:
     return await changes_scope(db, post.id) in ("copy", "both")
 
 
-async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
+async def _run(
+    db: AsyncSession, job: AIGenerationJob, *, fallback_reason: str | None = None
+) -> None:
+    """`fallback_reason` set: skip the AI and write the template draft."""
     post = await db.get(Post, job.entity_id)
     if post is None:
         raise AIError(AIErrorKind.BAD_REQUEST, "The post no longer exists.", public=True)
@@ -357,8 +387,11 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
     passages = await passages_for_query(db, post.organization_id, query)
     coverage = [m.title for m in await top_mentions(db, trend.id)][:8] if trend else []
 
-    provider = get_ai_provider(workflow=JOB_TYPE)
+    provider = None if fallback_reason else get_ai_provider(workflow=JOB_TYPE)
     meta: dict = {"kind": kind, "strategy_id": str(strategy.id)}
+    if fallback_reason:
+        job.provider, job.model = "template", None
+        meta["fallback_reason"] = fallback_reason
     if provider is not None:
         prompt_text = build_prompt(
             strategy=strategy,
@@ -371,9 +404,13 @@ async def _run(db: AsyncSession, job: AIGenerationJob) -> None:
             kind=kind,
             instructions=job.result.get("instructions"),
         )
-        copy = await _generate_with_ai(
-            provider, db, job, post, strategy, rule, prompt_text, passages
-        )
+        try:
+            copy = await _generate_with_ai(
+                provider, db, job, post, strategy, rule, prompt_text, passages
+            )
+        except AIError as exc:
+            exc.ai_stage = True  # only failures of the AI call itself fall back to the template
+            raise
         prompt = prompts.load(f"{post.platform.value}_post")
         meta |= {
             "engine": "ai",
