@@ -1,3 +1,4 @@
+# NOT used for the AWS deployment (see infra/aws/ and docs/system-review-and-aws-deploy.md).
 # Render Blueprint: the FastAPI backend only, on Render's FREE plan
 # (docs/deploy-vercel.md). The website runs on Vercel and reaches this service
 # through its /api/v1 rewrite (API_URL). Database: Supabase Postgres (free).

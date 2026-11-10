@@ -11,5 +11,21 @@ environment = "prod"
 auth_provider = "local" # or "supabase" (set SUPABASE_URL / SUPABASE_ANON_KEY in the app secret)
 llm_provider  = "gemini" # or "anthropic" / "none"; the key goes in the app secret
 
+# Extra non-secret settings (budgets, caching, token lifetimes, ...). Without a
+# budget a single account can spend your AI quota; set at least the per-organization one.
+# app_settings = {
+#   LLM_ORG_DAILY_REQUEST_BUDGET = "300"
+#   LLM_DAILY_REQUEST_BUDGET     = "3000"
+#   PROVIDER_BUDGET_MODE         = "enforce"
+#   PROVIDER_CACHE_BACKEND       = "postgres"
+#   PROVIDER_DAILY_BUDGETS       = "{\"newsapi\":80}"
+#   SMTP_SECURITY                = "starttls" # "ssl" for port 465
+#   UPLOAD_MAX_MB                = "50"
+# }
+
+# Alarm emails and the web firewall (see protection.tf).
+# alarm_email = "ops@example.com"
+# enable_waf  = true
+
 # Cheapest sizes by default. For a throwaway test environment:
 # protect_data = false   # allows `terraform destroy` to delete the database and bucket

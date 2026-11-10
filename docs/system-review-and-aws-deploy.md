@@ -19,13 +19,38 @@ line. Treat the findings as a strong start, not a certificate.
 | F4 open registration | **Mitigated in code**: email confirmation (on when SMTP is set) and optional Cloudflare Turnstile for local sign-in. Supabase mode is unchanged. Also set per-org AI budgets. |
 | F6 viewer migration | **Tested** on a scratch database seeded with a viewer (becomes a disabled creator; downgrade does not restore viewers). `deploy.sh` now takes an RDS snapshot before every migration. |
 | F7 build context | **Fixed** (`.dockerignore`) |
-| F3, F5, F8-F15 | Open |
+| F3 database TLS | **Fixed in code** (2026-11-10): the API image ships Amazon's RDS CA bundle and Terraform sets `DB_SSL_ROOT_CERT`, so the connection uses `verify-full`. Check on staging that the API connects. |
+| F5 AWS protection | **Added** (`infra/aws/terraform/protection.tf`, validated, not applied): WAF with rate limits (100/5 min per IP on `/api/v1/auth/`, 2000 elsewhere) + AWS managed rules, ALB access logs, alarms (5xx, unhealthy targets, DB CPU/storage). Set `alarm_email`; `enable_waf=false` turns the WAF off. |
+| F8-F15 (except F3, F5) | Open |
 
 Setting up the new sign-up protection on AWS: put `SMTP_*` (Amazon SES SMTP works) and, for the
 CAPTCHA, `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` in the app secret (section 8.7), then run
 `deploy.sh`. `REQUIRE_EMAIL_VERIFICATION` can stay empty: it turns on by itself once SMTP is set.
 
 ---
+
+## Status of F1-F15 (updated 2026-11-10, second pass)
+
+| Finding | Status |
+|---|---|
+| F1 | **Fixed.** Model/embedding/image/Turnstile keys are in `secret_keys`; every other setting (budgets, provider cache, token lifetimes, `SMTP_SECURITY`, ...) goes through the new `app_settings` Terraform variable. |
+| F2 | **Fixed in code** (checksum config) and uploads now use presigned POST (see F10). Still do one real upload on staging. |
+| F7 | **Fixed** (`.dockerignore`). The scratch files remain on disk but are no longer sent to Docker. |
+| F10 | **Fixed.** S3 uploads are presigned POSTs with a signed `content-length-range` and exact type; S3 enforces the size. SVG/HTML/XML are only served as downloads. |
+| F12 | **Documented** below and in `infra/aws/README.md`. |
+| F13 | **Fixed** (architecture note corrected; Render docs marked as not for AWS). |
+| F14 | **Documented**: state is git-ignored; keep the state bucket private, versioned, encrypted, MFA-protected. |
+| F9, F11, F15 | See the end of the section notes: accepted or needs the first real deploy. |
+
+**Decisions (2026-11-10).** F4: open sign-up with email confirmation (SES SMTP) + Cloudflare
+Turnstile + per-organization AI budget (`app_settings`: `LLM_ORG_DAILY_REQUEST_BUDGET`,
+`PROVIDER_BUDGET_MODE=enforce`). F11: keep the "account already exists" message. HSTS:
+no `includeSubDomains` yet. F8: the full CSP is enforced (scripts still allow `'unsafe-inline'`);
+it must be click-tested in Firefox before deploy, and can be put back to report-only by
+renaming the header in `frontend/next.config.ts`.
+
+**F12 reminder.** `TRUSTED_PROXY_COUNT=1` is correct for ALB -> API. Adding CloudFront or any
+other proxy in front means setting it to 2 (`app_settings`), or every user shares one rate-limit bucket.
 
 ## 1. What the product is
 

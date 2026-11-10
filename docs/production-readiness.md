@@ -1,5 +1,8 @@
 # Production readiness: verification and rollout (for approval)
 
+> **Scope:** this page describes the earlier Render + Supabase + Vercel deployment. For AWS
+> (ECS, RDS, ALB) use `docs/system-review-and-aws-deploy.md` and `infra/aws/README.md`.
+
 Status: **production not yet verified.** As of 2026-10-14, nothing in
 production has been read or changed by the implementation work.
 

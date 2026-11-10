@@ -46,7 +46,7 @@ locals {
   web_image = "${aws_ecr_repository.repo["web"].repository_url}:${var.image_tag}"
 
   backend_environment = [
-    for name, value in {
+    for name, value in merge(var.app_settings, {
       APP_ENV             = "production"
       LOG_LEVEL           = "INFO"
       AUTH_PROVIDER       = var.auth_provider
@@ -56,13 +56,14 @@ locals {
       DB_PORT             = tostring(aws_db_instance.main.port)
       DB_NAME             = aws_db_instance.main.db_name
       DB_USER             = aws_db_instance.main.username
+      DB_SSL_ROOT_CERT    = "/etc/ssl/certs/rds-global-bundle.pem" # verify the RDS certificate
       S3_BUCKET           = aws_s3_bucket.creatives.bucket
       AWS_REGION          = var.region
       FRONTEND_URL        = local.app_url
       CORS_ORIGINS        = jsonencode([local.app_url])
       COOKIE_SECURE       = local.https ? "true" : "false"
       TRUSTED_PROXY_COUNT = "1" # the load balancer appends the client address
-    } : { name = name, value = value }
+    }) : { name = name, value = value }
   ]
   backend_secrets = concat(
     [for key in local.secret_keys : { name = key, valueFrom = "${aws_secretsmanager_secret.app.arn}:${key}::" }],

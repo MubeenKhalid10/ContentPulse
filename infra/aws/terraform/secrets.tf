@@ -98,3 +98,11 @@ resource "aws_secretsmanager_secret_version" "app" {
     ignore_changes = [secret_string]
   }
 }
+
+# A name can't be both a plain setting and a secret key: ECS would reject the task.
+check "app_settings_not_in_secret" {
+  assert {
+    condition     = length(setintersection(toset(keys(var.app_settings)), toset(local.secret_keys))) == 0
+    error_message = "app_settings repeats a name from secret_keys (secrets.tf). Put that value in the app secret instead."
+  }
+}
