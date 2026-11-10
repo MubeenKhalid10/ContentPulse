@@ -104,7 +104,7 @@ resource "aws_s3_bucket_cors_configuration" "creatives" {
   bucket = aws_s3_bucket.creatives.id
   cors_rule {
     allowed_origins = [local.app_url]
-    allowed_methods = ["PUT", "GET"]
+    allowed_methods = ["POST", "PUT", "GET"]
     allowed_headers = ["Content-Type"]
     max_age_seconds = 3000
   }

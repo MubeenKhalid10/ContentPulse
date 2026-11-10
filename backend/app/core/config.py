@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     db_name: str = "contentpulse"
     db_user: str = "contentpulse"
     db_password: str | None = None
+    # Path to the CA bundle that signed the database certificate (the AWS image
+    # ships Amazon's RDS bundle). Set, the DB_HOST connection verifies the
+    # certificate and host name (sslmode=verify-full); unset keeps encrypted-only.
+    db_ssl_root_cert: str | None = None
     redis_url: str = "redis://localhost:6380/0"
 
     # Background jobs (Sprint 9).
@@ -413,6 +417,10 @@ class Settings(BaseSettings):
                 f"postgresql+asyncpg://{quote(self.db_user, safe='')}:"
                 f"{quote(self.db_password, safe='')}@{self.db_host}:{self.db_port}/{self.db_name}"
             )
+            if self.db_ssl_root_cert:
+                self.database_url += (
+                    f"?sslmode=verify-full&sslrootcert={quote(self.db_ssl_root_cert, safe='/')}"
+                )
         return self
 
     @model_validator(mode="after")

@@ -518,9 +518,10 @@ Known gaps and limitations:
   see real IPs.
 - JavaScript-rendered sites (content only after client-side rendering) aren't supported
   yet. A Playwright rendering fallback is a planned addition.
-- SSRF checks resolve DNS before connecting. A DNS-rebinding attacker could still race
-  that check, so production should also route crawler egress through a proxy that blocks
-  private ranges.
+- SSRF checks resolve DNS once, then connect only to that already-validated address
+  (`_PublicOnlyBackend`), so a DNS-rebinding race can't redirect the connection. Redirects
+  are re-checked per hop. Routing crawler egress through a filtering proxy is still an
+  optional extra layer.
 - Full-text search uses the English text configuration.
 - Topic extraction is heuristic, so broad topics like "AI" can surface; alignment judges
   whether they matter to the organization.

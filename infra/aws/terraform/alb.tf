@@ -8,6 +8,14 @@ resource "aws_lb" "main" {
   subnets            = aws_subnet.public[*].id
   idle_timeout       = 120
 
+  # Who called what, with status and timing (bucket and policy: protection.tf).
+  access_logs {
+    bucket  = aws_s3_bucket.alb_logs.id
+    prefix  = "alb"
+    enabled = true
+  }
+  depends_on = [aws_s3_bucket_policy.alb_logs]
+
   lifecycle {
     # Without a certificate the stack serves plain HTTP and drops the Secure
     # cookie flag: passwords and sessions would cross the network in cleartext.

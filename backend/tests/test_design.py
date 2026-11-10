@@ -1,6 +1,8 @@
 """Sprint 7: design briefs, designer tasks, signed uploads and creative
 versions (spec §27-30, §41, §52)."""
 
+import base64
+import json
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -432,8 +434,15 @@ async def test_s3_presigned_urls_and_head():
     )
     storage = S3Storage(settings)
     target = await storage.upload_target("orgs/1/a.png", "image/png", 1000)
-    assert target.url.startswith("https://cp-creatives.s3.") and "X-Amz-Signature=" in target.url
-    assert target.headers == {"Content-Type": "image/png"} and target.expires_at > datetime.now(UTC)
+    assert target.url.startswith("https://cp-creatives.s3.") and target.method == "POST"
+    assert target.fields["key"] == "orgs/1/a.png" and "x-amz-signature" in target.fields
+    assert target.fields["Content-Type"] == "image/png" and target.expires_at > datetime.now(UTC)
+    # The signed policy makes S3 itself refuse files over the cap or of another type.
+    policy = json.loads(base64.b64decode(target.fields["policy"]))
+    assert ["content-length-range", 1, 1000] in policy["conditions"]
+    assert {"Content-Type": "image/png"} in policy["conditions"]
+    svg = await storage.download_url("orgs/1/a.svg", "logo.svg", inline=True)
+    assert "response-content-disposition=attachment" in svg
     download = await storage.download_url("orgs/1/a.png", "Slide 1.png", inline=False)
     assert "response-content-disposition=attachment" in download
 

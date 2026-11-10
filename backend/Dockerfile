@@ -18,6 +18,11 @@ RUN uv sync --frozen --no-dev
 
 COPY . .
 
+# Amazon's RDS CA bundle, so the API can verify the database certificate
+# (DB_SSL_ROOT_CERT=/etc/ssl/certs/rds-global-bundle.pem; the AWS stack sets it).
+ADD https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
+RUN chmod 644 /etc/ssl/certs/rds-global-bundle.pem
+
 RUN useradd --create-home --uid 10001 app
 USER app
 

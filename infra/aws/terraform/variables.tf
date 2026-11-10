@@ -65,6 +65,18 @@ variable "llm_provider" {
   }
 }
 
+variable "app_settings" {
+  description = <<-EOT
+    Extra non-secret app settings, passed to the API and worker as environment
+    variables (name => value). Use it for anything the stack doesn't set itself:
+    budgets, provider caching, token lifetimes, SMTP_SECURITY, UPLOAD_MAX_MB, ...
+    Dict/list settings take JSON text, e.g. jsonencode({ newsapi = 80 }).
+    Don't repeat a name that is in `secret_keys` (see secrets.tf): put those in the secret.
+  EOT
+  type        = map(string)
+  default     = {}
+}
+
 # --- Sizing -----------------------------------------------------------------------
 
 variable "db_instance_class" {

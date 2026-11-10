@@ -888,6 +888,8 @@ export interface UploadTicket {
   headers: Record<string, string>;
   storage_key: string;
   expires_at: string;
+  /** Form fields to send before the file when method is POST (S3). */
+  fields?: Record<string, string>;
 }
 
 // --- Approvals (Sprint 8) -----------------------------------------------------------
