@@ -126,17 +126,21 @@ async def test_transient_ai_failure_is_retried(client, internet, retries, db):
 
 async def test_retries_are_limited(client, internet, retries, db):
     post, _, _ = await generate(client, FlakyAI(failures=10))
-    assert post["generation"]["status"] == "failed" and post["current_version"] == 0
-    # People see a neutral message; the provider's detail stays in the logs.
-    assert post["generation"]["error"] == USER_MESSAGES[AIErrorKind.RATE_LIMITED]
-    assert "Gemini" not in post["generation"]["error"]
+    # Once the retries are used up the person still gets a draft: the template one.
+    assert post["generation"]["status"] == "succeeded" and post["current_version"] == 1
+    assert post["current"]["meta"]["engine"] == "template"
+    # People see a neutral reason; the provider's detail stays in the logs.
+    assert post["generation"]["fallback_reason"] == USER_MESSAGES[AIErrorKind.RATE_LIMITED]
+    assert "Gemini" not in post["generation"]["fallback_reason"]
     job = await db.scalar(select(AIGenerationJob).where(AIGenerationJob.type == "post_generation"))
     assert job.attempts == 3  # first try + 2 retries
 
 
 async def test_permanent_failures_are_not_retried(client, internet, retries, db):
     post, _, _ = await generate(client, FlakyAI(failures=1, kind=AIErrorKind.AUTH))
-    assert post["generation"]["status"] == "failed"
+    # Not retried, and not left empty: straight to the template draft.
+    assert post["generation"]["status"] == "succeeded"
+    assert post["generation"]["fallback_reason"] == USER_MESSAGES[AIErrorKind.AUTH]
     job = await db.scalar(select(AIGenerationJob).where(AIGenerationJob.type == "post_generation"))
     assert job.attempts == 1
 
