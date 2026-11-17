@@ -91,7 +91,8 @@ export function NextStepCallout({ summary }: { summary: DashboardSummary }) {
   return (
     <section
       aria-labelledby="next-step-title"
-      className="dark grid gap-3 rounded-xl bg-background p-5 text-foreground"
+      // Always a dark panel; in dark mode it would match the page, so lift it like a card.
+      className="dark grid gap-3 rounded-xl bg-background p-5 text-foreground dark:bg-card dark:ring-1 dark:ring-foreground/10"
     >
       <SparklesIcon className="size-5 text-flash" aria-hidden />
       <div className="grid gap-1">
