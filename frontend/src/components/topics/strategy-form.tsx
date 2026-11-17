@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 import { fieldAria, FormField } from "@/components/shared/form-field";
 import { SimpleSelect } from "@/components/shared/simple-select";
+import { Tag } from "@/components/shared/tag";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle, useDialogBusy } from "@/components/ui/dialog";
@@ -85,7 +86,11 @@ export function StrategyForm({
     ? settings.data.enabled_platforms
     : (Object.keys(PLATFORM_LABEL) as Platform[]);
   const platforms = [...new Set([...topic.platform_fit.map((f) => f.platform), ...enabled])];
-  const platformOptions = platforms.map((p) => ({ value: p, label: PLATFORM_LABEL[p] }));
+  const recommended = new Set(topic.recommended_platforms);
+  const platformOptions = platforms.map((p) => ({
+    value: p,
+    label: recommended.has(p) ? `${PLATFORM_LABEL[p]} (recommended)` : PLATFORM_LABEL[p],
+  }));
   const [selected, setSelected] = useState<Platform[]>([initialPlatform]);
   const multi = !editing && selected.length > 1;
   const allSelected = platforms.every((p) => selected.includes(p));
@@ -331,6 +336,11 @@ export function StrategyForm({
                 <label key={p} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" className="size-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" checked={selected.includes(p)} onChange={() => toggle(p)} />
                   {PLATFORM_LABEL[p]}
+                  {recommended.has(p) && (
+                    <Tag tone="teal" title="Scored against your audience, goals and where this trend is being discussed.">
+                      Recommended
+                    </Tag>
+                  )}
                 </label>
               ))}
             </div>
