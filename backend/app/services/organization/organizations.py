@@ -59,7 +59,7 @@ async def create_organization(
         OrganizationSettings(
             organization_id=org.id,
             default_timezone=data.timezone,
-            enabled_sources=default_sources(data.industry),
+            enabled_sources=default_sources(app_settings()),
             trend_frequency=TrendFrequency(app_settings().trend_default_frequency),
         )
     )

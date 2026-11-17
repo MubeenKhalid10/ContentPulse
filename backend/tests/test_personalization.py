@@ -12,6 +12,7 @@ import httpx
 import pytest
 from sqlalchemy import select
 
+from app.core.config import Settings
 from app.models.trend import Trend
 from app.services.alignment.service import ai_priority
 from app.services.trends.industry import industry_terms, is_technology
@@ -111,14 +112,15 @@ def test_industry_seeds():
     assert is_technology("Cloud software") and not is_technology("Healthcare clinic")
 
 
-def test_technology_sources_are_only_default_for_technology_organizations():
-    assert "google_trends_tech" in default_sources("Software & SaaS")
-    assert "google_trends_tech" not in default_sources("Healthcare clinic")
-    assert "google_trends_tech" not in default_sources("Digital marketing agency")
-    assert "google_trends_tech" not in default_sources(None)
-    assert {"google_trends", "google_news", "hacker_news", "reddit", "rss"} <= set(
-        default_sources(None)
-    )
+def test_new_organizations_get_every_source_that_needs_no_server_setup():
+    bare = Settings(_env_file=None, news_api_key=None, gnews_api_key=None, x_bearer_token=None)
+    keyless = set(default_sources(bare))
+    assert {"google_trends", "google_news", "hacker_news", "rss"} <= keyless
+    # Keyed APIs stay off until their key is set; LinkedIn is never available.
+    assert "newsapi" not in keyless and "linkedin" not in keyless
+    # Search APIs that also need the organization's keywords are on once keyed.
+    keyed = Settings(_env_file=None, news_api_key="k", gnews_api_key="k")
+    assert {"newsapi", "gnews"} <= set(default_sources(keyed))
 
 
 async def test_collection_inputs_follow_each_organization(client, db):
@@ -140,9 +142,9 @@ async def test_collection_inputs_follow_each_organization(client, db):
 
     sources = {k: (await admin.get(f"{API}/sources")).json() for k, (admin, _) in orgs.items()}
     enabled = {k: {s["key"] for s in v if s["enabled"]} for k, v in sources.items()}
-    assert "google_trends_tech" in enabled["software"]
-    assert "google_trends_tech" not in enabled["clinic"]
-    assert "google_trends_tech" not in enabled["agency"]
+    # Every source that needs no server setup starts on, whatever the industry.
+    assert enabled["software"] == enabled["clinic"] == enabled["agency"]
+    assert "google_trends_tech" in enabled["clinic"]
 
 
 async def test_shared_public_items_are_scored_per_organization(client, shared_internet):

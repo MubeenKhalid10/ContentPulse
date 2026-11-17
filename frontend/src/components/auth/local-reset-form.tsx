@@ -21,7 +21,7 @@ import { toast } from "sonner";
 
 import { PasswordInput } from "@/components/auth/password-input";
 import { Input } from "@/components/ui/input";
-import { api, errorMessage } from "@/lib/api";
+import { api, ApiError, errorMessage } from "@/lib/api";
 import { type ResetPasswordValues, resetPasswordSchema } from "@/schemas/auth";
 
 /**
@@ -113,13 +113,19 @@ export function LocalResetForm() {
           {reset.isError && (
             <Alert variant="destructive">
               <AlertDescription>
-                {errorMessage(reset.error)}{" "}
-                <Link
-                  href="/forgot-password"
-                  className="font-medium underline underline-offset-4"
-                >
-                  Get a new link
-                </Link>
+                {errorMessage(reset.error)}
+                {/* Only an invalid or expired token (401) is fixed by a new link. */}
+                {reset.error instanceof ApiError && reset.error.status === 401 && (
+                  <>
+                    {" "}
+                    <Link
+                      href="/forgot-password"
+                      className="font-medium underline underline-offset-4"
+                    >
+                      Get a new link
+                    </Link>
+                  </>
+                )}
               </AlertDescription>
             </Alert>
           )}

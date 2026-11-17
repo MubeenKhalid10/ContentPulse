@@ -24,6 +24,9 @@ import { errorMessage } from "@/lib/api";
 import { getSupabase, supabaseErrorMessage } from "@/lib/supabase";
 import { type ResetPasswordValues, resetPasswordSchema } from "@/schemas/auth";
 
+/** The recovery session is gone: only then does asking for a new link help. */
+class ExpiredLinkError extends Error {}
+
 /** Reached through /auth/callback from a reset email, so a recovery session exists. */
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -39,9 +42,14 @@ export default function ResetPasswordPage() {
       if (!supabase) throw new Error("Password reset isn't available.");
       const { data } = await supabase.auth.getSession();
       if (!data.session)
-        throw new Error("Your reset link has expired. Request a new one.");
+        throw new ExpiredLinkError("Your reset link has expired. Request a new one.");
       const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw new Error(supabaseErrorMessage(error.message));
+      if (error) {
+        const expired = error.name === "AuthSessionMissingError" || error.status === 401;
+        if (expired)
+          throw new ExpiredLinkError("Your reset link has expired. Request a new one.");
+        throw new Error(supabaseErrorMessage(error.message));
+      }
     },
     onSuccess: () => {
       toast.success("Password updated.");
@@ -68,20 +76,25 @@ export default function ResetPasswordPage() {
           {update.isError && (
             <Alert variant="destructive">
               <AlertDescription>
-                {errorMessage(update.error)}{" "}
-                <Link
-                  href="/forgot-password"
-                  className="font-medium underline underline-offset-4"
-                >
-                  Get a new link
-                </Link>
+                {errorMessage(update.error)}
+                {update.error instanceof ExpiredLinkError && (
+                  <>
+                    {" "}
+                    <Link
+                      href="/forgot-password"
+                      className="font-medium underline underline-offset-4"
+                    >
+                      Get a new link
+                    </Link>
+                  </>
+                )}
               </AlertDescription>
             </Alert>
           )}
           <FormField
             id="password"
             label="New password"
-            hint="At least 10 characters."
+            hint="At least 10 characters, with a lowercase letter, an uppercase letter, a number and a special character."
             error={errors.password?.message}
           >
             <PasswordInput
