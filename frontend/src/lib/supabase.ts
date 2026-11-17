@@ -97,6 +97,8 @@ export function supabaseErrorMessage(message: string): string {
   if (m.includes("at least one character of each")) {
     return "Your password must include a lowercase letter, an uppercase letter, a number and a special character (like ! @ # $ %).";
   }
+  if (m.includes("current password required")) return "Enter your current password.";
+  if (m.includes("current password")) return "Your current password is incorrect.";
   if (m.includes("rate limit")) return "Too many attempts. Wait a minute and try again.";
   return message;
 }

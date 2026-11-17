@@ -212,9 +212,8 @@ function PasswordCard() {
 function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
   const form = useForm<z.infer<typeof localPasswordSchema>>({
     resolver: zodResolver(localPasswordSchema),
-    // Supabase sign-in has no current-password step: a placeholder satisfies the schema.
     defaultValues: {
-      current_password: supabaseMode ? "-" : "",
+      current_password: "",
       new_password: "",
       confirm: "",
     },
@@ -228,8 +227,10 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
         const supabase = await getSupabase();
         if (!supabase)
           throw new Error("Password changes aren't available right now.");
+        // The Supabase project requires the current password for a password change.
         const { error } = await supabase.auth.updateUser({
           password: v.new_password,
+          current_password: v.current_password,
         });
         if (error) throw new Error(supabaseErrorMessage(error.message));
         return;
@@ -244,7 +245,7 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
     },
     onSuccess: () => {
       form.reset({
-        current_password: supabaseMode ? "-" : "",
+        current_password: "",
         new_password: "",
         confirm: "",
       });
@@ -272,23 +273,21 @@ function PasswordForm({ supabaseMode }: { supabaseMode: boolean }) {
           className="grid gap-5 sm:grid-cols-3"
         >
 <fieldset disabled={change.isPending} className="contents">
-          {!supabaseMode && (
-            <FormField
-              id="current_password"
-              label="Current password"
-              error={errors.current_password?.message}
-            >
-              <Input
-                {...fieldAria(
-                  "current_password",
-                  errors.current_password?.message,
-                )}
-                type={show ? "text" : "password"}
-                autoComplete="current-password"
-                {...form.register("current_password")}
-              />
-            </FormField>
-          )}
+          <FormField
+            id="current_password"
+            label="Current password"
+            error={errors.current_password?.message}
+          >
+            <Input
+              {...fieldAria(
+                "current_password",
+                errors.current_password?.message,
+              )}
+              type={show ? "text" : "password"}
+              autoComplete="current-password"
+              {...form.register("current_password")}
+            />
+          </FormField>
           <FormField
             id="new_password"
             label="New password"
