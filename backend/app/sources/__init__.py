@@ -1,5 +1,6 @@
 """Registry of trend source adapters (spec §10)."""
 
+from app.core.config import Settings
 from app.sources.additional_news import (
     ApiTubeNewsSource,
     NewsDataSource,
@@ -7,7 +8,7 @@ from app.sources.additional_news import (
     TheNewsApiSource,
     WorldNewsSource,
 )
-from app.sources.base import TrendSource
+from app.sources.base import SourceInputs, TrendSource
 from app.sources.exa import ExaSource
 from app.sources.google_news import GoogleNewsSource
 from app.sources.google_trends import GoogleTrendsSource
@@ -43,24 +44,26 @@ SOURCES: dict[str, TrendSource] = {
     )
 }
 
-# Free sources that need no keys: enabled for new organizations.
-DEFAULT_ENABLED_SOURCES = [
-    "google_trends",
-    "google_news",
-    "hacker_news",
-    "reddit",
-    "rss",
-]
-# Topic-specific sources, enabled by default only where the industry fits.
-TECHNOLOGY_SOURCES = ["google_trends_tech"]
+# Stand-in organization inputs for judging server readiness: a new organization
+# has no keywords or feeds yet, and those are its own to add later.
+_FILLED_INPUTS = SourceInputs(
+    locations=[], keywords=["placeholder"], rss_feeds=["https://example.com/feed"]
+)
 
 
-def default_sources(industry: str | None) -> list[str]:
-    """Sources switched on for a new organization (admins can change them)."""
-    from app.services.trends.industry import is_technology
+def default_sources(settings: Settings) -> list[str]:
+    """Sources switched on for a new organization (admins can change them).
 
-    extra = TECHNOLOGY_SOURCES if is_technology(industry) else []
-    return [*DEFAULT_ENABLED_SOURCES, *extra]
+    Every source that doesn't need server setup: keyless feeds, plus keyed APIs
+    whose keys are present. Sources still waiting for the organization's own
+    keywords or feeds are on too, and run once those are added.
+    """
+    return [
+        key
+        for key, source in SOURCES.items()
+        if source.pricing != "unavailable"
+        and source.configuration(settings, _FILLED_INPUTS).configured
+    ]
 
 
 # Sources that need no API key or token (they read public feeds). Calling them
