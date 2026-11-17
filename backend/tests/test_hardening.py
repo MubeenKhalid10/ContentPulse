@@ -1,5 +1,5 @@
 """Regression tests for the security/consistency hardening pass: files served
-from our own origin, shared request cache errors, archive permission, and the
+from our own origin, shared request cache errors, and the
 rows that late background jobs and double clicks must not corrupt."""
 
 import asyncio
@@ -69,26 +69,6 @@ async def test_a_rate_limit_for_one_run_does_not_cancel_the_runs_waiting_on_it()
     results = await asyncio.gather(owner, other, return_exceptions=True)
     assert all(isinstance(r, SourceError) for r in results), results  # not CancelledError
     assert "k" not in cache._entries  # still not remembered
-
-
-# --- archive ----------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "status", [PostStatus.DESIGN_PENDING, PostStatus.APPROVED, PostStatus.FINAL]
-)
-async def test_only_a_reviewer_archives_work_past_review(client, db, status):
-    admin, creator, org_id = await setup(client, db)
-    post = await make_post(db, org_id, status)
-    assert (await creator.post(f"{API}/{post.id}/archive")).status_code == 403
-    assert (await admin.post(f"{API}/{post.id}/archive")).status_code == 200
-
-
-@pytest.mark.parametrize("status", [PostStatus.DRAFT, PostStatus.CONTENT_REVIEW])
-async def test_a_creator_still_archives_a_draft_or_a_post_in_review(client, db, status):
-    _, creator, org_id = await setup(client, db)
-    post = await make_post(db, org_id, status)
-    assert (await creator.post(f"{API}/{post.id}/archive")).status_code == 200
 
 
 # --- one open round / one open task per post --------------------------------------------

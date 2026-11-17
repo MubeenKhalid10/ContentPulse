@@ -36,7 +36,7 @@ async def list_topics(
     ctx: CanRead,
     db: DB,
     status_filter: Annotated[
-        Literal["open", "new", "reviewed", "shortlisted", "rejected", "archived", "all"],
+        Literal["open", "new", "reviewed", "shortlisted", "rejected", "all"],
         Query(alias="status"),
     ] = "open",
     relevance: Literal["relevant", "highly_relevant", "weakly_relevant", "not_relevant"]
@@ -91,7 +91,6 @@ for _path, _target in (
     ("reject", TopicStatus.REJECTED),
     ("review", TopicStatus.REVIEWED),
     ("restore", TopicStatus.REVIEWED),
-    ("archive", TopicStatus.ARCHIVED),
 ):
     router.add_api_route(
         f"/{{topic_id}}/{_path}",
@@ -158,7 +157,6 @@ def _strategy_transition(target: StrategyStatus):
 for _path, _target in (
     ("approve", StrategyStatus.APPROVED),
     ("reopen", StrategyStatus.DRAFT),
-    ("archive", StrategyStatus.ARCHIVED),
 ):
     router.add_api_route(
         f"/{{topic_id}}/strategies/{{strategy_id}}/{_path}",

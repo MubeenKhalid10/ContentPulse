@@ -1,32 +1,20 @@
 "use client";
 
-import { ArchiveIcon, ArrowRightIcon, PencilIcon, SparklesIcon } from "lucide-react";
+import { ArrowRightIcon, PencilIcon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { toast } from "sonner";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { Tag } from "@/components/shared/tag";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useGeneratePost } from "@/hooks/use-content";
-import { useDeleteStrategy, useStrategyAction } from "@/hooks/use-topics";
+import { useDeleteStrategy } from "@/hooks/use-topics";
 import { errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { POST_STATUS_LABEL } from "@/lib/content";
 import { POST_STATUS_TONE } from "@/lib/tones";
 import { PLATFORM_LABEL, STRATEGY_SOURCE_LABEL } from "@/lib/topics";
-import { cn } from "@/lib/utils";
 import type { Post, Strategy } from "@/types/api";
 
 /** Shown on the card: the plan at a glance (the post idea leads). */
@@ -76,11 +64,9 @@ export function StrategyCard({
   canManage: boolean;
   onEdit: () => void;
 }) {
-  const action = useStrategyAction();
   const remove = useDeleteStrategy();
   const isAdmin = useCan()("organization.write");
   const canGenerate = useCan()("content.generate");
-  const [confirmArchive, setConfirmArchive] = useState(false);
   const label = `${PLATFORM_LABEL[s.platform]} · ${s.post_type}`;
   const d = s.details ?? {};
   const seoRows: [string, string | null | undefined][] =
@@ -93,26 +79,23 @@ export function StrategyCard({
           ["Featured image", d.featured_image_direction],
         ]
       : [];
-  const active = s.status !== "archived";
 
   return (
     <article
       aria-label={label}
-      className={cn("grid gap-3 rounded-xl p-4 ring-1 ring-foreground/10", !active && "opacity-60")}
+      className="grid gap-3 rounded-xl p-4 ring-1 ring-foreground/10"
     >
       <header className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{label}</h3>
-        {post ? (
+        {post && (
           <Tag tone={POST_STATUS_TONE[post.status]} dot>
             {POST_STATUS_LABEL[post.status]}
           </Tag>
-        ) : !active ? (
-          <Tag tone="neutral">Archived</Tag>
-        ) : null}
+        )}
         <span className="text-xs text-muted-foreground">{STRATEGY_SOURCE_LABEL[s.source]}</span>
         <div className="ml-auto flex flex-wrap gap-1.5">
-          {canManage && active && (
-            <Button size="sm" variant="ghost" disabled={action.isPending || remove.isPending} onClick={onEdit}>
+          {canManage && (
+            <Button size="sm" variant="ghost" disabled={remove.isPending} onClick={onEdit}>
               <PencilIcon />
               Edit plan
             </Button>
@@ -123,21 +106,7 @@ export function StrategyCard({
               <ArrowRightIcon />
             </Link>
           ) : (
-            canManage && active && canGenerate && <WritePostButton strategy={s} />
-          )}
-          {canManage && active && (
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label={`Archive ${label}`}
-              title="Archive plan: keep it for reference, but stop editing it"
-              disabled={remove.isPending}
-              pending={action.isPending}
-              onClick={() => setConfirmArchive(true)}
-            >
-              <ArchiveIcon />
-              Archive
-            </Button>
+            canManage && canGenerate && <WritePostButton strategy={s} />
           )}
           {isAdmin && (
             <DeleteButton
@@ -208,32 +177,6 @@ export function StrategyCard({
         </details>
       )}
 
-      <AlertDialog open={confirmArchive} onOpenChange={setConfirmArchive}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Archive this {PLATFORM_LABEL[s.platform]} plan?</AlertDialogTitle>
-            <AlertDialogDescription>
-              It stays visible on this topic for reference, but can no longer be edited or written from. Posts already
-              written from it are not affected.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={action.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={action.isPending}
-              onClick={() => {
-                action.mutate(
-                  { topicId: s.topic_id, id: s.id, action: "archive" },
-                  { onSuccess: () => toast.success("Plan archived"), onError: (e) => toast.error(errorMessage(e)) },
-                );
-                setConfirmArchive(false);
-              }}
-            >
-              Archive
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </article>
   );
 }

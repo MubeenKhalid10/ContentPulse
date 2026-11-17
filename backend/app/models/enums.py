@@ -89,6 +89,8 @@ class TrendStatus(StrEnum):
     ANALYZED = "analyzed"
     SHORTLISTED = "shortlisted"
     REJECTED = "rejected"
+    # Retired: nothing archives any more (Rejected replaces it). Kept only because
+    # the Postgres enum type still lists the value.
     ARCHIVED = "archived"
 
 
@@ -104,12 +106,16 @@ class TopicStatus(StrEnum):
     REVIEWED = "reviewed"
     SHORTLISTED = "shortlisted"
     REJECTED = "rejected"
+    # Retired: nothing archives any more (Rejected replaces it). Kept only because
+    # the Postgres enum type still lists the value.
     ARCHIVED = "archived"
 
 
 class StrategyStatus(StrEnum):
     DRAFT = "draft"
     APPROVED = "approved"
+    # Retired: nothing archives any more (Rejected replaces it). Kept only because
+    # the Postgres enum type still lists the value.
     ARCHIVED = "archived"
 
 
@@ -124,6 +130,8 @@ class PostStatus(StrEnum):
     APPROVED = "approved"
     FINAL = "final"
     REJECTED = "rejected"
+    # Retired: nothing archives any more (Rejected replaces it). Kept only because
+    # the Postgres enum type still lists the value.
     ARCHIVED = "archived"
 
 

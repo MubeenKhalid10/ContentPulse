@@ -207,9 +207,6 @@ async def test_reject(client, internet, design_ai):
     restored = await admin.post(f"/api/v1/content/{post['id']}/restore-rejected")
     assert restored.status_code == 200 and restored.json()["status"] == "draft"
     assert restored.json()["editable"] is True
-    assert (await admin.post(f"/api/v1/content/{post['id']}/archive")).json()[
-        "status"
-    ] == "archived"
 
     logs = (await admin.get(f"/api/v1/organizations/{org['id']}/audit-logs")).json()
     assert {"APPROVAL_REQUESTED", "REJECTED"} <= {e["action"] for e in logs}

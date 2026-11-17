@@ -51,7 +51,7 @@ def apply_decision(brief: DesignBrief, decision: ApprovalStatus, scope: str) -> 
 
 
 async def cancel_open(db: AsyncSession, post_id: uuid.UUID) -> None:
-    """The post left design (back to draft, archived): close its open task."""
+    """The post left design (back to draft, rejected): close its open task."""
     rows = await db.scalars(
         select(DesignBrief).where(
             DesignBrief.post_id == post_id, DesignBrief.status.in_(OPEN_STATUSES)

@@ -349,10 +349,10 @@ async def list_runs(
 STATUS_FILTERS = {
     "active": [TrendStatus.NEW, TrendStatus.ANALYZED],
     "shortlisted": [TrendStatus.SHORTLISTED],
-    # "All trends" on the Trends page: everything not yet shortlisted (rejected ones included).
-    "unshortlisted": [TrendStatus.NEW, TrendStatus.ANALYZED, TrendStatus.REJECTED],
+    # "All trends" on the Trends page: everything not yet decided. Shortlisted and
+    # rejected trends each have their own tab.
+    "unshortlisted": [TrendStatus.NEW, TrendStatus.ANALYZED],
     "rejected": [TrendStatus.REJECTED],
-    "archived": [TrendStatus.ARCHIVED],
 }
 
 
@@ -493,19 +493,17 @@ async def override_relevance(
     return await trend_detail(db, organization_id, trend.id)
 
 
-DELETABLE = (TrendStatus.SHORTLISTED, TrendStatus.REJECTED, TrendStatus.ARCHIVED)
+DELETABLE = (TrendStatus.SHORTLISTED, TrendStatus.REJECTED)
 
 
 async def delete_trend(
     db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, trend_id: uuid.UUID
 ) -> None:
-    """Permanently remove a shortlisted, rejected or archived trend with its
+    """Permanently remove a shortlisted or rejected trend with its
     mentions and its topic (whose plans go with it; written posts are kept)."""
     trend = await _get_trend(db, organization_id, trend_id)
     if trend.status not in DELETABLE:
-        raise InvalidStateTransition(
-            "Only shortlisted, rejected or archived trends can be deleted."
-        )
+        raise InvalidStateTransition("Only shortlisted or rejected trends can be deleted.")
     topic = await topic_sync.topic_for_trend(db, trend)
     if topic is not None:
         await db.delete(topic)

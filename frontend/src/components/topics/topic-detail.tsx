@@ -1,6 +1,5 @@
 "use client";
 
-import { PencilIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -9,7 +8,6 @@ import { BackLink, useFromHere } from "@/components/shared/back-link";
 import { CollapsibleCard } from "@/components/shared/collapsible-card";
 import { PageLoading } from "@/components/shared/loading";
 import { Tag } from "@/components/shared/tag";
-import { EditTopicDialog } from "@/components/topics/edit-topic-dialog";
 import { StrategyDialog } from "@/components/topics/strategy-dialog";
 import { TopicActions } from "@/components/topics/topic-actions";
 import { AlignmentPanel } from "@/components/trends/alignment-panel";
@@ -31,7 +29,6 @@ import type { ContentAngle, Platform, Strategy } from "@/types/api";
 
 import { StrategiesCard } from "./strategies-card";
 import { TopicPosts } from "./topic-posts";
-import { PlatformFitCard } from "./platform-fit-card";
 
 export function TopicDetailView({ id }: { id: string }) {
   const fromHere = useFromHere();
@@ -53,7 +50,6 @@ export function TopicDetailView({ id }: { id: string }) {
   const [autoPlan, setAutoPlan] = useState(
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("plan") === "1",
   );
-  const [editing, setEditing] = useState(false);
 
   const back = <BackLink href="/topics" label="Shortlist & plans" />;
 
@@ -107,24 +103,13 @@ export function TopicDetailView({ id }: { id: string }) {
               {TOPIC_STATUS_LABEL[t.status]}
             </Tag>
             <RelevanceBadge level={t.relevance_level} />
-            {canManage && t.status !== "archived" && (
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Edit topic"
-                title="Edit topic"
-                onClick={() => setEditing(true)}
-              >
-                <PencilIcon />
-              </Button>
-            )}
           </div>
         </div>
         {canManage && <TopicActions topic={t} />}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="grid content-start gap-6 lg:col-span-2">
+      <div>
+        <div className="grid content-start gap-6">
           <StrategiesCard
             topic={t}
             canManage={canManage}
@@ -219,15 +204,6 @@ export function TopicDetailView({ id }: { id: string }) {
             </CollapsibleCard>
           )}
         </div>
-
-        <div className="grid content-start gap-6">
-          <PlatformFitCard
-            fit={t.platform_fit}
-            recommended={t.recommended_platforms}
-            canPlan={canManage && shortlisted}
-            onPlan={plan}
-          />
-        </div>
       </div>
 
       <StrategyDialog
@@ -243,11 +219,6 @@ export function TopicDetailView({ id }: { id: string }) {
             window.history.replaceState(null, "", window.location.pathname);
           }
         }}
-      />
-      <EditTopicDialog
-        topic={t}
-        open={editing}
-        onClose={() => setEditing(false)}
       />
     </>
   );

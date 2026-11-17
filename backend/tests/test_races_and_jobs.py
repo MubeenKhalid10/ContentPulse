@@ -5,7 +5,7 @@ Also the Celery task wrapper, which the in-process test backend never runs."""
 import asyncio
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.ai.images import set_image_provider
 from app.ai.provider import set_ai_provider
@@ -13,7 +13,7 @@ from app.models.ai import AIGenerationJob
 from app.models.approval import ApprovalRequest
 from app.models.design import CreativeAsset, DesignBrief
 from app.models.enums import ApprovalStatus, DesignBriefStatus, JobStatus, PostStatus
-from app.models.post import PostVersion
+from app.models.post import Post, PostVersion
 from app.workers.runner import runner
 from tests.conftest import add_member
 from tests.test_alignment import internet, setup_org  # noqa: F401  (fixtures)
@@ -124,7 +124,7 @@ class BlockedImages(FakeImages):
         return await super().generate(prompt, ratio)
 
 
-async def test_an_image_that_arrives_after_the_post_was_archived_is_dropped(
+async def test_an_image_that_arrives_after_the_post_left_design_is_dropped(
     client,
     internet,
     db,
@@ -138,8 +138,8 @@ async def test_an_image_that_arrives_after_the_post_was_archived_is_dropped(
         assert (await admin.post(f"{TASKS}/{task['id']}/generate-image")).status_code == 202
         await asyncio.wait_for(images.started.wait(), 10)
 
-        # While the provider is still working, an admin archives the post.
-        assert (await admin.post(f"{CONTENT}/{post['id']}/archive")).status_code == 200
+        # While the provider is still working, an admin reopens the copy.
+        assert (await admin.post(f"{CONTENT}/{post['id']}/back-to-draft")).status_code == 200
         images.release.set()
         await runner.wait_idle()
     finally:
@@ -150,7 +150,7 @@ async def test_an_image_that_arrives_after_the_post_was_archived_is_dropped(
     assert job.status == JobStatus.FAILED and "waiting for a design" in job.error
     assert await db.scalar(select(func.count()).select_from(CreativeAsset)) == 0
     detail = (await admin.get(f"{CONTENT}/{post['id']}")).json()
-    assert detail["status"] == "archived"
+    assert detail["status"] == "draft"
 
 
 async def test_cancelling_an_ai_image_drops_it_when_it_arrives(client, internet, db):
@@ -198,7 +198,7 @@ class BlockedAI(ContentAI):
         )
 
 
-async def test_regenerated_text_that_arrives_after_the_post_was_archived_is_dropped(
+async def test_regenerated_text_that_arrives_after_the_post_was_rejected_is_dropped(
     client,
     internet,
     db,
@@ -214,7 +214,11 @@ async def test_regenerated_text_that_arrives_after_the_post_was_archived_is_drop
         assert resp.status_code == 202
         await asyncio.wait_for(ai.started.wait(), 10)
 
-        assert (await admin.post(f"{CONTENT}/{post['id']}/archive")).status_code == 200
+        # While the text is still coming, the post is rejected (locked).
+        await db.execute(
+            update(Post).where(Post.id == uuid.UUID(post["id"])).values(status=PostStatus.REJECTED)
+        )
+        await db.commit()
         ai.release.set()
         await runner.wait_idle()
     finally:
@@ -234,7 +238,7 @@ async def test_regenerated_text_that_arrives_after_the_post_was_archived_is_drop
     assert job.status == JobStatus.FAILED and "locked" in job.error
     assert (await admin.get(f"{CONTENT}/{post['id']}")).json()[
         "status"
-    ] == PostStatus.ARCHIVED.value
+    ] == PostStatus.REJECTED.value
 
 
 # --- the Celery worker's task wrapper ---------------------------------------------------

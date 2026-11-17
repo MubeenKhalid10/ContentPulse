@@ -17,7 +17,7 @@ import type {
 // Topic routes use the active organization (X-Organization-Id header).
 const root = (orgId: string) => ["org", orgId, "topics"] as const;
 
-export type TopicStatusFilter = "open" | "shortlisted" | "rejected" | "archived" | "all";
+export type TopicStatusFilter = "open" | "shortlisted" | "rejected" | "all";
 
 export interface TopicFilters {
   status: TopicStatusFilter;
@@ -70,7 +70,7 @@ function useTopicMutation<TVars, TResult>(request: (vars: TVars) => Promise<TRes
   });
 }
 
-export type TopicAction = "shortlist" | "reject" | "review" | "restore" | "archive";
+export type TopicAction = "shortlist" | "reject" | "review" | "restore";
 
 export const useTopicAction = () =>
   useTopicMutation(({ id, action }: { id: string; action: TopicAction }) =>
@@ -107,7 +107,7 @@ export const useUpdateStrategy = () =>
 
 export const useStrategyAction = () =>
   useTopicMutation(
-    ({ topicId, id, action }: { topicId: string; id: string; action: "approve" | "reopen" | "archive" }) =>
+    ({ topicId, id, action }: { topicId: string; id: string; action: "approve" | "reopen" }) =>
       api<Strategy>(`/topics/${topicId}/strategies/${id}/${action}`, { method: "POST" }),
   );
 

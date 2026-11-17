@@ -151,7 +151,7 @@ async def list_trends(
     ctx: CanRead,
     db: DB,
     status_filter: Annotated[
-        Literal["active", "unshortlisted", "shortlisted", "rejected", "archived", "all"],
+        Literal["active", "unshortlisted", "shortlisted", "rejected", "all"],
         Query(alias="status"),
     ] = "active",
     source: Annotated[str | None, Query(max_length=40)] = None,

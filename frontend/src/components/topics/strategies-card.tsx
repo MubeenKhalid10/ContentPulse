@@ -27,9 +27,7 @@ export function StrategiesCard({
   onEdit: (strategy: Strategy) => void;
 }) {
   const shortlisted = topic.status === "shortlisted";
-  const strategies = [...topic.strategies].sort(
-    (a, b) => Number(a.status === "archived") - Number(b.status === "archived"),
-  );
+  const strategies = topic.strategies;
   // Same query as the Posts card below (shared cache): the post each plan led to.
   const posts = useTopicPosts(topic.id);
   const can = useCan();
@@ -44,7 +42,6 @@ export function StrategiesCard({
     (s) =>
       !(posts.data?.items ?? []).some((p) => p.content_strategy_id === s.id),
   );
-  const toWrite = unwritten.filter((s) => s.status !== "archived");
   const hasPlans = strategies.length > 0;
   const canCreate = canManage && shortlisted;
   return (
@@ -56,16 +53,16 @@ export function StrategiesCard({
           description="Plans waiting to be turned into posts."
           badge={`${unwritten.length} ${unwritten.length === 1 ? "plan" : "plans"}`}
           actions={
-              !checking && !checkFailed && canCreate && toWrite.length > 0 ? (
+              !checking && !checkFailed && canCreate && unwritten.length > 0 ? (
                 <>
-                  {canGenerate && toWrite.length > 1 && (
+                  {canGenerate && unwritten.length > 1 && (
                     <Button
                       size="sm"
                       disabled={writeAll.isPending}
                       pending={writeAll.isPending}
                       onClick={() =>
                         writeAll.mutate(
-                          toWrite.map((s) => s.id),
+                          unwritten.map((s) => s.id),
                           {
                             onError: (e) => toast.error(errorMessage(e)),
                             onSuccess: (r) =>
@@ -81,12 +78,12 @@ export function StrategiesCard({
                       }
                     >
                       <SparklesIcon />
-                      {writeAll.isPending ? "Starting…" : `Write all ${toWrite.length} posts`}
+                      {writeAll.isPending ? "Starting…" : `Write all ${unwritten.length} posts`}
                     </Button>
                   )}
                   <Button
                     size="sm"
-                    variant={toWrite.length > 1 && canGenerate ? "outline" : "default"}
+                    variant={unwritten.length > 1 && canGenerate ? "outline" : "default"}
                     disabled={writeAll.isPending}
                     onClick={() => onPlan(null)}
                   >

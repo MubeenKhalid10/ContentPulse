@@ -23,7 +23,6 @@ STATUS_FILTERS: dict[str, list[TopicStatus] | None] = {
     "reviewed": [S.REVIEWED],
     "shortlisted": [S.SHORTLISTED],
     "rejected": [S.REJECTED],
-    "archived": [S.ARCHIVED],
     "all": None,
 }
 LEVEL_RANK = case(
@@ -39,12 +38,11 @@ LEVEL_RANK = case(
 
 
 def _strategy_counts():
-    live = ContentStrategy.status != StrategyStatus.ARCHIVED
     approved = ContentStrategy.status == StrategyStatus.APPROVED
     return (
         select(
             ContentStrategy.topic_id,
-            func.count().filter(live).label("total"),
+            func.count().label("total"),
             func.count().filter(approved).label("approved"),
         )
         .group_by(ContentStrategy.topic_id)
@@ -168,7 +166,6 @@ async def topic_detail(
     topic = await get_topic(db, organization_id, topic_id)
     trend = await db.get(Trend, topic.trend_id) if topic.trend_id else None
     strategies = await list_strategies(db, organization_id, topic.id)
-    live = [s for s in strategies if s.status != StrategyStatus.ARCHIVED]
     fields = {
         name: getattr(topic, name) for name in TopicDetail.model_fields if hasattr(topic, name)
     }
@@ -176,8 +173,8 @@ async def topic_detail(
         {
             **fields,
             "opportunity_score": trend.opportunity_score if trend else None,
-            "strategy_count": len(live),
-            "approved_strategy_count": sum(s.status == StrategyStatus.APPROVED for s in live),
+            "strategy_count": len(strategies),
+            "approved_strategy_count": sum(s.status == StrategyStatus.APPROVED for s in strategies),
             "trend": await trend_detail(db, organization_id, trend.id)
             if trend and include_trend
             else None,
@@ -194,8 +191,6 @@ async def update_topic(
     changes: dict,
 ) -> TopicDetail:
     topic = await get_topic(db, organization_id, topic_id)
-    if topic.status == TopicStatus.ARCHIVED:
-        raise InvalidStateTransition("Archived topics can't be edited.")
     old, new = audit.diff(topic, changes)
     for field, value in changes.items():
         setattr(topic, field, value)
@@ -214,20 +209,18 @@ async def update_topic(
     return await topic_detail(db, organization_id, topic.id)
 
 
-DELETABLE = (TopicStatus.SHORTLISTED, TopicStatus.REJECTED, TopicStatus.ARCHIVED)
+DELETABLE = (TopicStatus.SHORTLISTED, TopicStatus.REJECTED)
 
 
 async def delete_topic(
     db: AsyncSession, organization_id: uuid.UUID, user_id: uuid.UUID, topic_id: uuid.UUID
 ) -> None:
-    """Permanently remove a shortlisted, rejected or archived topic with its plans
+    """Permanently remove a shortlisted or rejected topic with its plans
     (written posts are kept). Its trend goes too when that was also decided on,
     otherwise the startup backfill would bring the topic back."""
     topic = await get_topic(db, organization_id, topic_id)
     if topic.status not in DELETABLE:
-        raise InvalidStateTransition(
-            "Only shortlisted, rejected or archived topics can be deleted."
-        )
+        raise InvalidStateTransition("Only shortlisted or rejected topics can be deleted.")
     trend = await db.get(Trend, topic.trend_id) if topic.trend_id else None
     audit.record(
         db,
@@ -239,11 +232,7 @@ async def delete_topic(
         old_value={"status": topic.status, "title": topic.title},
     )
     await db.delete(topic)
-    if trend is not None and trend.status in (
-        TrendStatus.SHORTLISTED,
-        TrendStatus.REJECTED,
-        TrendStatus.ARCHIVED,
-    ):
+    if trend is not None and trend.status in (TrendStatus.SHORTLISTED, TrendStatus.REJECTED):
         await db.delete(trend)
     await db.commit()
 

@@ -200,7 +200,6 @@ async def update_strategy(
 _ACTIONS = {
     StrategyStatus.APPROVED: AuditAction.STRATEGY_APPROVED,
     StrategyStatus.DRAFT: AuditAction.STRATEGY_REOPENED,
-    StrategyStatus.ARCHIVED: AuditAction.STRATEGY_ARCHIVED,
 }
 
 

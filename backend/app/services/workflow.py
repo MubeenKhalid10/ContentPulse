@@ -45,17 +45,16 @@ POST_MACHINE: StateMachine[PostStatus] = StateMachine(
     "post",
     {
         # The copy needs an admin's approval before any design work starts.
-        _P.DRAFT: {_P.CONTENT_REVIEW, _P.ARCHIVED},
+        _P.DRAFT: {_P.CONTENT_REVIEW},
         # Admin approves the copy → design; asks for changes → back to draft.
-        _P.CONTENT_REVIEW: {_P.DRAFT, _P.DESIGN_PENDING, _P.REJECTED, _P.ARCHIVED},
-        _P.DESIGN_PENDING: {_P.DESIGN_IN_PROGRESS, _P.DESIGN_UPLOADED, _P.DRAFT, _P.ARCHIVED},
+        _P.CONTENT_REVIEW: {_P.DRAFT, _P.DESIGN_PENDING, _P.REJECTED},
+        _P.DESIGN_PENDING: {_P.DESIGN_IN_PROGRESS, _P.DESIGN_UPLOADED, _P.DRAFT},
         # -> DRAFT: an admin reopens the approved copy.
-        _P.DESIGN_IN_PROGRESS: {_P.DESIGN_UPLOADED, _P.DESIGN_PENDING, _P.DRAFT, _P.ARCHIVED},
+        _P.DESIGN_IN_PROGRESS: {_P.DESIGN_UPLOADED, _P.DESIGN_PENDING, _P.DRAFT},
         _P.DESIGN_UPLOADED: {
             _P.PENDING_APPROVAL,
             _P.DESIGN_IN_PROGRESS,
             _P.DRAFT,
-            _P.ARCHIVED,
         },
         # -> DESIGN_UPLOADED: the designer withdraws it before an admin decided.
         _P.PENDING_APPROVAL: {_P.APPROVED, _P.CHANGES_REQUESTED, _P.REJECTED, _P.DESIGN_UPLOADED},
@@ -64,13 +63,11 @@ POST_MACHINE: StateMachine[PostStatus] = StateMachine(
             _P.DESIGN_IN_PROGRESS,
             _P.DESIGN_UPLOADED,
             _P.DRAFT,
-            _P.ARCHIVED,
         },
         # -> CHANGES_REQUESTED: an admin reopens an approved post.
-        _P.APPROVED: {_P.FINAL, _P.CHANGES_REQUESTED, _P.ARCHIVED},
-        _P.FINAL: {_P.CHANGES_REQUESTED, _P.ARCHIVED},
-        _P.REJECTED: {_P.DRAFT, _P.ARCHIVED},
-        _P.ARCHIVED: set(),
+        _P.APPROVED: {_P.FINAL, _P.CHANGES_REQUESTED},
+        _P.FINAL: {_P.CHANGES_REQUESTED},
+        _P.REJECTED: {_P.DRAFT},
     },
 )
 
@@ -78,11 +75,10 @@ _T = TopicStatus
 TOPIC_MACHINE: StateMachine[TopicStatus] = StateMachine(
     "topic",
     {
-        _T.NEW: {_T.REVIEWED, _T.SHORTLISTED, _T.REJECTED, _T.ARCHIVED},
-        _T.REVIEWED: {_T.SHORTLISTED, _T.REJECTED, _T.ARCHIVED},
-        _T.SHORTLISTED: {_T.REVIEWED, _T.REJECTED, _T.ARCHIVED},
-        _T.REJECTED: {_T.REVIEWED, _T.ARCHIVED},
-        _T.ARCHIVED: set(),
+        _T.NEW: {_T.REVIEWED, _T.SHORTLISTED, _T.REJECTED},
+        _T.REVIEWED: {_T.SHORTLISTED, _T.REJECTED},
+        _T.SHORTLISTED: {_T.REVIEWED, _T.REJECTED},
+        _T.REJECTED: {_T.REVIEWED},
     },
 )
 
@@ -90,10 +86,9 @@ _S = StrategyStatus
 STRATEGY_MACHINE: StateMachine[StrategyStatus] = StateMachine(
     "strategy",
     {
-        _S.DRAFT: {_S.APPROVED, _S.ARCHIVED},
+        _S.DRAFT: {_S.APPROVED},
         # Reopening an approved strategy returns it to draft for edits.
-        _S.APPROVED: {_S.DRAFT, _S.ARCHIVED},
-        _S.ARCHIVED: set(),
+        _S.APPROVED: {_S.DRAFT},
     },
 )
 
@@ -101,13 +96,12 @@ _R = TrendStatus
 TREND_MACHINE: StateMachine[TrendStatus] = StateMachine(
     "trend",
     {
-        _R.NEW: {_R.ANALYZED, _R.SHORTLISTED, _R.REJECTED, _R.ARCHIVED},
-        _R.ANALYZED: {_R.SHORTLISTED, _R.REJECTED, _R.ARCHIVED},
+        _R.NEW: {_R.ANALYZED, _R.SHORTLISTED, _R.REJECTED},
+        _R.ANALYZED: {_R.SHORTLISTED, _R.REJECTED},
         # Un-shortlisting (from the topic) returns the trend to its analyzed state.
-        _R.SHORTLISTED: {_R.ANALYZED, _R.NEW, _R.REJECTED, _R.ARCHIVED},
+        _R.SHORTLISTED: {_R.ANALYZED, _R.NEW, _R.REJECTED},
         # Restoring returns to NEW, or ANALYZED if it was already analyzed.
-        _R.REJECTED: {_R.NEW, _R.ANALYZED, _R.ARCHIVED},
-        _R.ARCHIVED: set(),
+        _R.REJECTED: {_R.NEW, _R.ANALYZED},
     },
 )
 

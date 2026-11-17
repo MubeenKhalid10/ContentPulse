@@ -341,7 +341,7 @@ export interface KnowledgeSearchResponse {
 
 // --- Trends -----------------------------------------------------------------------
 
-export type TrendStatus = "new" | "analyzed" | "shortlisted" | "rejected" | "archived";
+export type TrendStatus = "new" | "analyzed" | "shortlisted" | "rejected";
 export type SourceHealth = "unknown" | "healthy" | "degraded" | "rate_limited" | "down";
 export type SourcePricing = "free" | "free_tier" | "paid" | "unavailable";
 export type RunStatus = "queued" | "running" | "succeeded" | "failed";
@@ -557,8 +557,8 @@ export interface MarketOption {
 
 // --- Topics & strategies (Sprint 5) ------------------------------------------
 
-export type TopicStatus = "new" | "reviewed" | "shortlisted" | "rejected" | "archived";
-export type StrategyStatus = "draft" | "approved" | "archived";
+export type TopicStatus = "new" | "reviewed" | "shortlisted" | "rejected";
+export type StrategyStatus = "draft" | "approved";
 
 export interface TopicAngle {
   title: string;
@@ -676,8 +676,7 @@ export type PostStatus =
   | "changes_requested"
   | "approved"
   | "final"
-  | "rejected"
-  | "archived";
+  | "rejected";
 export type DesignFormat = "text_only" | "single_image" | "carousel" | "infographic" | "video" | "reel";
 
 export interface GenerationStatus {
@@ -758,7 +757,6 @@ export type PostGroup =
   | "approval_done"
   | "approved"
   | "rejected"
-  | "archived"
   | "all";
 
 export interface PostPage {

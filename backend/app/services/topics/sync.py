@@ -27,7 +27,6 @@ TOPIC_LEVELS = (RelevanceLevel.HIGHLY_RELEVANT, RelevanceLevel.RELEVANT)
 STATUS_ACTIONS = {
     TopicStatus.SHORTLISTED: AuditAction.TOPIC_SHORTLISTED,
     TopicStatus.REJECTED: AuditAction.TOPIC_REJECTED,
-    TopicStatus.ARCHIVED: AuditAction.TOPIC_ARCHIVED,
 }
 
 
@@ -97,7 +96,6 @@ async def refresh_platform_fit(db: AsyncSession, organization_id: uuid.UUID) -> 
         await db.scalars(
             select(TopicCandidate).where(
                 TopicCandidate.organization_id == organization_id,
-                TopicCandidate.status != TopicStatus.ARCHIVED,
                 TopicCandidate.trend_id.is_not(None),
             )
         )
@@ -134,7 +132,7 @@ async def sync_from_trend(
     topic = await topic_for_trend(db, trend)
     if topic is None:
         wanted = create or trend.relevance_level in TOPIC_LEVELS
-        if not wanted or trend.status in (TrendStatus.REJECTED, TrendStatus.ARCHIVED):
+        if not wanted or trend.status == TrendStatus.REJECTED:
             return None
         settings = await _settings(db, trend.organization_id)
         topic = TopicCandidate(
@@ -145,9 +143,8 @@ async def sync_from_trend(
             target_audience=settings.target_audience if settings else None,
         )
         db.add(topic)
-    if topic.status != TopicStatus.ARCHIVED:
-        for field, value in (await analysis_fields(db, trend)).items():
-            setattr(topic, field, value)
+    for field, value in (await analysis_fields(db, trend)).items():
+        setattr(topic, field, value)
     await db.flush()
     return topic
 

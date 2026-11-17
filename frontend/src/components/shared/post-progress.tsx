@@ -38,12 +38,10 @@ export function PostProgress({ status, className }: { status: PostStatus; classN
   const can = useCan();
   const position = POSITION[status];
   if (!position) {
-    if (status !== "rejected" && status !== "archived") return null;
+    if (status !== "rejected") return null;
     return (
       <p className={cn("mb-6 rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground", className)}>
-        {status === "rejected"
-          ? "This post was rejected and has left the workflow."
-          : "This post is archived and has left the workflow."}
+        This post was rejected and has left the workflow.
       </p>
     );
   }
