@@ -15,7 +15,7 @@ import type {
  *   blue    new, not started      sky     seen, under way
  *   amber   needs a decision      orange  sent back
  *   violet  waiting on someone    red     rejected / failed
- *   neutral inactive, archived
+ *   neutral inactive
  * Platforms use their own recognizable hues.
  */
 export type Tone =
@@ -84,7 +84,6 @@ export const TREND_STATUS_TONE: Record<string, Tone> = {
   analyzed: "sky",
   shortlisted: "green",
   rejected: "red",
-  archived: "neutral",
 };
 
 export const TOPIC_STATUS_TONE: Record<TopicStatus, Tone> = {
@@ -92,13 +91,11 @@ export const TOPIC_STATUS_TONE: Record<TopicStatus, Tone> = {
   reviewed: "sky",
   shortlisted: "green",
   rejected: "red",
-  archived: "neutral",
 };
 
 export const STRATEGY_STATUS_TONE: Record<StrategyStatus, Tone> = {
   draft: "amber",
   approved: "green",
-  archived: "neutral",
 };
 
 export const POST_STATUS_TONE: Record<PostStatus, Tone> = {
@@ -112,7 +109,6 @@ export const POST_STATUS_TONE: Record<PostStatus, Tone> = {
   approved: "green",
   final: "green",
   rejected: "red",
-  archived: "neutral",
 };
 
 export const TASK_STATUS_TONE: Record<DesignTaskStatus, Tone> = {

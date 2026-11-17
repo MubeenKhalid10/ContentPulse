@@ -13,13 +13,11 @@ export const TOPIC_STATUS_LABEL: Record<TopicStatus, string> = {
   reviewed: "Reviewed",
   shortlisted: "Shortlisted",
   rejected: "Rejected",
-  archived: "Archived",
 };
 
 export const STRATEGY_STATUS_LABEL: Record<StrategyStatus, string> = {
   draft: "Draft",
   approved: "Approved",
-  archived: "Archived",
 };
 
 export const STRATEGY_SOURCE_LABEL = {

@@ -216,9 +216,6 @@ async def test_writing_a_post_from_a_draft_plan_approves_the_plan(client, intern
     plans = (await admin.get(f"/api/v1/topics/{strategy['topic_id']}/strategies")).json()
     assert {p["id"]: p["status"] for p in plans}[strategy["id"]] == "approved"
 
-    await admin.post(f"{topic_url}/archive")
-    resp = await admin.post(f"{API}/generate", json={"strategy_id": strategy["id"]})
-    assert resp.status_code == 409  # archived plans can't be written from
     resp = await admin.post(f"{API}/generate", json={"strategy_id": str(uuid.uuid4())})
     assert resp.status_code == 404
 
@@ -407,8 +404,6 @@ async def test_review_and_hand_off_to_design(client, internet, content_ai):
 
     back = (await admin.post(f"{url}/back-to-draft")).json()
     assert back["status"] == "draft"
-    archived = (await admin.post(f"{url}/archive")).json()
-    assert archived["status"] == "archived"
 
     logs = (await admin.get(f"/api/v1/organizations/{org['id']}/audit-logs")).json()
     actions = [e["action"] for e in logs]

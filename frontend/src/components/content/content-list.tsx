@@ -49,7 +49,6 @@ const EMPTY: Record<PostGroup, string> = {
   approval_done: "No approved posts yet.",
   approved: "Nothing ready to post yet.",
   rejected: "No rejected posts. Posts rejected by an approver will remain here.",
-  archived: "No archived posts.",
   all: "No posts yet.",
 };
 

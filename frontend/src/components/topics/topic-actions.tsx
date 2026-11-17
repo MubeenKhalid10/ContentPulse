@@ -28,8 +28,7 @@ const MESSAGES: Record<TopicAction, (title: string) => string> = {
   shortlist: (t) => `Shortlisted “${t}”. Plan a post for it next.`,
   reject: (t) => `Rejected “${t}”`,
   review: (t) => `Removed “${t}” from the shortlist`,
-  restore: (t) => `Restored “${t}” to the trends to review`,
-  archive: (t) => `Archived “${t}”`,
+  restore: (t) => `Restored “${t}” to All trends`,
 };
 
 /** Reject asks first: it hides the trend from the review list. */
@@ -60,7 +59,7 @@ function RejectButton({
           <AlertDialogHeader>
             <AlertDialogTitle>{`Reject “${title}”?`}</AlertDialogTitle>
             <AlertDialogDescription>
-              It leaves your list. You can find it under All trends on Find trends and restore it later.
+              It leaves your list. You can find it under Rejected on Find trends and restore it later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -114,7 +113,6 @@ export function TopicActions({ topic, compact = false }: { topic: Topic; compact
     />
   );
 
-  if (topic.status === "archived") return deleteButton;
   if (topic.status === "rejected") {
     return (
       <div className="flex flex-wrap gap-1.5">

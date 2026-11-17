@@ -56,7 +56,6 @@ async def list_posts(
             "approval_done",
             "approved",
             "rejected",
-            "archived",
             "all",
         ],
         Query(alias="status"),

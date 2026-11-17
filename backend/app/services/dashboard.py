@@ -79,7 +79,7 @@ async def summary(db: AsyncSession, organization_id: uuid.UUID) -> DashboardSumm
                     Trend.relevance_level.in_(
                         [RelevanceLevel.HIGHLY_RELEVANT, RelevanceLevel.RELEVANT]
                     ),
-                    Trend.status.notin_([TrendStatus.REJECTED, TrendStatus.ARCHIVED]),
+                    Trend.status != TrendStatus.REJECTED,
                 ),
             ).where(Trend.organization_id == org, shown)
         )
@@ -292,7 +292,7 @@ async def overview(
         select(Post.platform, func.count())
         .where(
             Post.organization_id == org,
-            Post.status.notin_([PostStatus.ARCHIVED, PostStatus.REJECTED]),
+            Post.status != PostStatus.REJECTED,
         )
         .group_by(Post.platform)
     )
@@ -304,7 +304,7 @@ async def overview(
             Trend.organization_id == org,
             shown,
             Trend.last_seen_at >= start,
-            Trend.status.notin_([TrendStatus.REJECTED, TrendStatus.ARCHIVED]),
+            Trend.status != TrendStatus.REJECTED,
         )
         .order_by(Trend.opportunity_score.desc().nulls_last(), Trend.last_seen_at.desc())
         .limit(20)

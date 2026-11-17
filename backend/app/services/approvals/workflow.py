@@ -238,8 +238,8 @@ async def changes_scopes(db: AsyncSession, post_ids: set[uuid.UUID]) -> dict[uui
     return {post_id: shown_scope(scope) for post_id, scope in rows.all()}
 
 
-# A request is over when the post is rejected or archived; resubmitting opens a newer round.
-_ENDED = (PostStatus.REJECTED, PostStatus.ARCHIVED)
+# A request is over when the post is rejected; resubmitting opens a newer round.
+_ENDED = (PostStatus.REJECTED,)
 
 
 async def current_change_requests(

@@ -222,7 +222,7 @@ export const useRestoreVersion = () =>
       }),
   );
 
-export type PostAction = "back-to-draft" | "restore-rejected" | "submit-for-review" | "archive";
+export type PostAction = "back-to-draft" | "restore-rejected" | "submit-for-review";
 
 export const usePostAction = () =>
   useContentMutation(({ id, action }: { id: string; action: PostAction }) =>

@@ -147,8 +147,8 @@ export function PostEditor({ post, canEdit }: { post: PostDetail; canEdit: boole
                   ? "The copy is with an admin for approval, so it's read-only. Withdraw it from review to edit."
                   : post.status === "draft"
                     ? "The copy can't be edited right now."
-                    : ["rejected", "archived"].includes(post.status)
-                      ? `This post is ${post.status}, so the copy is read-only.`
+                    : post.status === "rejected"
+                      ? "This post is rejected, so the copy is read-only."
                       : "The copy is approved, so it's read-only."
                 : !canEdit
                   ? "You can read this copy but don't have permission to edit it."

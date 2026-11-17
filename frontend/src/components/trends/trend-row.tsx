@@ -47,7 +47,6 @@ export function TrendActions({
     />
   );
 
-  if (trend.status === "archived") return deleteButton;
   if (trend.status === "rejected") {
     return (
       <div className="flex gap-1.5">
@@ -56,7 +55,7 @@ export function TrendActions({
           size="sm"
           disabled={action.isPending}
           pending={action.isPending}
-          title="Move this trend back to To review"
+          title="Move this trend back to All trends"
           onClick={() =>
             action.mutate(
               { id: trend.id, action: "restore" },

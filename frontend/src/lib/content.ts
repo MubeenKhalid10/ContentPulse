@@ -15,7 +15,6 @@ export const POST_STATUS_LABEL: Record<PostStatus, string> = {
   approved: "Design approved, almost ready to publish",
   final: "Ready to publish",
   rejected: "Rejected",
-  archived: "Archived",
 };
 
 const CHANGES_LABEL = {

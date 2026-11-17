@@ -60,7 +60,7 @@ export function TrendsExplorer() {
   const canDiscover = can("trends.manage");
   const canReview = can("trends.manage") || can("topics.manage");
   const [saved, setFilters] = usePersistedState<TrendFilters>("trends-v2", {
-    status: "active",
+    status: "all",
     // Any relevance by default; the filter applies only when the user sets it.
     relevance: "",
     sort: "score",
@@ -68,7 +68,10 @@ export function TrendsExplorer() {
     location: "",
     q: "",
   });
-  const filters: TrendFilters = saved;
+  // "To review" was removed (it listed the same trends as All trends): a
+  // browser that remembered it opens All trends instead.
+  const filters: TrendFilters =
+    (saved.status as string) === "active" ? { ...saved, status: "all" } : saved;
   const [limit, setLimit] = useState(PAGE);
   const trends = useTrends(filters, limit);
   const runs = useDiscoveryRuns();
@@ -259,7 +262,6 @@ export function TrendsExplorer() {
                 >
                   <TabsList>
                     <TabsTrigger value="all">All trends</TabsTrigger>
-                    <TabsTrigger value="active">To review</TabsTrigger>
                     <TabsTrigger value="shortlisted">Shortlisted</TabsTrigger>
                     <TabsTrigger value="rejected">Rejected</TabsTrigger>
                   </TabsList>

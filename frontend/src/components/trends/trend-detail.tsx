@@ -32,7 +32,6 @@ const STATUS_LABEL: Record<string, string> = {
   analyzed: "Analyzed",
   shortlisted: "Shortlisted",
   rejected: "Rejected",
-  archived: "Archived",
 };
 
 export function TrendDetailView({ id }: { id: string }) {
@@ -109,7 +108,7 @@ export function TrendDetailView({ id }: { id: string }) {
             {t.status === "shortlisted"
               ? "Shortlisted: plan posts for it below."
               : t.status === "rejected"
-                ? "Rejected: hidden from To review. Restore it to review it again."
+                ? "Rejected: hidden from All trends. Restore it to review it again."
                 : "Shortlist a trend to plan posts for it, or reject it to hide it."}
           </p>
         </div>

@@ -97,7 +97,6 @@ STATUS_GROUPS: dict[str, list[PostStatus] | None] = {
     ],
     "approved": [P.APPROVED, P.FINAL],
     "rejected": [P.REJECTED],
-    "archived": [P.ARCHIVED],
     "all": None,
 }
 # Changes requested on the copy put the post back to DRAFT; on the design
@@ -381,11 +380,6 @@ async def generate(
     )
     if strategy is None:
         raise NotFound("Strategy")
-    if strategy.status == StrategyStatus.ARCHIVED:
-        raise InvalidStateTransition(
-            "This plan is archived. Create a new plan to write a post.",
-            details={"status": strategy.status.value},
-        )
     topic = await db.get(TopicCandidate, strategy.topic_id)
     if strategy.status == StrategyStatus.DRAFT:
         if topic is None or topic.status != TopicStatus.SHORTLISTED:
@@ -666,7 +660,6 @@ ACTIONS: dict[str, PostStatus] = {
     "back-to-draft": P.DRAFT,
     "restore-rejected": P.DRAFT,
     "submit-for-review": P.CONTENT_REVIEW,
-    "archive": P.ARCHIVED,
 }
 
 
@@ -712,9 +705,6 @@ async def transition(
     ):
         # Back to draft reopens approved copy: an admin's call.
         raise Forbidden("Only an admin can reopen approved copy.")
-    if target == P.ARCHIVED and post.status not in (*EDITABLE, P.CONTENT_REVIEW) and not can_review:
-        # Archiving is terminal: past review it discards approved work.
-        raise Forbidden("Only an admin can archive approved content.")
     if target == P.CONTENT_REVIEW:
         if not post.current_version:
             raise InvalidStateTransition("Generate or write the post before moving it on.")

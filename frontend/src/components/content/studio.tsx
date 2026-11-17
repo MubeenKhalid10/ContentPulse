@@ -396,7 +396,6 @@ const ACTION_COPY: Record<PostAction, string> = {
   "back-to-draft": "Moved back to draft",
   "restore-rejected": "Post restored to draft",
   "submit-for-review": "Sent to an admin for approval",
-  archive: "Post archived",
 };
 // The post's design task is where the creative is uploaded and submitted.
 const DESIGN_STEP = ["design_pending", "design_in_progress", "design_uploaded", "changes_requested"];

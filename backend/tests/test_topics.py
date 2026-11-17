@@ -168,17 +168,12 @@ async def test_review_decisions_stay_in_sync_with_trends(client, internet, fake_
     await admin.post(f"{trend_url}/shortlist")
     assert (await admin.get(f"{API}/{topic['id']}")).json()["status"] == "shortlisted"
 
-    archived = (await admin.post(f"{API}/{topic['id']}/archive")).json()
-    assert archived["status"] == "archived"
-    resp = await admin.post(f"{API}/{topic['id']}/shortlist")
-    assert resp.status_code == 409
-    assert resp.json()["error"]["code"] == "INVALID_STATE_TRANSITION"
-    assert resp.json()["error"]["details"]["allowed"] == []
-    assert (await admin.patch(f"{API}/{topic['id']}", json={"title": "x"})).status_code == 409
+    # Archiving was retired: Rejected replaces it.
+    assert (await admin.post(f"{API}/{topic['id']}/archive")).status_code in (404, 405)
 
     logs = (await admin.get(f"/api/v1/organizations/{org['id']}/audit-logs")).json()
     actions = {entry["action"] for entry in logs}
-    assert {"TOPIC_SHORTLISTED", "TOPIC_REJECTED", "TOPIC_RESTORED", "TOPIC_ARCHIVED"} <= actions
+    assert {"TOPIC_SHORTLISTED", "TOPIC_REJECTED", "TOPIC_RESTORED"} <= actions
 
 
 async def test_shortlisting_any_trend_creates_a_topic(client, internet, fake_ai):
@@ -393,12 +388,7 @@ async def test_strategy_lifecycle(client, internet, strategy_ai, db):
     listed = (await admin.get(API, params={"status": "shortlisted"})).json()["items"][0]
     assert listed["strategy_count"] == 2 and listed["approved_strategy_count"] == 1
 
-    archived = (await admin.post(f"{base}/{manual.json()['id']}/archive")).json()
-    assert archived["status"] == "archived"
-    resp = await admin.post(f"{base}/{manual.json()['id']}/approve")
-    assert resp.status_code == 409
-    assert len((await admin.get(base)).json()) == 2
-    assert (await admin.get(f"{API}/{topic['id']}")).json()["strategy_count"] == 1
+    assert (await admin.post(f"{base}/{manual.json()['id']}/archive")).status_code in (404, 405)
 
     logs = (await admin.get(f"/api/v1/organizations/{org['id']}/audit-logs")).json()
     actions = {e["action"] for e in logs}
