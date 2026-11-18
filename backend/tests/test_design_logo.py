@@ -190,7 +190,9 @@ async def test_brand_logo_is_placed_where_the_admin_chose(
     assert (left, top) == (32, 32)  # 4% margin of 800
     assert logo_link == ["https://acme.example.com/logo.png"]  # the real logo, as is
     prompt, _ = sized_images.prompts[0]
-    assert "Don't draw any logo" in prompt and "Keep the top-left corner plain" in prompt
+    assert "Don't draw any logo" in prompt
+    assert "Leave the top 20% of the image" in prompt
+    assert "top-left corner of that strip" in prompt
 
 
 async def test_creator_moves_the_logo_for_one_post_or_turns_it_off(
@@ -210,13 +212,14 @@ async def test_creator_moves_the_logo_for_one_post_or_turns_it_off(
     assert task["creatives"][0]["note"].endswith("your logo in the bottom centre")
     _, _, _, bottom = red_box((await client.get(task["creatives"][0]["files"][0]["url"])).content)
     assert bottom == 800 - 32
-    assert "Keep the bottom centre plain" in sized_images.prompts[-1][0]
+    assert "Leave the bottom 20% of the image" in sized_images.prompts[-1][0]
+    assert "bottom centre of that strip" in sized_images.prompts[-1][0]
 
     off = await creator.patch(url, json={"logo_position": "none"})
     assert off.json()["brand_requirements"]["logo_position"] == "none"
     task = await _generate(admin, task["id"])
     assert task["creatives"][0]["note"] == "Generated with AI"
-    assert "Keep the" not in sized_images.prompts[-1][0]
+    assert "of that strip" not in sized_images.prompts[-1][0]
 
     back = await creator.patch(url, json={"logo_position": None})
     assert "logo_position" not in back.json()["brand_requirements"]
