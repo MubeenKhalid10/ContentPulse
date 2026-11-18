@@ -110,29 +110,14 @@ export function TopicDetailView({ id }: { id: string }) {
 
       <div>
         <div className="grid content-start gap-6">
-          <StrategiesCard
+          <StrategiesCard topic={t} canManage={canManage} onPlan={plan} />
+          <TopicPosts
             topic={t}
             canManage={canManage}
-            onPlan={plan}
             onEdit={(s) => setDialog({ platform: s.platform, editing: s })}
           />
-          {can("content.read") && <TopicPosts topicId={t.id} />}
           {trend ? (
-            <AlignmentPanel
-              trend={trend}
-              canReview={canManage}
-              onPlanAngle={
-                canManage && shortlisted
-                  ? (angle) =>
-                      setDialog({
-                        platform:
-                          (angle.platforms[0] as Platform | undefined) ?? null,
-                        editing: null,
-                        angle,
-                      })
-                  : undefined
-              }
-            />
+            <AlignmentPanel trend={trend} canReview={canManage} mode="fit" />
           ) : (
             t.relevance_reason && (
               <Card>

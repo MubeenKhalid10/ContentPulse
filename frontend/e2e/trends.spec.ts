@@ -119,7 +119,6 @@ test("discover live trends, shortlist one and plan content for it", async ({ pag
   await expect(topics.getByRole("link", { name: topic, exact: true })).toHaveCount(1);
   await topics.getByRole("link", { name: topic, exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: topic })).toBeVisible();
-  await expect(page.getByText("Post ideas", { exact: true })).toBeVisible();
 
   // Plan a post and write it in one step: draft the plan from the playbook (no
   // AI model in E2E), then "Write post" opens the studio.

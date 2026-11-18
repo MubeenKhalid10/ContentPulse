@@ -96,14 +96,15 @@ test("a plan isn't offered as unwritten until its posts have loaded", async ({ p
   });
 
   await page.goto(`/trends/${TREND}`);
-  await expect(page.getByText("Loading post plans…")).toBeVisible();
+  await expect(page.getByText("Loading drafts…")).toBeVisible();
   await expect(page.getByText("Loading generated posts…")).toBeVisible();
   await expect(page.getByText("A plan that already has its post")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Create plan" })).toHaveCount(0);
+  // Post plans only starts new plans, so it doesn't wait for the posts.
+  await expect(page.getByRole("button", { name: "Create plan" })).toBeVisible();
 
   release();
   await expect(page.getByRole("link", { name: "The written post" })).toBeVisible();
-  await expect(page.getByText("Every plan has a post.")).toBeVisible();
+  await expect(page.getByText("No generated posts yet.", { exact: false })).toBeVisible();
   await expect(page.getByText("A plan that already has its post")).toHaveCount(0);
   await expect(page.getByText(/^Loading .*…$/)).toHaveCount(0);
 });
@@ -120,7 +121,7 @@ test("if the posts can't load the page says so and offers a retry", async ({ pag
   );
 
   await page.goto(`/trends/${TREND}`);
-  await expect(page.getByText(/Couldn't check which plans/)).toBeVisible();
+  await expect(page.getByText(/Couldn't load the drafts/)).toBeVisible();
   await expect(page.getByText("A plan that already has its post")).toHaveCount(0);
 
   fail = false;

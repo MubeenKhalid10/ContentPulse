@@ -87,9 +87,13 @@ export function StrategyCard({
     >
       <header className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{label}</h3>
-        {post && (
+        {post ? (
           <Tag tone={POST_STATUS_TONE[post.status]} dot>
             {POST_STATUS_LABEL[post.status]}
+          </Tag>
+        ) : (
+          <Tag tone="neutral" dot title="A plan whose post hasn't been written yet">
+            Plan · not written
           </Tag>
         )}
         <span className="text-xs text-muted-foreground">{STRATEGY_SOURCE_LABEL[s.source]}</span>

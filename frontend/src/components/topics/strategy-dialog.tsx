@@ -11,6 +11,7 @@ export function StrategyDialog({
   platform,
   editing,
   angle = null,
+  ideas,
   onClose,
 }: {
   topic: TopicDetail;
@@ -19,6 +20,8 @@ export function StrategyDialog({
   editing: Strategy | null;
   /** A content angle from the analysis to start the plan from. */
   angle?: ContentAngle | null;
+  /** Post ideas from the trend analysis, offered in the Post idea field. */
+  ideas?: ContentAngle[];
   onClose: () => void;
 }) {
   return (
@@ -31,6 +34,7 @@ export function StrategyDialog({
             initialPlatform={editing?.platform ?? platform ?? topic.recommended_platforms[0] ?? "linkedin"}
             editing={editing}
             angle={angle}
+            ideas={ideas}
             onClose={onClose}
           />
         )}

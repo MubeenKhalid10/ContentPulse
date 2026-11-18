@@ -9,7 +9,7 @@ import {
   RefreshCwIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { APPROVAL_STATUS_TONE } from "@/lib/tones";
@@ -93,6 +93,23 @@ export function ApprovalList() {
   const [limit, setLimit] = useState(PAGE);
   const approvals = useApprovals(stage, shownStatus, platform, limit);
   const counts = approvals.data?.counts;
+  // Open on the stage that has posts waiting: with nothing pending for this stage and
+  // something pending for the other one, show the other one. A stage picked by hand stays.
+  const [picked, setPicked] = useState(false);
+  const pending = approvals.data?.stage_pending;
+  const other: ApprovalStage = stage === "copy" ? "design" : "copy";
+  const switchTo =
+    section === "pending" &&
+    !picked &&
+    !approvals.isPlaceholderData &&
+    pending &&
+    (pending[stage] ?? 0) === 0 &&
+    (pending[other] ?? 0) > 0
+      ? other
+      : null;
+  useEffect(() => {
+    if (switchTo) setFilters((f) => ({ ...f, stage: switchTo }));
+  }, [switchTo, setFilters]);
   // A post sent back for changes later is no longer ready: only posts still Ready to publish.
   const items = ready
     ? approvals.data?.items.filter((a) => a.post.status === "final")
@@ -169,7 +186,10 @@ export function ApprovalList() {
               <SimpleSelect
                 aria-label="Stage"
                 value={stage}
-                onChange={(v) => patch({ stage: v })}
+                onChange={(v) => {
+                  setPicked(true);
+                  patch({ stage: v });
+                }}
                 options={STAGES.map((x) => ({
                   value: x.value,
                   label:
