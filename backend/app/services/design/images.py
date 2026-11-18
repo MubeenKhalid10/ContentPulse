@@ -110,16 +110,32 @@ def image_prompt(
         lines.append(f"Notes: {brief.designer_notes}")
     if brand and brand.forbidden_terms:
         lines.append("Never show these words: " + ", ".join(brand.forbidden_terms) + ".")
-    lines.append(
-        "Don't draw any logo, watermark or brand name."
-        + (
-            f" Keep the {POSITION_LABEL[logo_spot]} plain and uncluttered, with nothing "
-            "important there: the real logo is placed there afterwards."
-            if logo_spot
-            else ""
-        )
-    )
+    lines.append("Don't draw any logo, watermark or brand name." + _logo_strip(logo_spot))
     return "\n".join(lines)
+
+
+# The strip kept clear for the logo, as a share of the image height: the logo's
+# box (logo.MAX_HEIGHT_SHARE) plus its margin, with room to spare.
+LOGO_STRIP_SHARE = 0.20
+
+
+def _logo_strip(logo_spot: str | None) -> str:
+    """A whole-width strip along the logo's edge stays empty, so the headline and
+    other content never run under the logo pasted there afterwards."""
+    if not logo_spot:
+        return ""
+    edge = "top" if logo_spot.startswith("top") else "bottom"
+    share = f"{round(LOGO_STRIP_SHARE * 100)}%"
+    where = (
+        "The headline and all other content start below this strip."
+        if edge == "top"
+        else "The headline and all other content end above this strip."
+    )
+    return (
+        f" Leave the {edge} {share} of the image, across its full width, as plain empty "
+        f"background with no text, shapes or objects. {where} The real logo is placed "
+        f"in the {POSITION_LABEL[logo_spot]} of that strip afterwards."
+    )
 
 
 async def start(

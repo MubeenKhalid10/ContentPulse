@@ -7,7 +7,9 @@ from PIL import Image
 
 from app.core.config import Settings
 from app.services.design import logo as logo_module
+from app.services.design.images import _logo_strip
 from app.services.design.logo import (
+    POSITION_LABEL,
     POSITIONS,
     LogoError,
     effective_position,
@@ -91,6 +93,25 @@ def test_effective_position():
     assert effective_position({}, None) == "bottom_right"
     assert effective_position({"logo_position": "none"}, "top_left") is None
     assert effective_position({}, "none") is None
+
+
+@pytest.mark.parametrize(
+    ("position", "edge", "order"),
+    [
+        ("top_left", "top", "start below"),
+        ("top_center", "top", "start below"),
+        ("top_right", "top", "start below"),
+        ("bottom_left", "bottom", "end above"),
+        ("bottom_center", "bottom", "end above"),
+        ("bottom_right", "bottom", "end above"),
+    ],
+)
+def test_the_logo_edge_keeps_a_full_width_strip_clear(position, edge, order):
+    text = _logo_strip(position)
+    assert f"Leave the {edge} 20% of the image, across its full width" in text
+    assert f"all other content {order} this strip" in text
+    assert POSITION_LABEL[position] in text
+    assert _logo_strip(None) == ""
 
 
 # --- End to end: brand default, post override, failures --------------------------------
