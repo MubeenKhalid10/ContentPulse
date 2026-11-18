@@ -1,49 +1,24 @@
 "use client";
 
-import { ClipboardListIcon, PlusIcon, RefreshCwIcon, SparklesIcon } from "lucide-react";
-import { toast } from "sonner";
+import { ClipboardListIcon, PlusIcon } from "lucide-react";
 
-import { ListLoading } from "@/components/shared/loading";
-import { StrategyCard } from "@/components/topics/strategy-card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { useTopicPosts, useWriteAll } from "@/hooks/use-content";
-import { errorMessage } from "@/lib/api";
-import { useCan } from "@/lib/auth";
-import type { Platform, Strategy, TopicDetail } from "@/types/api";
+import type { Platform, TopicDetail } from "@/types/api";
 
 import { SectionHeader } from "./platform-fit-card";
 
+/** Starts a new plan. Saved plans are listed under Draft posts until a post is written. */
 export function StrategiesCard({
   topic,
   canManage,
   onPlan,
-  onEdit,
 }: {
   topic: TopicDetail;
   canManage: boolean;
   onPlan: (platform: Platform | null) => void;
-  onEdit: (strategy: Strategy) => void;
 }) {
   const shortlisted = topic.status === "shortlisted";
-  const strategies = topic.strategies;
-  // Same query as the Posts card below (shared cache): the post each plan led to.
-  const posts = useTopicPosts(topic.id);
-  const can = useCan();
-  const canGenerate = can("content.generate");
-  // Which plans still need a post is unknown until the posts load, so none are offered yet.
-  const checking = posts.isPending || posts.isPlaceholderData;
-  // People who can't read posts get a 403 here and still see the plans.
-  const checkFailed = posts.isError && can("content.read");
-  const writeAll = useWriteAll();
-  // A plan that already has a post is shown in the Posts card instead.
-  const unwritten = strategies.filter(
-    (s) =>
-      !(posts.data?.items ?? []).some((p) => p.content_strategy_id === s.id),
-  );
-  const hasPlans = strategies.length > 0;
-  const canCreate = canManage && shortlisted;
   return (
     <Card>
       <CardHeader>
@@ -51,114 +26,28 @@ export function StrategiesCard({
           icon={ClipboardListIcon}
           title="Post plans"
           description="Plans waiting to be turned into posts."
-          badge={`${unwritten.length} ${unwritten.length === 1 ? "plan" : "plans"}`}
-          actions={
-              !checking && !checkFailed && canCreate && unwritten.length > 0 ? (
-                <>
-                  {canGenerate && unwritten.length > 1 && (
-                    <Button
-                      size="sm"
-                      disabled={writeAll.isPending}
-                      pending={writeAll.isPending}
-                      onClick={() =>
-                        writeAll.mutate(
-                          unwritten.map((s) => s.id),
-                          {
-                            onError: (e) => toast.error(errorMessage(e)),
-                            onSuccess: (r) =>
-                              r.failed
-                                ? toast.error(
-                                    `Started ${r.ok}, but ${r.failed} failed: ${errorMessage(r.error)}`,
-                                  )
-                                : toast.success(
-                                    `Writing ${r.ok} posts, one per platform. They stay together in Write posts.`,
-                                  ),
-                          },
-                        )
-                      }
-                    >
-                      <SparklesIcon />
-                      {writeAll.isPending ? "Starting…" : `Write all ${unwritten.length} posts`}
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant={unwritten.length > 1 && canGenerate ? "outline" : "default"}
-                    disabled={writeAll.isPending}
-                    onClick={() => onPlan(null)}
-                  >
-                    <PlusIcon />
-                    Create plan
-                  </Button>
-                </>
-              ) : null
-          }
+          badge="0 plans"
         />
       </CardHeader>
       <CardContent className="grid gap-3">
-        {hasPlans && checking ? (
-          <ListLoading label="Loading post plans…" rows={1} rowClassName="h-32" />
-        ) : hasPlans && checkFailed ? (
-          <Alert variant="destructive">
-              <AlertDescription className="grid gap-2">
-                <span>Couldn&apos;t check which plans already have a post. {errorMessage(posts.error)}</span>
-                <Button size="sm" variant="outline" className="w-fit" onClick={() => posts.refetch()}>
-                  <RefreshCwIcon />
-                  Retry
-                </Button>
-              </AlertDescription>
-          </Alert>
-        ) : unwritten.length ? (
-          <PlanList plans={unwritten} canManage={canManage && shortlisted} onEdit={onEdit} />
-        ) : hasPlans ? (
+        {shortlisted ? (
           <div className="grid justify-items-center gap-3 rounded-lg border border-dashed p-5 text-center">
-              <p className="text-sm text-muted-foreground">
-                Every plan has a post. Review them under Generated posts below.
-              </p>
-              {canCreate && (
-                <Button size="sm" onClick={() => onPlan(null)}>
-                  <PlusIcon />
-                  Create plan
-                </Button>
-              )}
-          </div>
-        ) : shortlisted ? (
-          <div className="grid justify-items-center gap-3 rounded-lg border border-dashed p-5 text-center">
-              <p className="text-sm text-muted-foreground">
-                Choose where to publish, who you&apos;re targeting, and what the post should achieve.
-              </p>
-              {canCreate && (
-                <Button size="sm" onClick={() => onPlan(null)}>
-                  <PlusIcon />
-                  Create plan
-                </Button>
-              )}
+            <p className="text-sm text-muted-foreground">
+              Every plan has a post. Review them under Generated posts below.
+            </p>
+            {canManage && (
+              <Button size="sm" onClick={() => onPlan(null)}>
+                <PlusIcon />
+                Create plan
+              </Button>
+            )}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-              Plans can be made once the trend is shortlisted.
+            Plans can be made once the trend is shortlisted.
           </p>
         )}
       </CardContent>
     </Card>
   );
-}
-
-function PlanList({
-  plans,
-  canManage,
-  onEdit,
-}: {
-  plans: Strategy[];
-  canManage: boolean;
-  onEdit: (strategy: Strategy) => void;
-}) {
-  return plans.map((strategy) => (
-    <StrategyCard
-      key={strategy.id}
-      strategy={strategy}
-      canManage={canManage}
-      onEdit={() => onEdit(strategy)}
-    />
-  ));
 }

@@ -40,20 +40,31 @@ import {
   toBody,
 } from "./strategy-form-model";
 
+/** The "write your own" choice in the Post idea dropdown. */
+const OWN_IDEA = "own";
+
 export function StrategyForm({
   topic,
   initialPlatform,
   editing,
   angle,
+  ideas,
   onClose,
 }: {
   topic: TopicDetail;
   initialPlatform: Platform;
   editing: Strategy | null;
   angle: ContentAngle | null;
+  ideas?: ContentAngle[];
   onClose: () => void;
 }) {
   const rules = usePlatformRules();
+  // Post ideas from the trend analysis; the person can pick one or write their own.
+  const ideaList = (ideas ?? topic.trend?.alignment.possible_angles ?? topic.suggested_angles ?? []).filter(
+    (idea) => idea.title,
+  );
+  const ideaText = (idea: ContentAngle) => `${idea.title}: ${stripCitations(idea.angle)}`;
+  const [idea, setIdea] = useState<string | undefined>(undefined);
   const settings = useOrgSettings();
   const ai = useAIStatus();
   const suggest = useSuggestStrategy();
@@ -459,8 +470,30 @@ export function StrategyForm({
         </FormField>
       </div>}
 
-      <FormField id="strategy-angle" label="Post idea (required)" hint="The main point or story this post tells." error={errors.content_angle?.message}>
-        <Textarea {...fieldAria("strategy-angle", errors.content_angle?.message)} rows={3} {...form.register("content_angle")} />
+      <FormField id="strategy-angle" label="Post idea (required)" hint={ideaList.length ? "Pick an idea from the trend analysis or write your own. You can edit it either way." : "The main point or story this post tells."} error={errors.content_angle?.message}>
+        <div className="grid gap-2">
+          {ideaList.length > 0 && (
+            <SimpleSelect
+              aria-label="Ideas from this trend"
+              value={idea}
+              onChange={(v) => {
+                setIdea(v);
+                const chosen = v === OWN_IDEA ? null : ideaList[Number(v)];
+                form.setValue("content_angle", chosen ? ideaText(chosen) : "", {
+                  shouldDirty: true,
+                  shouldValidate: !!chosen,
+                });
+                if (!chosen) form.setFocus("content_angle");
+              }}
+              options={[
+                ...ideaList.map((x, i) => ({ value: String(i), label: x.title })),
+                { value: OWN_IDEA, label: "Write my own idea" },
+              ]}
+              placeholder="Choose a post idea"
+            />
+          )}
+          <Textarea {...fieldAria("strategy-angle", errors.content_angle?.message)} rows={3} placeholder={ideaList.length ? "Or write your own idea here" : undefined} {...form.register("content_angle")} />
+        </div>
       </FormField>
       <FormField id="strategy-audience" label="Target audience" error={errors.target_audience?.message}>
         <Input {...fieldAria("strategy-audience", errors.target_audience?.message)} {...form.register("target_audience")} />

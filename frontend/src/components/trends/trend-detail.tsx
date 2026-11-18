@@ -122,7 +122,7 @@ export function TrendDetailView({ id }: { id: string }) {
           {/* Once shortlisted the page is for planning: the summary is only for deciding. */}
           {t.status !== "shortlisted" && <SummaryCard trend={t} marketNames={marketNames} />}
           {t.status === "shortlisted" && t.topic_id && can("topics.read") ? (
-            <ShortlistPlans trend={t} canReview={canReview} />
+            <ShortlistPlans trend={t} />
           ) : (
             <AlignmentPanel trend={t} canReview={canReview} mode="fit" />
           )}
@@ -139,6 +139,19 @@ export function TrendDetailView({ id }: { id: string }) {
   );
 }
 
+/** Enough to tell what the trend is about; the full text is in its sources. */
+const SUMMARY_WORDS = 60;
+
+/** The first SUMMARY_WORDS words, ending on a full sentence when one ends late enough. */
+function shortSummary(text: string) {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= SUMMARY_WORDS) return text;
+  const cut = words.slice(0, SUMMARY_WORDS).join(" ");
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  // A sentence end in the second half keeps it readable; earlier would drop too much.
+  return end > cut.length / 2 ? cut.slice(0, end + 1) : `${cut.replace(/[\s,;:.-]+$/, "")}…`;
+}
+
 /** What the trend is, in a few lines. */
 function SummaryCard({
   trend,
@@ -147,7 +160,7 @@ function SummaryCard({
   trend: TrendDetail;
   marketNames: Map<string, string>;
 }) {
-  const text = trend.description ?? trend.title ?? trend.topic;
+  const text = shortSummary(trend.description ?? trend.title ?? trend.topic);
   return (
     <Card>
       <CardHeader>
@@ -172,14 +185,12 @@ function SummaryCard({
   );
 }
 
-/** A shortlisted trend is planned right here: post plans and posts first, then
- * the fit analysis, whose post ideas start a plan. Same data as the topic page. */
+/** A shortlisted trend is planned right here: post plans and posts. The analysis's
+ * post ideas are offered in the plan form. Same data as the topic page. */
 function ShortlistPlans({
   trend,
-  canReview,
 }: {
   trend: TrendDetail;
-  canReview: boolean;
 }) {
   const topic = useTopic(trend.topic_id as string, false);
   // Fetched together with the topic rather than after it, so the plans don't wait twice.
@@ -200,13 +211,12 @@ function ShortlistPlans({
     <>
       {t ? (
         <>
-          <StrategiesCard
+          <StrategiesCard topic={t} canManage={canManage} onPlan={(platform) => setDialog({ platform, editing: null })} />
+          <TopicPosts
             topic={t}
             canManage={canManage}
-            onPlan={(platform) => setDialog({ platform, editing: null })}
             onEdit={(s) => setDialog({ platform: s.platform, editing: s })}
           />
-          {can("content.read") && <TopicPosts topicId={t.id} />}
         </>
       ) : (
         topic.isError ? (
@@ -222,25 +232,10 @@ function ShortlistPlans({
           <ListLoading label="Loading post plans…" rows={1} rowClassName="h-40" />
         )
       )}
-      <AlignmentPanel
-        trend={trend}
-        canReview={canReview}
-        mode="ideas"
-        onPlanAngle={
-          t && canManage
-            ? (angle) =>
-                setDialog({
-                  platform:
-                    (angle.platforms[0] as Platform | undefined) ?? null,
-                  editing: null,
-                  angle,
-                })
-            : undefined
-        }
-      />
       {t && (
         <StrategyDialog
           topic={t}
+          ideas={trend.alignment.possible_angles}
           open={!!dialog || (autoPlan && canManage)}
           platform={dialog?.platform ?? null}
           editing={dialog?.editing ?? null}
