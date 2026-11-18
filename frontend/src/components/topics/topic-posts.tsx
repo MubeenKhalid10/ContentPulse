@@ -188,7 +188,7 @@ export function TopicPosts({
               <>
                 <ul className="grid gap-2" aria-label="Generated posts">
                   {generated.map((p) => (
-                    <GeneratedPost key={p.id} post={p} href={fromHere(`/posts/${p.id}`)} />
+                    <GeneratedPost key={p.id} post={p} href={fromHere(`/posts/${p.id}`)} deletable={false} />
                   ))}
                 </ul>
                 <p className="text-xs text-muted-foreground">
@@ -213,11 +213,14 @@ function GeneratedPost({
   post,
   href,
   deletePlan,
+  deletable = true,
 }: {
   post: Post;
   href: string;
   /** Draft posts: delete the plan with the post, so it doesn't come back as an unwritten plan. */
   deletePlan?: { topicId: string; id: string };
+  /** Generated posts have no Delete here; they can still be deleted from their own pages. */
+  deletable?: boolean;
 }) {
   const isAdmin = useCan()("organization.write");
   const remove = useDeletePost();
@@ -268,7 +271,7 @@ function GeneratedPost({
             Updated {timeAgo(post.updated_at)}
           </time>
         </span>
-        {isAdmin && (
+        {isAdmin && deletable && (
           <span className="relative z-10 ml-auto">
             <DeleteButton
               title={`Delete “${post.title ?? "this post"}”?`}
